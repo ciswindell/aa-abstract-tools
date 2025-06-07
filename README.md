@@ -9,7 +9,7 @@ A class-based Python application that automates the process of sorting Excel dat
 - **Bookmark Synchronization**: Update PDF bookmarks to match the new Excel order
 - **User-Friendly GUI**: Intuitive tkinter interface for file selection
 - **Column Mapping**: Handle Excel files with different column names through mapping interface
-- **Safe Output**: Creates new files with "_renumbered" suffix, preserving originals
+- **Safe Backup System**: Creates timestamped backup files before processing, preserving originals with automatic rollback on failure
 
 ## Requirements
 
@@ -57,10 +57,11 @@ A class-based Python application that automates the process of sorting Excel dat
 4. The tool will:
    - Validate that your Excel file has the required columns
    - Show a column mapping dialog if columns need to be mapped
+   - Create timestamped backup files of your original documents
    - Sort the data according to the specified criteria
    - Renumber the Index# column starting from 1
    - Update PDF bookmarks to match the new order
-   - Save new files with "_renumbered" suffix
+   - Save processed files with original filenames (originals are safely backed up)
 
 ## Required Excel Columns
 
@@ -85,9 +86,22 @@ Data is sorted in the following order:
 
 ## Output Files
 
-The tool creates new files with "_renumbered" added to the filename:
-- `Original_File.xlsx` → `Original_File_renumbered.xlsx`
-- `Original_File.pdf` → `Original_File_renumbered.pdf`
+The tool uses a safe backup approach for file processing:
+- **Original files** are backed up with datetime stamps before processing
+- **Processed files** keep the original filenames
+- **Backup files** are created with format: `filename_backup_YYYY-MM-DD_HH-MM-SS.ext`
+
+Example:
+- `Document.xlsx` → `Document_backup_2024-01-15_14-30-45.xlsx` (backup)
+- `Document.xlsx` → `Document.xlsx` (processed file with original name)
+- `Document.pdf` → `Document_backup_2024-01-15_14-30-45.pdf` (backup) 
+- `Document.pdf` → `Document.pdf` (processed file with original name)
+
+This approach ensures:
+- ✅ **No data loss** - Original files are safely backed up before processing
+- ✅ **User-friendly output** - Processed files maintain original names
+- ✅ **Easy reversion** - Original files can be restored from timestamped backups
+- ✅ **Automatic rollback** - If processing fails, originals are restored automatically
 
 ## Bookmark Format
 

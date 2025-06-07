@@ -94,4 +94,54 @@
   - [x] 9.5 Remove unused methods and instance variables
   - [x] 9.6 Add comprehensive docstring validation and cleanup for all public methods
   - [x] 9.7 Validate all imports are actually used and remove unused ones
-  - [x] 9.8 Add type hints validation for all function parameters and return values 
+  - [x] 9.8 Add type hints validation for all function parameters and return values
+
+- [ ] 10.0 Enhanced File Naming with Backup System
+  - [x] 10.1 Design backup file naming strategy with datetime stamps (format: filename_backup_YYYY-MM-DD_HH-MM-SS.ext)
+  - [x] 10.2 Implement file backup functionality to rename original files before processing
+  - [x] 10.3 Update output filename generation to use original filenames instead of "_renumbered" suffix
+  - [x] 10.4 Add safe file operations with rollback capability in case of processing failure
+  - [x] 10.5 Update user interface feedback to inform users about backup file creation
+  - [x] 10.6 Add validation to ensure backup operations don't overwrite existing backup files
+  - [x] 10.7 Add GUI checkbox for "Backup Files" (checked by default) to control backup creation and remove popup dialogs for better UX
+  - [x] 10.8 Update file access validation to check backup file creation permissions
+  - [x] 10.9 Implement error handling for backup file creation failures with user guidance 
+
+- [ ] 11.0 MAJOR SIMPLIFICATION: Reduce Codebase Complexity
+  - [ ] 11.1 Remove excessive file access validation - keep only basic file existence checks
+  - [ ] 11.2 Drastically reduce status logging - keep only essential user feedback (start, complete, errors)
+  - [ ] 11.3 Remove complex file permission checking and atomic operations
+  - [ ] 11.4 Remove backup system rollback complexity - simple copy with error handling
+  - [ ] 11.5 Keep modular architecture but simplify each class by removing over-validation
+  - [ ] 11.6 Keep GUI and dynamic column mapping (these work well)
+  - [ ] 11.7 Remove comprehensive error recovery systems - basic try/catch sufficient
+  - [ ] 11.8 Remove detailed progress updates during processing steps
+  - [ ] 11.9 Remove extensive docstrings and type hints where obvious
+  - [ ] 11.10 Consolidate similar validation methods into single functions
+  - [ ] 11.11 Remove defensive programming patterns that add complexity without value
+  - [ ] 11.12 Test simplified version maintains core functionality and user experience
+
+### Simplification Strategy
+
+**Current State**: 2,800+ lines with excessive validation, logging, and defensive programming
+**Target State**: ~800-1000 lines with streamlined validation and minimal logging
+
+**Keep These Good Parts**:
+- Modular class architecture (GUI, Excel, PDF, Column Mapping)
+- Dynamic column mapping dialog
+- Core GUI functionality and layout
+- Essential formatting preservation (widths, alignment)
+
+**Remove These Excessive Parts**:
+- Complex file access validation chains
+- Atomic file operations and rollback systems  
+- Verbose status logging during every step
+- Defensive programming for edge cases
+- Comprehensive error recovery workflows
+- Excessive docstrings and type annotations
+
+**Target Reductions**:
+- `abstract_renumber.py`: 1,831 → ~600 lines (remove file validation complexity)
+- `excel_processor.py`: 664 → ~200 lines (remove excessive validation)
+- `pdf_processor.py`: 450 → ~150 lines (streamline operations)
+- Keep `column_mapper.py` and `excel_formatter.py` mostly as-is 
