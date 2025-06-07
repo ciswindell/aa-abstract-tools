@@ -1,0 +1,159 @@
+#!/usr/bin/env python3
+"""
+Excel formatting module for the Abstract Renumber Tool.
+Handles all Excel file formatting operations including alignment, widths, and styling.
+"""
+
+from typing import List, Optional
+
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import Alignment
+
+
+class ExcelFormatter:
+    """Handles Excel file formatting operations."""
+
+    def __init__(self, columns: List, bookmark_formula_column: Optional[str] = None):
+        self.columns = columns
+        self.bookmark_formula_column = bookmark_formula_column
+
+    def apply_formatting(self, workbook_path: str, output_df: pd.DataFrame) -> bool:
+        """Apply all formatting to the Excel file."""
+        try:
+            wb = load_workbook(workbook_path)
+            ws = wb.active
+
+            # Apply all formatting
+            self._apply_column_widths(ws)
+            self._apply_cell_alignments(ws, output_df)
+            self._apply_text_wrapping(ws, output_df)
+            self._apply_date_formatting(ws, output_df)
+
+            # Apply bookmark formulas if needed
+            if self.bookmark_formula_column:
+                self._apply_bookmark_formulas(ws, output_df)
+
+            wb.save(workbook_path)
+            wb.close()
+
+            return True
+
+        except Exception as e:
+            raise ValueError(f"Failed to apply formatting: {str(e)}")
+
+    def _apply_column_widths(self, worksheet):
+        """Apply column widths from source file."""
+        for col_info in self.columns:
+            # Skip internal columns that don't appear in final output
+            if col_info.original_name == "Original_Index":
+                continue
+            worksheet.column_dimensions[col_info.excel_letter].width = col_info.width
+
+    def _apply_cell_alignments(self, worksheet, output_df):
+        """Apply cell alignments to all cells."""
+        for col_info in self.columns:
+            # Skip internal columns that don't appear in final output
+            if col_info.original_name == "Original_Index":
+                continue
+
+            col_letter = col_info.excel_letter
+
+            # Apply special header row alignment (center/bottom)
+            header_cell = worksheet[f"{col_letter}1"]
+            header_cell.alignment = Alignment(horizontal="center", vertical="bottom")
+
+            # Apply data row alignment to all data cells in this column
+            for row_num in range(2, len(output_df) + 2):  # Skip header row
+                cell = worksheet[f"{col_letter}{row_num}"]
+                cell.alignment = Alignment(
+                    horizontal=col_info.horizontal_alignment,
+                    vertical=col_info.vertical_alignment,
+                )
+
+    def _apply_text_wrapping(self, worksheet, output_df):
+        """Apply text wrapping to all cells while preserving alignment."""
+        for col_info in self.columns:
+            # Skip internal columns that don't appear in final output
+            if col_info.original_name == "Original_Index":
+                continue
+
+            col_letter = col_info.excel_letter
+
+            # Apply text wrapping to header row while preserving center/bottom alignment
+            header_cell = worksheet[f"{col_letter}1"]
+            header_cell.alignment = Alignment(
+                horizontal="center", vertical="bottom", wrapText=True
+            )
+
+            # Apply text wrapping to data rows while preserving their alignment
+            for row_num in range(2, len(output_df) + 2):  # Skip header row
+                cell = worksheet[f"{col_letter}{row_num}"]
+                cell.alignment = Alignment(
+                    horizontal=col_info.horizontal_alignment,
+                    vertical=col_info.vertical_alignment,
+                    wrapText=True,
+                )
+
+    def _apply_date_formatting(self, worksheet, output_df):
+        """Apply M/D/YYYY formatting to date columns."""
+        # Define the date format
+        date_format = "m/d/yyyy"
+
+        # Find date columns in the column info
+        date_column_names = ["Document Date", "Received Date"]
+
+        for col_info in self.columns:
+            # Skip internal columns that don't appear in final output
+            if col_info.original_name == "Original_Index":
+                continue
+
+            # Check if this column is a date column (by current name)
+            if col_info.current_name in date_column_names:
+                # Apply date formatting to the entire column
+                col_letter = col_info.excel_letter
+
+                # Format all data cells in this column (skip header row)
+                for row_num in range(2, len(output_df) + 2):
+                    cell = worksheet[f"{col_letter}{row_num}"]
+                    cell.number_format = date_format
+
+    def _apply_bookmark_formulas(self, worksheet, output_df):
+        """Apply bookmark formulas using original column structure."""
+        try:
+            # Find bookmark column info
+            bookmark_col_info = None
+            for col_info in self.columns:
+                if col_info.current_name == self.bookmark_formula_column:
+                    bookmark_col_info = col_info
+                    break
+
+            if not bookmark_col_info:
+                return
+
+            # Find required column positions in original structure
+            index_col_info = self._find_column_by_current_name("Index#")
+            doc_type_col_info = self._find_column_by_current_name("Document Type")
+            received_date_col_info = self._find_column_by_current_name("Received Date")
+
+            if all([index_col_info, doc_type_col_info, received_date_col_info]):
+                # Generate formulas using original column letters
+                for row_num in range(2, len(output_df) + 2):
+                    formula = (
+                        f'={index_col_info.excel_letter}{row_num}&"-"&'
+                        f'{doc_type_col_info.excel_letter}{row_num}&"-"&'
+                        f'TEXT({received_date_col_info.excel_letter}{row_num},"m/d/yyyy")'
+                    )
+
+                    cell = f"{bookmark_col_info.excel_letter}{row_num}"
+                    worksheet[cell] = formula
+
+        except Exception:
+            pass  # Skip if bookmark formulas can't be applied
+
+    def _find_column_by_current_name(self, current_name: str):
+        """Find column info by current (mapped) name."""
+        for col_info in self.columns:
+            if col_info.current_name == current_name:
+                return col_info
+        return None
