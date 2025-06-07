@@ -6,15 +6,22 @@ Handles column validation and mapping dialog functionality.
 
 import tkinter as tk
 from tkinter import messagebox, ttk
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 class ColumnMappingDialog:
     """Dialog for mapping Excel columns to required columns."""
 
     def __init__(
-        self, parent, available_columns: List[str], missing_columns: List[str]
-    ):
+        self, parent: tk.Tk, available_columns: List[str], missing_columns: List[str]
+    ) -> None:
+        """Initialize the column mapping dialog.
+
+        Args:
+            parent: Parent tkinter window
+            available_columns (List[str]): List of column names available in the Excel file
+            missing_columns (List[str]): List of required column names that are missing
+        """
         self.window = tk.Toplevel(parent)
         self.window.title("Column Mapping")
         self.window.geometry("500x400")
@@ -31,8 +38,12 @@ class ColumnMappingDialog:
 
         self.setup_dialog()
 
-    def center_on_parent(self, parent):
-        """Center the dialog on the parent window."""
+    def center_on_parent(self, parent: tk.Tk) -> None:
+        """Center the dialog on the parent window.
+
+        Args:
+            parent: Parent tkinter window to center on
+        """
         self.window.update_idletasks()
         parent_x = parent.winfo_x()
         parent_y = parent.winfo_y()
@@ -47,7 +58,7 @@ class ColumnMappingDialog:
 
         self.window.geometry(f"{dialog_width}x{dialog_height}+{pos_x}+{pos_y}")
 
-    def setup_dialog(self):
+    def setup_dialog(self) -> None:
         """Setup the column mapping dialog."""
         # Main frame
         main_frame = ttk.Frame(self.window, padding="20")
@@ -75,7 +86,7 @@ class ColumnMappingDialog:
         # Buttons
         self._create_buttons(main_frame)
 
-    def _create_mapping_area(self, parent):
+    def _create_mapping_area(self, parent: ttk.Frame) -> None:
         """Create scrollable area for column mappings."""
         canvas = tk.Canvas(parent, height=200)
         scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
@@ -95,7 +106,7 @@ class ColumnMappingDialog:
         # Create mapping controls
         self._create_mapping_controls(scrollable_frame)
 
-    def _create_mapping_controls(self, parent):
+    def _create_mapping_controls(self, parent: ttk.Frame) -> None:
         """Create mapping controls for each missing column."""
         for i, missing_col in enumerate(self.missing_columns):
             # Create frame for this mapping
@@ -136,7 +147,7 @@ class ColumnMappingDialog:
                     fill=tk.X, pady=10, padx=10
                 )
 
-    def _create_buttons(self, parent):
+    def _create_buttons(self, parent: ttk.Frame) -> None:
         """Create OK and Cancel buttons."""
         button_frame = ttk.Frame(parent)
         button_frame.pack(pady=(20, 0))
@@ -148,7 +159,7 @@ class ColumnMappingDialog:
             side=tk.LEFT
         )
 
-    def _ok_clicked(self):
+    def _ok_clicked(self) -> None:
         """Handle OK button click with validation."""
         result = {}
         unmapped_columns = []
@@ -161,7 +172,7 @@ class ColumnMappingDialog:
                 # Check for duplicate mappings
                 if selected in used_columns:
                     self._show_duplicate_error(
-                        selected, used_columns[selected], required_col
+                        [selected], used_columns[selected], required_col
                     )
                     return
 
@@ -179,17 +190,17 @@ class ColumnMappingDialog:
         self.window.destroy()
 
     def _show_duplicate_error(
-        self, column: str, existing_mapping: str, new_mapping: str
-    ):
+        self, target_columns: List[str], source_column: str, new_mapping: str
+    ) -> None:
         """Show error for duplicate column mapping."""
         messagebox.showerror(
             "Duplicate Mapping",
-            f"Column '{column}' is already mapped to '{existing_mapping}'.\n"
+            f"Column '{source_column}' is already mapped to '{target_columns[0]}'.\n"
             f"Each Excel column can only be mapped to one required column.\n\n"
             f"Please select a different column for '{new_mapping}'.",
         )
 
-    def _show_unmapped_error(self, unmapped_columns: List[str]):
+    def _show_unmapped_error(self, unmapped_columns: List[str]) -> None:
         """Show error for unmapped columns."""
         messagebox.showerror(
             "Incomplete Mapping",
@@ -197,7 +208,7 @@ class ColumnMappingDialog:
             + "\n".join(f"• {col}" for col in unmapped_columns),
         )
 
-    def _cancel_clicked(self):
+    def _cancel_clicked(self) -> None:
         """Handle Cancel button click."""
         self.result = None
         self.window.destroy()
@@ -207,16 +218,38 @@ class ColumnMapper:
     """Handles column validation and mapping operations."""
 
     def __init__(self, required_columns: List[str]):
+        """Initialize the column mapper.
+
+        Args:
+            required_columns (List[str]): List of column names that are required
+        """
         self.required_columns = required_columns
 
     def validate_columns(self, available_columns: List[str]) -> List[str]:
-        """Return list of missing required columns."""
+        """Return list of missing required columns.
+
+        Args:
+            available_columns (List[str]): List of column names available in the data
+
+        Returns:
+            List[str]: List of required column names that are missing from available_columns
+        """
         return [col for col in self.required_columns if col not in available_columns]
 
     def show_mapping_dialog(
         self, parent, available_columns: List[str], missing_columns: List[str]
     ) -> Optional[Dict[str, str]]:
-        """Show column mapping dialog and return results."""
+        """Show column mapping dialog and return results.
+
+        Args:
+            parent: Parent tkinter window
+            available_columns (List[str]): List of column names available in the Excel file
+            missing_columns (List[str]): List of required column names that are missing
+
+        Returns:
+            Optional[Dict[str, str]]: Dictionary mapping available column names to required
+                                    column names, or None if dialog was cancelled
+        """
         dialog = ColumnMappingDialog(parent, available_columns, missing_columns)
         parent.wait_window(dialog.window)
         return dialog.result

@@ -4,17 +4,21 @@ Excel formatting module for the Abstract Renumber Tool.
 Handles all Excel file formatting operations including alignment, widths, and styling.
 """
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
+from openpyxl.workbook import Workbook
+from openpyxl.worksheet.worksheet import Worksheet
 
 
 class ExcelFormatter:
     """Handles Excel file formatting operations."""
 
-    def __init__(self, columns: List, bookmark_formula_column: Optional[str] = None):
+    def __init__(
+        self, columns: List[Any], bookmark_formula_column: Optional[str] = None
+    ) -> None:
         self.columns = columns
         self.bookmark_formula_column = bookmark_formula_column
 
@@ -42,7 +46,7 @@ class ExcelFormatter:
         except Exception as e:
             raise ValueError(f"Failed to apply formatting: {str(e)}")
 
-    def _apply_column_widths(self, worksheet):
+    def _apply_column_widths(self, worksheet: Worksheet) -> None:
         """Apply column widths from source file."""
         for col_info in self.columns:
             # Skip internal columns that don't appear in final output
@@ -50,7 +54,9 @@ class ExcelFormatter:
                 continue
             worksheet.column_dimensions[col_info.excel_letter].width = col_info.width
 
-    def _apply_cell_alignments(self, worksheet, output_df):
+    def _apply_cell_alignments(
+        self, worksheet: Worksheet, output_df: pd.DataFrame
+    ) -> None:
         """Apply cell alignments to all cells."""
         for col_info in self.columns:
             # Skip internal columns that don't appear in final output
@@ -71,7 +77,9 @@ class ExcelFormatter:
                     vertical=col_info.vertical_alignment,
                 )
 
-    def _apply_text_wrapping(self, worksheet, output_df):
+    def _apply_text_wrapping(
+        self, worksheet: Worksheet, output_df: pd.DataFrame
+    ) -> None:
         """Apply text wrapping to all cells while preserving alignment."""
         for col_info in self.columns:
             # Skip internal columns that don't appear in final output
@@ -95,7 +103,9 @@ class ExcelFormatter:
                     wrapText=True,
                 )
 
-    def _apply_date_formatting(self, worksheet, output_df):
+    def _apply_date_formatting(
+        self, worksheet: Worksheet, output_df: pd.DataFrame
+    ) -> None:
         """Apply M/D/YYYY formatting to date columns."""
         # Define the date format
         date_format = "m/d/yyyy"
@@ -118,7 +128,9 @@ class ExcelFormatter:
                     cell = worksheet[f"{col_letter}{row_num}"]
                     cell.number_format = date_format
 
-    def _apply_bookmark_formulas(self, worksheet, output_df):
+    def _apply_bookmark_formulas(
+        self, worksheet: Worksheet, output_df: pd.DataFrame
+    ) -> None:
         """Apply bookmark formulas using original column structure."""
         try:
             # Find bookmark column info
@@ -151,7 +163,7 @@ class ExcelFormatter:
         except Exception:
             pass  # Skip if bookmark formulas can't be applied
 
-    def _find_column_by_current_name(self, current_name: str):
+    def _find_column_by_current_name(self, current_name: str) -> Optional[Any]:
         """Find column info by current (mapped) name."""
         for col_info in self.columns:
             if col_info.current_name == current_name:

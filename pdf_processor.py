@@ -6,7 +6,7 @@ Handles PDF bookmark operations and management.
 
 import os
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from PyPDF2 import PdfReader, PdfWriter
@@ -15,15 +15,26 @@ from PyPDF2 import PdfReader, PdfWriter
 class PDFProcessor:
     """Handles PDF file operations and bookmark management."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.pdf_path: Optional[str] = None
         self.reader: Optional[PdfReader] = None
         self.writer: Optional[PdfWriter] = None
-        self.bookmarks: List = []
+        self.bookmarks: List[Dict[str, Any]] = []
         self.pages_count: int = 0
 
     def load_pdf(self, file_path: str) -> bool:
-        """Load PDF file and extract basic information."""
+        """Load PDF file and extract basic information.
+
+        Args:
+            file_path (str): Path to the PDF file to load
+
+        Returns:
+            bool: True if PDF was loaded successfully
+
+        Raises:
+            FileNotFoundError: If PDF file does not exist
+            Exception: If PDF loading or bookmark extraction fails
+        """
         try:
             # Validate file exists
             if not os.path.exists(file_path):
@@ -62,7 +73,9 @@ class PDFProcessor:
         except Exception as e:
             raise ValueError(f"Failed to extract bookmarks: {str(e)}")
 
-    def _parse_bookmark_outline(self, outline, bookmarks: List, level: int = 0):
+    def _parse_bookmark_outline(
+        self, outline: List[Any], bookmarks: List[Dict[str, Any]], level: int = 0
+    ) -> None:
         """Recursively parse bookmark outline structure."""
         for item in outline:
             if isinstance(item, list):
@@ -78,7 +91,7 @@ class PDFProcessor:
                 }
                 bookmarks.append(bookmark_info)
 
-    def _get_bookmark_page(self, bookmark) -> int:
+    def _get_bookmark_page(self, bookmark: Any) -> int:
         """Get the page number for a bookmark."""
         try:
             if hasattr(bookmark, "page") and bookmark.page:
@@ -102,7 +115,14 @@ class PDFProcessor:
             return 1  # Default to page 1 on any error
 
     def get_bookmark_info(self) -> Dict[str, any]:
-        """Get information about loaded PDF and bookmarks."""
+        """Get information about loaded PDF and bookmarks.
+
+        Returns:
+            Dict[str, any]: Dictionary containing:
+                - pages_count (int): Number of pages in the PDF
+                - bookmarks_count (int): Number of bookmarks found
+                - bookmark_titles (List[str]): List of bookmark titles
+        """
         return {
             "pages_count": self.pages_count,
             "bookmarks_count": len(self.bookmarks),
@@ -110,11 +130,23 @@ class PDFProcessor:
         }
 
     def get_bookmarks(self) -> List:
-        """Get the extracted bookmarks list."""
+        """Get the extracted bookmarks list.
+
+        Returns:
+            List: List of bookmark dictionaries containing title, level, page, and original_item
+        """
         return self.bookmarks
 
     def find_bookmarks_by_pattern(self, pattern: str = None) -> List:
-        """Find bookmarks that match a specific pattern (e.g., start with number)."""
+        """Find bookmarks that match a specific pattern.
+
+        Args:
+            pattern (str, optional): Pattern to search for in bookmark titles.
+                                   If None, finds bookmarks starting with numbers.
+
+        Returns:
+            List: List of matching bookmark dictionaries
+        """
         if not self.bookmarks:
             return []
 
@@ -134,7 +166,14 @@ class PDFProcessor:
         return matching_bookmarks
 
     def copy_pages_to_writer(self) -> bool:
-        """Copy all pages from source PDF to new PdfWriter object."""
+        """Copy all pages from source PDF to new PdfWriter object.
+
+        Returns:
+            bool: True if pages were copied successfully
+
+        Raises:
+            ValueError: If no PDF loaded or page copying fails
+        """
         if not self.reader:
             raise ValueError("No PDF loaded. Call load_pdf() first.")
 
@@ -165,11 +204,11 @@ class PDFProcessor:
         """Generate new bookmark titles using Excel data and index mapping.
 
         Args:
-            excel_data: List of dictionaries containing Excel row data
-            index_mapping: Dictionary mapping original_index -> new_index
+            excel_data (List[Dict]): List of dictionaries containing Excel row data
+            index_mapping (Dict[int, int]): Dictionary mapping original_index -> new_index
 
         Returns:
-            Dictionary mapping original_index -> new_bookmark_title
+            Dict[int, str]: Dictionary mapping original_index -> new_bookmark_title
         """
         if not excel_data or not index_mapping:
             return {}
@@ -202,7 +241,7 @@ class PDFProcessor:
 
         return new_titles
 
-    def _format_date_for_bookmark(self, date_value) -> str:
+    def _format_date_for_bookmark(self, date_value: Any) -> str:
         """Format date value for bookmark title in M/D/YYYY format."""
         if date_value is None or date_value == "":
             return "N/A"
@@ -251,7 +290,7 @@ class PDFProcessor:
             # Fallback: return "N/A" if value exists but can't be formatted
             return "N/A"
 
-    def _format_datetime_to_mdy(self, dt) -> str:
+    def _format_datetime_to_mdy(self, dt: Any) -> str:
         """Convert datetime object to M/D/YYYY format (no leading zeros)."""
         try:
             # Use %-m and %-d on Unix systems to avoid leading zeros
@@ -290,10 +329,13 @@ class PDFProcessor:
         """Update PDF bookmarks with new titles while preserving non-matching bookmarks.
 
         Args:
-            new_titles: Dictionary mapping original_index -> new_bookmark_title
+            new_titles (Dict[int, str]): Dictionary mapping original_index -> new_bookmark_title
 
         Returns:
-            True if bookmarks were updated successfully
+            bool: True if bookmarks were updated successfully
+
+        Raises:
+            ValueError: If bookmark update fails
         """
         if not self.writer or not self.bookmarks:
             return False
@@ -347,7 +389,17 @@ class PDFProcessor:
         return page_mapping
 
     def save_pdf(self, output_path: str) -> bool:
-        """Save the updated PDF with new bookmarks to the specified path."""
+        """Save the updated PDF with new bookmarks to the specified path.
+
+        Args:
+            output_path (str): Path where the PDF should be saved
+
+        Returns:
+            bool: True if PDF was saved successfully
+
+        Raises:
+            ValueError: If no PdfWriter available or save operation fails
+        """
         if not self.writer:
             raise ValueError(
                 "No PdfWriter available. Call copy_pages_to_writer() first."
@@ -362,7 +414,18 @@ class PDFProcessor:
             raise ValueError(f"Failed to save PDF: {str(e)}")
 
     def get_bookmark_update_summary(self, new_titles: Dict[int, str]) -> Dict[str, any]:
-        """Get summary of bookmark updates for user feedback."""
+        """Get summary of bookmark updates for user feedback.
+
+        Args:
+            new_titles (Dict[int, str]): Dictionary of new bookmark titles
+
+        Returns:
+            Dict[str, any]: Dictionary containing:
+                - total_bookmarks_updated (int): Number of bookmarks updated
+                - total_bookmarks_preserved (int): Number of bookmarks preserved
+                - new_titles_preview (List[str]): Preview of first 5 new titles
+                - original_bookmark_count (int): Original number of bookmarks
+        """
         # Count how many existing bookmarks match our format
         matching_bookmarks = 0
         non_matching_bookmarks = 0

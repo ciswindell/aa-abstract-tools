@@ -53,17 +53,25 @@ class ExcelProcessor:
         self.processed_columns = set()  # Track which columns we've modified
         self.bookmark_formula_column: Optional[str] = None
         self.columns: List[ColumnInfo] = []  # Complete column information
-        self.source_column_widths = (
-            {}
-        )  # Store original column widths by final column name
         self.source_column_widths_by_position = (
             {}
         )  # Store original column widths by position
-        self.original_column_names = []  # Store original column names for export
-        self.column_name_mapping = {}  # Track original -> standardized mappings
 
     def load_file(self, file_path: str) -> bool:
-        """Load Excel file and perform basic validation with proper data type handling."""
+        """Load Excel file and perform basic validation with proper data type handling.
+
+        Args:
+            file_path (str): Path to the Excel file to load
+
+        Returns:
+            bool: True if file was loaded successfully
+
+        Raises:
+            FileNotFoundError: If Excel file does not exist
+            ValueError: If file format is invalid or contains no data
+            PermissionError: If file cannot be accessed due to permissions
+            ImportError: If required dependencies are missing
+        """
         try:
             # Validate file exists
             if not os.path.exists(file_path):
@@ -91,11 +99,15 @@ class ExcelProcessor:
 
             return True
 
-        except Exception as e:
+        except (FileNotFoundError, ValueError, PermissionError) as e:
             raise e
+        except (pd.errors.EmptyDataError, pd.errors.ParserError) as e:
+            raise ValueError(f"Invalid Excel file format: {str(e)}")
+        except ImportError as e:
+            raise ValueError(f"Required dependencies missing: {str(e)}")
 
-    def _initialize_column_info(self):
-        """Initialize complete column information from source file."""
+    def _initialize_column_info(self) -> None:
+        """Initialize column information with source formatting from Excel file."""
         self.columns = []
 
         # Extract column widths and alignments from source Excel file
@@ -139,8 +151,8 @@ class ExcelProcessor:
 
             wb.close()
 
-        except Exception as e:
-            # Set reasonable defaults if extraction fails
+        except (FileNotFoundError, PermissionError, OSError) as e:
+            # File access issues - set reasonable defaults
             default_widths = {
                 "Index#": 8,
                 "Document Type": 15,
@@ -208,8 +220,8 @@ class ExcelProcessor:
 
             wb.close()
 
-        except Exception as e:
-            # Set reasonable defaults if extraction fails
+        except (FileNotFoundError, PermissionError, OSError) as e:
+            # File access issues - set reasonable defaults
             default_alignments = {
                 "Index#": ("left", "top"),
                 "Document Type": ("left", "top"),
@@ -225,7 +237,7 @@ class ExcelProcessor:
 
         return alignments
 
-    def _detect_bookmark_formula_column(self):
+    def _detect_bookmark_formula_column(self) -> None:
         """Detect which column contains bookmark formulas."""
         if self.df is None:
             return
@@ -239,25 +251,6 @@ class ExcelProcessor:
                 self.bookmark_formula_column = col
                 break
 
-    def _map_column_letters(self):
-        """Map column names to Excel column letters for formula generation."""
-        if self.df is None:
-            return
-
-        # Map DataFrame columns to Excel column letters (A, B, C, etc.)
-        for idx, col_name in enumerate(self.df.columns):
-            excel_col = self._number_to_excel_column(idx + 1)
-            self.column_letters[col_name] = excel_col
-
-    def _number_to_excel_column(self, n):
-        """Convert column number to Excel column letter (1=A, 2=B, etc.)."""
-        result = ""
-        while n > 0:
-            n -= 1
-            result = chr(n % 26 + ord("A")) + result
-            n //= 26
-        return result
-
     def _get_excel_column_letter(self, col_index: int) -> str:
         """Convert column index to Excel column letter (0=A, 1=B, etc.)."""
         result = ""
@@ -266,29 +259,8 @@ class ExcelProcessor:
             col_index = col_index // 26 - 1
         return result
 
-    def _generate_bookmark_formula(self, row_number: int) -> str:
-        """Generate bookmark formula for a specific row using known required columns."""
-        if self.df is None:
-            return ""
-
-        # Find column positions for required columns
-        try:
-            index_pos = self.df.columns.get_loc("Index#")
-            doc_type_pos = self.df.columns.get_loc("Document Type")
-            received_date_pos = self.df.columns.get_loc("Received Date")
-        except KeyError:
-            return ""  # Required columns not found
-
-        # Convert to Excel column letters
-        index_col = self._get_excel_column_letter(index_pos)
-        doc_type_col = self._get_excel_column_letter(doc_type_pos)
-        received_date_col = self._get_excel_column_letter(received_date_pos)
-
-        # Generate formula: =B2&"-"&C2&"-"&TEXT(D2,"m/d/yyyy")
-        return f'={index_col}{row_number}&"-"&{doc_type_col}{row_number}&"-"&TEXT({received_date_col}{row_number},"m/d/yyyy")'
-
-    def _process_data_types(self):
-        """Process and convert data types for specific columns."""
+    def _process_data_types(self) -> None:
+        """Process data types for specific columns to optimize sorting and display."""
         if self.df is None:
             return
 
@@ -297,7 +269,7 @@ class ExcelProcessor:
             try:
                 self.df["Index#"] = pd.to_numeric(self.df["Index#"], errors="coerce")
                 self.processed_columns.add("Index#")
-            except:
+            except (ValueError, TypeError):
                 pass
 
         # Convert date columns to datetime if they exist - this is more comprehensive than before
@@ -308,11 +280,7 @@ class ExcelProcessor:
                     # Convert to datetime but preserve original format in string representation
                     self.df[col] = pd.to_datetime(self.df[col], errors="coerce")
                     self.processed_columns.add(col)
-                    print(
-                        f"DEBUG: Processed {col} as datetime, sample: {self.df[col].head(2).tolist()}"
-                    )
-                except Exception as e:
-                    print(f"DEBUG: Failed to process {col} as datetime: {e}")
+                except (ValueError, TypeError, pd.errors.OutOfBoundsDatetime):
                     # If conversion fails, keep as string
                     pass
 
@@ -326,24 +294,45 @@ class ExcelProcessor:
                     # Handle NaN values
                     self.df[col] = self.df[col].replace("nan", "")
                     self.processed_columns.add(col)
-                except Exception as e:
-                    print(f"DEBUG: Failed to clean text column {col}: {e}")
+                except (ValueError, TypeError, AttributeError):
+                    pass
 
     def validate_columns(self) -> List[str]:
-        """Check for required columns and return list of missing ones."""
+        """Check for required columns and return list of missing ones.
+
+        Returns:
+            List[str]: List of column names that are required but missing from the DataFrame
+
+        Raises:
+            ValueError: If no Excel file has been loaded
+        """
         if self.df is None:
             raise ValueError("No Excel file loaded")
 
         return [col for col in self.required_columns if col not in self.df.columns]
 
     def check_duplicate_columns(self) -> List[str]:
-        """Check for duplicate column names."""
+        """Check for duplicate column names in the loaded DataFrame.
+
+        Returns:
+            List[str]: List of column names that appear more than once
+        """
         if self.df is None:
             return []
         return self.df.columns[self.df.columns.duplicated()].tolist()
 
     def apply_column_mapping(self, mapping: Dict[str, str]) -> bool:
-        """Apply column name mappings to the DataFrame."""
+        """Apply column name mappings to the DataFrame.
+
+        Args:
+            mapping (Dict[str, str]): Dictionary mapping existing column names to required column names
+
+        Returns:
+            bool: True if mapping was applied successfully
+
+        Raises:
+            ValueError: If no Excel file loaded or required columns still missing after mapping
+        """
         if self.df is None:
             raise ValueError("No Excel file loaded")
 
@@ -366,7 +355,14 @@ class ExcelProcessor:
         return True
 
     def get_column_info(self) -> Dict[str, any]:
-        """Get information about the loaded DataFrame."""
+        """Get information about the loaded DataFrame.
+
+        Returns:
+            Dict[str, any]: Dictionary containing:
+                - rows (int): Number of rows in the DataFrame
+                - columns (int): Number of columns in the DataFrame
+                - column_names (List[str]): List of column names
+        """
         if self.df is None:
             return {}
 
@@ -377,16 +373,29 @@ class ExcelProcessor:
         }
 
     def get_dataframe(self) -> Optional[pd.DataFrame]:
-        """Get the loaded DataFrame."""
+        """Get the loaded DataFrame.
+
+        Returns:
+            Optional[pd.DataFrame]: The loaded pandas DataFrame, or None if no file loaded
+        """
         return self.df
 
     def sort_data(self) -> bool:
-        """Sort the DataFrame according to PRD requirements while preserving Original_Index for PDF bookmark mapping."""
+        """Sort the DataFrame according to PRD requirements while preserving Original_Index for PDF bookmark mapping.
+
+        Sorts by: Received Date, Document Date, Document Type, Grantor, Grantee, Legal Description (all ascending).
+        The Original_Index column is preserved to maintain mapping for PDF bookmark processing.
+
+        Returns:
+            bool: True if sorting completed successfully
+
+        Raises:
+            ValueError: If no Excel file loaded, no sorting columns found, or sorting fails
+        """
         if self.df is None:
             raise ValueError("No Excel file loaded")
 
-        # FIXED: Reorder sort columns to put Received Date first since it has the most meaningful data
-        # Updated to match user's exact specification for sort order
+        # Sort order: Received Date, Document Date, Document Type, Grantor, Grantee, Legal Description
         sort_columns = [
             "Received Date",  # 1. Primary sort - chronological
             "Document Date",  # 2. Secondary sort - chronological
@@ -402,52 +411,15 @@ class ExcelProcessor:
         if not existing_sort_columns:
             raise ValueError("No sorting columns found in DataFrame")
 
-        # Debug: Log current column names and what we're looking for
-        print(f"DEBUG: Available columns: {list(self.df.columns)}")
-        print(f"DEBUG: Looking for sort columns: {sort_columns}")
-        print(f"DEBUG: Found existing sort columns: {existing_sort_columns}")
-        print(f"DEBUG: DataFrame shape before sort: {self.df.shape}")
-
-        # Debug: Check data types before processing
-        print(f"DEBUG: Data types before processing:")
-        for col in existing_sort_columns:
-            if col in self.df.columns:
-                print(
-                    f"  {col}: {self.df[col].dtype} - Sample: {self.df[col].head(3).tolist()}"
-                )
-
         # Handle null/missing values before sorting
         self._handle_missing_values()
 
         # Ensure proper data types for sorting columns before sorting
         self._prepare_sorting_data_types()
 
-        # Debug: Check data types after processing
-        print(f"DEBUG: Data types after processing:")
-        for col in existing_sort_columns:
-            if col in self.df.columns:
-                print(
-                    f"  {col}: {self.df[col].dtype} - Sample: {self.df[col].head(3).tolist()}"
-                )
-
         try:
-            # Get a comprehensive snapshot before sorting
-            if len(self.df) > 0:
-                print(
-                    f"DEBUG: Before sort - showing Received Date values for first 10 rows:"
-                )
-                if "Received Date" in self.df.columns:
-                    for i in range(min(10, len(self.df))):
-                        orig_idx = self.df.iloc[i].get("Original_Index", "N/A")
-                        rec_date = self.df.iloc[i]["Received Date"]
-                        print(
-                            f"  Row {i}: Original_Index={orig_idx}, Received Date={rec_date} (type: {type(rec_date)})"
-                        )
-
             # Sort by multiple columns - all ascending (alphabetical for text, chronological for dates)
-            print(f"DEBUG: Attempting to sort by: {existing_sort_columns}")
-
-            # Note: Sorting reorders rows which affects all columns INCLUDING Original_Index
+            # Sorting reorders rows which affects all columns INCLUDING Original_Index
             # This preserves the Original_Index values with each row so we can map PDF bookmarks
             self.df = self.df.sort_values(
                 by=existing_sort_columns, ascending=True, na_position="last"
@@ -455,94 +427,48 @@ class ExcelProcessor:
             # Reset index to maintain proper row order
             self.df = self.df.reset_index(drop=True)
 
-            # Debug: Show results after sorting
-            if len(self.df) > 0:
-                print(
-                    f"DEBUG: After sort - showing Received Date values for first 10 rows:"
-                )
-                if "Received Date" in self.df.columns:
-                    for i in range(min(10, len(self.df))):
-                        orig_idx = self.df.iloc[i].get("Original_Index", "N/A")
-                        rec_date = self.df.iloc[i]["Received Date"]
-                        print(
-                            f"  Row {i}: Original_Index={orig_idx}, Received Date={rec_date} (type: {type(rec_date)})"
-                        )
-
             # Renumber Index# column starting from 1 (Original_Index remains unchanged)
             self._renumber_index()
 
-            print(f"DEBUG: Sort completed successfully")
             return True
-        except Exception as e:
-            print(f"DEBUG: Sort failed with error: {str(e)}")
-            import traceback
-
-            print(f"DEBUG: Full traceback: {traceback.format_exc()}")
+        except (ValueError, TypeError, KeyError) as e:
             raise ValueError(f"Failed to sort data: {str(e)}")
 
-    def _prepare_sorting_data_types(self):
+    def _prepare_sorting_data_types(self) -> None:
         """Ensure proper data types for sorting columns."""
         if self.df is None:
             return
-
-        print(f"DEBUG: _prepare_sorting_data_types() starting...")
 
         # Clean and prepare text columns for proper sorting
         text_columns = ["Legal Description", "Grantee", "Grantor", "Document Type"]
         for col in text_columns:
             if col in self.df.columns:
-                print(f"DEBUG: Processing text column {col}")
                 # Strip whitespace and ensure string type
                 self.df[col] = self.df[col].astype(str).str.strip()
                 # Replace empty strings with empty string (for consistent sorting)
                 self.df[col] = self.df[col].replace("nan", "")
-                print(
-                    f"DEBUG: Text column {col} processed. Sample: {self.df[col].head(3).tolist()}"
-                )
 
         # Ensure date columns are properly formatted for sorting
         date_columns = ["Document Date", "Received Date"]
         for col in date_columns:
             if col in self.df.columns:
-                print(f"DEBUG: Processing date column {col}")
-                print(f"DEBUG: Before conversion - {col} dtype: {self.df[col].dtype}")
-                print(
-                    f"DEBUG: Before conversion - {col} sample values: {self.df[col].head(5).tolist()}"
-                )
-
                 try:
                     # Convert to datetime for proper chronological sorting
                     original_values = self.df[col].copy()
                     self.df[col] = pd.to_datetime(self.df[col], errors="coerce")
 
-                    print(
-                        f"DEBUG: After conversion - {col} dtype: {self.df[col].dtype}"
-                    )
-                    print(
-                        f"DEBUG: After conversion - {col} sample values: {self.df[col].head(5).tolist()}"
-                    )
-
                     # Check for any NaT values that might indicate conversion problems
                     nat_count = self.df[col].isna().sum()
                     if nat_count > 0:
-                        print(
-                            f"DEBUG: WARNING - {nat_count} NaT values found in {col} after conversion"
-                        )
                         # Show which original values became NaT
                         nat_mask = self.df[col].isna()
                         problem_values = original_values[nat_mask].tolist()
-                        print(
-                            f"DEBUG: Problem values that became NaT: {problem_values}"
-                        )
 
-                except Exception as e:
-                    print(f"DEBUG: Failed to convert {col} to datetime: {e}")
+                except (ValueError, TypeError, pd.errors.OutOfBoundsDatetime):
                     # Keep as string if conversion fails
                     self.df[col] = self.df[col].astype(str).str.strip()
 
-        print(f"DEBUG: _prepare_sorting_data_types() completed")
-
-    def _renumber_index(self):
+    def _renumber_index(self) -> None:
         """Renumber the Index# column starting from 1 and incrementing by 1.
 
         Note: This method ONLY modifies the Index# column and leaves Original_Index
@@ -557,7 +483,7 @@ class ExcelProcessor:
             self.df["Index#"] = range(1, len(self.df) + 1)
             self.processed_columns.add("Index#")
 
-    def _handle_missing_values(self):
+    def _handle_missing_values(self) -> None:
         """Handle null/missing values in sorting columns."""
         if self.df is None:
             return
@@ -596,17 +522,38 @@ class ExcelProcessor:
         # The na_position='last' parameter in sort_values() will handle sorting
 
     def get_processed_columns(self) -> set:
-        """Return set of columns that have been processed/modified."""
+        """Return set of columns that have been processed/modified.
+
+        Returns:
+            set: Set of column names that have been processed or modified
+        """
         return self.processed_columns.copy()
 
     def get_unprocessed_columns(self) -> List[str]:
-        """Return list of columns that haven't been processed."""
+        """Return list of columns that haven't been processed.
+
+        Returns:
+            List[str]: List of column names that have not been processed or modified
+        """
         if self.df is None:
             return []
         return [col for col in self.df.columns if col not in self.processed_columns]
 
     def save_with_formulas(self, output_path: str) -> bool:
-        """Save Excel file preserving bookmark formulas and formatting using ExcelFormatter."""
+        """Save Excel file preserving bookmark formulas and formatting using ExcelFormatter.
+
+        Args:
+            output_path (str): Path where the Excel file should be saved
+
+        Returns:
+            bool: True if file was saved successfully
+
+        Raises:
+            ValueError: If no DataFrame to save or save operation fails
+            PermissionError: If unable to write to the specified path
+            OSError: If file system error occurs
+            ImportError: If required dependencies are missing
+        """
         if self.df is None:
             raise ValueError("No DataFrame to save")
 
@@ -623,10 +570,16 @@ class ExcelProcessor:
 
             return True
 
-        except Exception as e:
-            raise ValueError(f"Failed to save Excel file: {str(e)}")
+        except (PermissionError, OSError) as e:
+            raise ValueError(f"Failed to save Excel file - file access error: {str(e)}")
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Failed to save Excel file - data error: {str(e)}")
+        except ImportError as e:
+            raise ValueError(
+                f"Failed to save Excel file - missing dependencies: {str(e)}"
+            )
 
-    def _create_output_dataframe(self):
+    def _create_output_dataframe(self) -> pd.DataFrame:
         """Create DataFrame with original column names for export, excluding internal columns."""
         output_df = self.df.copy()
 
@@ -658,22 +611,15 @@ class ExcelProcessor:
         return None
 
     def get_bookmark_formula_column(self) -> Optional[str]:
-        """Return the name of the bookmark formula column if detected."""
+        """Return the name of the bookmark formula column if detected.
+
+        Returns:
+            Optional[str]: Name of the detected bookmark formula column, or None if not found
+        """
         return self.bookmark_formula_column
 
-    def _map_column_widths_to_names(self):
-        """Map column widths from positions to current DataFrame column names."""
-        if self.df is None:
-            return
-
-        # Map widths to current column names based on position
-        for col_idx, col_name in enumerate(self.df.columns):
-            if col_idx in self.source_column_widths_by_position:
-                width = self.source_column_widths_by_position[col_idx]
-                self.source_column_widths[col_name] = width
-
-    def _add_original_index_column(self):
-        """Add Original_Index column to store original Index# values for PDF bookmark mapping."""
+    def _add_original_index_column(self) -> None:
+        """Add Original_Index column to preserve original Index# values for PDF bookmark mapping."""
         if self.df is None:
             return
 
@@ -695,7 +641,11 @@ class ExcelProcessor:
             self.columns.append(original_index_col_info)
 
     def get_original_index_mapping(self) -> Dict[int, int]:
-        """Get mapping from original index to new index for PDF bookmark processing."""
+        """Get mapping from original index values to new index values.
+
+        Returns:
+            Dict[int, int]: Dictionary mapping original_index -> new_index
+        """
         if (
             self.df is None
             or "Original_Index" not in self.df.columns

@@ -9,6 +9,7 @@ import tkinter as tk
 from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
+from typing import Dict, List, Optional, Tuple
 
 from column_mapper import ColumnMapper
 
@@ -20,16 +21,16 @@ from pdf_processor import PDFProcessor
 class AbstractRenumberGUI:
     """Handles the GUI components and user interactions."""
 
-    def __init__(self, root, controller):
+    def __init__(self, root: tk.Tk, controller: "AbstractRenumberTool") -> None:
         self.root = root
         self.controller = controller
-        self.excel_file = None
-        self.pdf_file = None
+        self.excel_file: Optional[str] = None
+        self.pdf_file: Optional[str] = None
 
         self.setup_window()
         self.setup_gui()
 
-    def setup_window(self):
+    def setup_window(self) -> None:
         """Setup main window properties."""
         self.root.title("Abstract Renumber Tool")
         self.root.geometry("600x500")
@@ -42,7 +43,7 @@ class AbstractRenumberGUI:
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
 
-    def _center_window(self):
+    def _center_window(self) -> None:
         """Center the main window on the screen."""
         self.root.update_idletasks()
         width = self.root.winfo_width()
@@ -51,7 +52,7 @@ class AbstractRenumberGUI:
         pos_y = (self.root.winfo_screenheight() // 2) - (height // 2)
         self.root.geometry(f"{width}x{height}+{pos_x}+{pos_y}")
 
-    def setup_gui(self):
+    def setup_gui(self) -> None:
         """Initialize GUI components."""
         # Main frame
         main_frame = ttk.Frame(self.root, padding="20")
@@ -83,7 +84,7 @@ class AbstractRenumberGUI:
         # Initial status
         self.log_status("Ready. Please select Excel and PDF files.")
 
-    def _create_file_selection(self, parent):
+    def _create_file_selection(self, parent: ttk.Frame) -> None:
         """Create file selection components."""
         # Section header
         ttk.Label(parent, text="Select Files:", font=("Arial", 12, "bold")).grid(
@@ -118,7 +119,7 @@ class AbstractRenumberGUI:
         )
         self.pdf_label.grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
 
-    def _create_status_area(self, parent):
+    def _create_status_area(self, parent: ttk.Frame) -> None:
         """Create status text area with scrollbar."""
         status_frame = ttk.LabelFrame(parent, text="Status", padding="10")
         status_frame.grid(
@@ -136,12 +137,12 @@ class AbstractRenumberGUI:
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.status_text.configure(yscrollcommand=scrollbar.set)
 
-    def _get_default_directory(self):
+    def _get_default_directory(self) -> str:
         """Get the user's Downloads directory."""
         downloads_path = Path.home() / "Downloads"
         return str(downloads_path) if downloads_path.exists() else str(Path.home())
 
-    def _select_excel_file(self):
+    def _select_excel_file(self) -> None:
         """Handle Excel file selection."""
         file_path = filedialog.askopenfilename(
             title="Select Excel File",
@@ -157,7 +158,7 @@ class AbstractRenumberGUI:
             self.log_status(f"Excel file selected: {os.path.basename(file_path)}")
             self._check_files_ready()
 
-    def _select_pdf_file(self):
+    def _select_pdf_file(self) -> None:
         """Handle PDF file selection."""
         file_path = filedialog.askopenfilename(
             title="Select PDF File",
@@ -171,7 +172,7 @@ class AbstractRenumberGUI:
             self.log_status(f"PDF file selected: {os.path.basename(file_path)}")
             self._check_files_ready()
 
-    def _check_files_ready(self):
+    def _check_files_ready(self) -> None:
         """Enable process button if both files are selected."""
         if self.excel_file and self.pdf_file:
             self.process_button.config(state="normal")
@@ -179,14 +180,14 @@ class AbstractRenumberGUI:
         else:
             self.process_button.config(state="disabled")
 
-    def log_status(self, message):
+    def log_status(self, message: str) -> None:
         """Add a timestamped message to the status text."""
         timestamp = datetime.now().strftime("%H:%M:%S")
         self.status_text.insert(tk.END, f"[{timestamp}] {message}\n")
         self.status_text.see(tk.END)
         self.root.update()
 
-    def get_selected_files(self):
+    def get_selected_files(self) -> Tuple[Optional[str], Optional[str]]:
         """Return the selected file paths."""
         return self.excel_file, self.pdf_file
 
@@ -195,6 +196,7 @@ class AbstractRenumberTool:
     """Main application controller that orchestrates the components."""
 
     def __init__(self):
+        """Initialize the Abstract Renumber Tool with required configuration."""
         # Configuration
         self.required_columns = [
             "Index#",
@@ -213,7 +215,11 @@ class AbstractRenumberTool:
         self.gui = AbstractRenumberGUI(self.root, self)
 
     def process_files(self):
-        """Main processing function."""
+        """Main processing function that orchestrates Excel and PDF file processing.
+
+        Raises:
+            Exception: If processing fails at any stage, logged via GUI with user feedback
+        """
         try:
             excel_file, pdf_file = self.gui.get_selected_files()
 
@@ -230,7 +236,7 @@ class AbstractRenumberTool:
             self.gui.log_status(f"Processing failed: {str(e)}")
             messagebox.showerror("Error", f"Processing failed: {str(e)}")
 
-    def _process_excel_file(self, file_path):
+    def _process_excel_file(self, file_path: str) -> bool:
         """Process Excel file with validation and mapping."""
         try:
             # Load file
@@ -287,7 +293,9 @@ class AbstractRenumberTool:
             )
             return False
 
-    def _handle_missing_columns(self, missing_columns, available_columns):
+    def _handle_missing_columns(
+        self, missing_columns: List[str], available_columns: List[str]
+    ) -> bool:
         """Handle missing columns with mapping dialog."""
         self.gui.log_status(f"Missing required columns: {missing_columns}")
         self.gui.log_status("Opening column mapping dialog...")
@@ -314,13 +322,20 @@ class AbstractRenumberTool:
             self.gui.log_status("Column mapping cancelled.")
             return False
 
-    def _handle_error(self, title, message):
+    def _handle_error(self, title: str, message: str):
         """Handle errors with consistent logging and user feedback."""
         self.gui.log_status(f"Error: {message}")
         messagebox.showerror(title, message)
 
-    def _perform_excel_processing(self):
-        """Perform complete Excel and PDF processing with file output operations."""
+    def _perform_excel_processing(self) -> bool:
+        """Perform Excel file processing after validation.
+
+        Returns:
+            bool: True if processing completed successfully
+
+        Raises:
+            ValueError: If Excel processing fails
+        """
         try:
             self.gui.log_status("Starting data processing...")
 
@@ -343,7 +358,7 @@ class AbstractRenumberTool:
             # Check if output files exist and get user confirmation if needed
             if not self._check_output_files_exist(excel_output_path, pdf_output_path):
                 self.gui.log_status("Processing cancelled by user")
-                return
+                return False
 
             # Validate file access permissions
             self.gui.log_status("Validating file permissions...")
@@ -351,20 +366,22 @@ class AbstractRenumberTool:
                 excel_output_path, "write"
             ) or not self._validate_file_access(pdf_output_path, "write"):
                 self.gui.log_status("Processing stopped due to file access issues")
-                return
+                return False
 
             # Save processed Excel file
             if not self._save_processed_excel_file(excel_output_path):
                 self.gui.log_status("Processing stopped due to Excel file save failure")
-                return
+                return False
 
             # Save updated PDF file
             if not self._save_updated_pdf_file(pdf_output_path):
                 self.gui.log_status("Processing stopped due to PDF file save failure")
-                return
+                return False
 
             # Provide success feedback with output filenames
             self._show_completion_success(excel_output_path, pdf_output_path)
+
+            return True
 
         except Exception as e:
             self.gui.log_status(f"Processing failed: {str(e)}")
@@ -372,10 +389,17 @@ class AbstractRenumberTool:
                 "Processing Error",
                 f"An unexpected error occurred during processing:\n\n{str(e)}\n\nPlease check the status log for details.",
             )
-            raise e
+            raise ValueError(f"Processing failed: {str(e)}")
 
-    def _show_completion_success(self, excel_output_path: str, pdf_output_path: str):
-        """Show successful completion message with output file information."""
+    def _show_completion_success(
+        self, excel_output_path: str, pdf_output_path: str
+    ) -> None:
+        """Show completion success message with output file paths.
+
+        Args:
+            excel_output_path (str): Path to the saved Excel file
+            pdf_output_path (str): Path to the saved PDF file
+        """
         # Log status messages
         self.gui.log_status("=" * 50)
         self.gui.log_status("🎉 PROCESSING COMPLETED SUCCESSFULLY! 🎉")
@@ -423,11 +447,11 @@ class AbstractRenumberTool:
         """Validate that we can access the file for the specified operation.
 
         Args:
-            file_path: Path to the file to check
-            operation: Type of operation ("read" or "write")
+            file_path (str): Path to the file to check
+            operation (str): Type of operation ("read" or "write"). Defaults to "write".
 
         Returns:
-            True if file access is available
+            bool: True if file access is available, False otherwise
         """
         try:
             if operation == "write":
@@ -486,7 +510,9 @@ class AbstractRenumberTool:
             )
             return False
 
-    def _handle_file_access_error(self, title: str, message: str, error_type: str):
+    def _handle_file_access_error(
+        self, title: str, message: str, error_type: str
+    ) -> None:
         """Handle file access errors with specific user guidance."""
         self.gui.log_status(f"File Access Error ({error_type}): {message}")
 
@@ -497,10 +523,10 @@ class AbstractRenumberTool:
         """Save the processed Excel file with formatting to the output path.
 
         Args:
-            excel_output_path: Path where the processed Excel file should be saved
+            excel_output_path (str): Path where the processed Excel file should be saved
 
         Returns:
-            True if file was saved successfully
+            bool: True if file was saved successfully, False otherwise
         """
         try:
             self.gui.log_status("Saving processed Excel file...")
@@ -535,8 +561,10 @@ class AbstractRenumberTool:
             )
             return False
 
-    def _handle_save_error(self, title: str, user_message: str, technical_error: str):
-        """Handle file save errors with user-friendly messages and technical logging."""
+    def _handle_save_error(
+        self, title: str, user_message: str, technical_error: str
+    ) -> None:
+        """Handle save errors with user-friendly messaging and logging."""
         # Log technical details for debugging
         self.gui.log_status(f"Save Error - {title}: {technical_error}")
 
@@ -547,10 +575,10 @@ class AbstractRenumberTool:
         """Save the updated PDF file with new bookmark structure.
 
         Args:
-            pdf_output_path: Path where the updated PDF file should be saved
+            pdf_output_path (str): Path where the updated PDF file should be saved
 
         Returns:
-            True if PDF was saved successfully
+            bool: True if PDF was saved successfully, False otherwise
         """
         try:
             self.gui.log_status("Saving updated PDF file...")
@@ -584,44 +612,26 @@ class AbstractRenumberTool:
                 excel_data, index_mapping
             )
 
-            if new_titles:
-                self.gui.log_status(f"Generated {len(new_titles)} new bookmark titles")
+            # Update bookmarks with new titles
+            self.gui.log_status(f"Updating {len(new_titles)} bookmark titles...")
+            self.pdf_processor.update_bookmarks_with_new_titles(new_titles)
 
-                # Update bookmarks with new titles while preserving existing ones
-                self.gui.log_status(
-                    "Processing bookmarks (updating matching, preserving others)..."
-                )
-                self.pdf_processor.update_bookmarks_with_new_titles(new_titles)
+            # Save the updated PDF
+            self.pdf_processor.save_pdf(pdf_output_path)
 
-                # Get summary of what was updated vs preserved
-                summary = self.pdf_processor.get_bookmark_update_summary(new_titles)
-                self.gui.log_status(
-                    f"✓ Updated {summary['total_bookmarks_updated']} bookmarks from Excel data"
-                )
-                self.gui.log_status(
-                    f"✓ Preserved {summary['total_bookmarks_preserved']} existing bookmarks"
-                )
+            # Get bookmark processing summary
+            summary = self.pdf_processor.get_bookmark_update_summary(new_titles)
+            self.gui.log_status(
+                f"✓ PDF file saved: {os.path.basename(pdf_output_path)}"
+            )
+            self.gui.log_status(
+                f"  • Updated: {summary['total_bookmarks_updated']} bookmarks"
+            )
+            self.gui.log_status(
+                f"  • Preserved: {summary['total_bookmarks_preserved']} bookmarks"
+            )
 
-                # Save the updated PDF
-                self.pdf_processor.save_pdf(pdf_output_path)
-
-                self.gui.log_status(
-                    f"✓ PDF file saved: {os.path.basename(pdf_output_path)}"
-                )
-                return True
-            else:
-                # Even if no new titles, still preserve existing bookmarks
-                self.gui.log_status(
-                    "No new bookmark titles generated, preserving all existing bookmarks"
-                )
-                self.pdf_processor.update_bookmarks_with_new_titles(
-                    {}
-                )  # Preserve all existing
-                self.pdf_processor.save_pdf(pdf_output_path)
-                self.gui.log_status(
-                    f"✓ PDF file saved with preserved bookmarks: {os.path.basename(pdf_output_path)}"
-                )
-                return True
+            return True
 
         except PermissionError as e:
             self._handle_save_error(
@@ -647,15 +657,18 @@ class AbstractRenumberTool:
 
     def _generate_output_filenames(
         self, excel_path: str, pdf_path: str
-    ) -> tuple[str, str]:
+    ) -> Tuple[str, str]:
         """Generate output filenames with '_renumbered' suffix before file extension.
 
         Args:
-            excel_path: Path to source Excel file
-            pdf_path: Path to source PDF file
+            excel_path (str): Path to source Excel file
+            pdf_path (str): Path to source PDF file
 
         Returns:
-            Tuple of (excel_output_path, pdf_output_path)
+            tuple[str, str]: Tuple of (excel_output_path, pdf_output_path)
+
+        Raises:
+            ValueError: If filename generation fails
         """
         try:
             # Process Excel filename
@@ -678,10 +691,14 @@ class AbstractRenumberTool:
             raise ValueError(f"Failed to generate output filenames: {str(e)}")
 
     def _check_output_files_exist(self, excel_output: str, pdf_output: str) -> bool:
-        """Check if output files already exist and ask user for confirmation.
+        """Check if output files already exist and get user confirmation to overwrite.
+
+        Args:
+            excel_output (str): Path to Excel output file
+            pdf_output (str): Path to PDF output file
 
         Returns:
-            True if it's safe to proceed (files don't exist or user confirmed overwrite)
+            bool: True if user confirms overwrite or files don't exist, False otherwise
         """
         existing_files = []
 
@@ -702,8 +719,8 @@ class AbstractRenumberTool:
 
         return True  # No existing files, safe to proceed
 
-    def run(self):
-        """Start the application."""
+    def run(self) -> None:
+        """Start the GUI application."""
         self.root.mainloop()
 
 
