@@ -225,17 +225,6 @@ class ColumnMapper:
         """
         self.required_columns = required_columns
 
-    def validate_columns(self, available_columns: List[str]) -> List[str]:
-        """Return list of missing required columns.
-
-        Args:
-            available_columns (List[str]): List of column names available in the data
-
-        Returns:
-            List[str]: List of required column names that are missing from available_columns
-        """
-        return [col for col in self.required_columns if col not in available_columns]
-
     def show_mapping_dialog(
         self, parent, available_columns: List[str], missing_columns: List[str]
     ) -> Optional[Dict[str, str]]:
