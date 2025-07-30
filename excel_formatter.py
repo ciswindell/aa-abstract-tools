@@ -52,7 +52,22 @@ class ExcelFormatter:
             # Skip internal columns that don't appear in final output
             if col_info.original_name == "Original_Index":
                 continue
-            worksheet.column_dimensions[col_info.excel_letter].width = col_info.width
+
+            # Get the actual column letter based on the column's position in the worksheet
+            # This ensures we're applying widths to the correct columns
+            col_letter = self._get_column_letter_by_position(col_info.position)
+            worksheet.column_dimensions[col_letter].width = col_info.width
+
+    def _get_column_letter_by_position(self, position: int) -> str:
+        """Convert position to Excel column letter (0=A, 1=B, etc.)."""
+        if position < 0:
+            return ""
+
+        result = ""
+        while position >= 0:
+            result = chr(position % 26 + ord("A")) + result
+            position = position // 26 - 1
+        return result
 
     def _apply_cell_alignments(
         self, worksheet: Worksheet, output_df: pd.DataFrame
@@ -63,7 +78,7 @@ class ExcelFormatter:
             if col_info.original_name == "Original_Index":
                 continue
 
-            col_letter = col_info.excel_letter
+            col_letter = self._get_column_letter_by_position(col_info.position)
 
             # Apply special header row alignment (center/bottom)
             header_cell = worksheet[f"{col_letter}1"]
@@ -86,7 +101,7 @@ class ExcelFormatter:
             if col_info.original_name == "Original_Index":
                 continue
 
-            col_letter = col_info.excel_letter
+            col_letter = self._get_column_letter_by_position(col_info.position)
 
             # Apply text wrapping to header row while preserving center/bottom alignment
             header_cell = worksheet[f"{col_letter}1"]
@@ -121,7 +136,7 @@ class ExcelFormatter:
             # Check if this column is a date column (by current name)
             if col_info.current_name in date_column_names:
                 # Apply date formatting to the entire column
-                col_letter = col_info.excel_letter
+                col_letter = self._get_column_letter_by_position(col_info.position)
 
                 # Format all data cells in this column (skip header row)
                 for row_num in range(2, len(output_df) + 2):
@@ -152,12 +167,12 @@ class ExcelFormatter:
                 # Generate formulas using original column letters
                 for row_num in range(2, len(output_df) + 2):
                     formula = (
-                        f'={index_col_info.excel_letter}{row_num}&"-"&'
-                        f'{doc_type_col_info.excel_letter}{row_num}&"-"&'
-                        f'TEXT({received_date_col_info.excel_letter}{row_num},"m/d/yyyy")'
+                        f'={self._get_column_letter_by_position(index_col_info.position)}{row_num}&"-"&'
+                        f'{self._get_column_letter_by_position(doc_type_col_info.position)}{row_num}&"-"&'
+                        f'TEXT({self._get_column_letter_by_position(received_date_col_info.position)}{row_num},"m/d/yyyy")'
                     )
 
-                    cell = f"{bookmark_col_info.excel_letter}{row_num}"
+                    cell = f"{self._get_column_letter_by_position(bookmark_col_info.position)}{row_num}"
                     worksheet[cell] = formula
 
         except Exception:

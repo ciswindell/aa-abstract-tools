@@ -397,6 +397,9 @@ class ExcelProcessor:
         # Save to Excel
         output_df.to_excel(output_path, index=False)
 
+        # Update column positions for the final output
+        self._update_column_positions_for_output(output_df)
+
         # Apply formatting
         formatter = ExcelFormatter(self.columns, self.bookmark_formula_column)
         formatter.apply_formatting(output_path, output_df)
@@ -425,6 +428,21 @@ class ExcelProcessor:
         output_df.rename(columns=name_mapping, inplace=True)
 
         return output_df
+
+    def _update_column_positions_for_output(self, output_df: pd.DataFrame) -> None:
+        """Update column positions to match the output DataFrame column order."""
+        # Create a mapping from column names to their new positions in the output DataFrame
+        position_mapping = {name: pos for pos, name in enumerate(output_df.columns)}
+
+        # Update each column's position
+        for col_info in self.columns:
+            # Skip internal columns that don't appear in final output
+            if col_info.original_name == "Original_Index":
+                continue
+
+            # Only update columns that exist in the output DataFrame
+            if col_info.current_name in position_mapping:
+                col_info.position = position_mapping[col_info.current_name]
 
     def _find_column_by_current_name(self, current_name: str) -> Optional[ColumnInfo]:
         """Find column info by current (mapped) name."""
