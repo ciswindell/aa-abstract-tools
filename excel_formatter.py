@@ -33,6 +33,7 @@ class ExcelFormatter:
             self._apply_cell_alignments(ws, output_df)
             self._apply_text_wrapping(ws, output_df)
             self._apply_date_formatting(ws, output_df)
+            self._apply_auto_filters(ws, output_df)
 
             # Apply bookmark formulas if needed
             if self.bookmark_formula_column:
@@ -142,6 +143,35 @@ class ExcelFormatter:
                 for row_num in range(2, len(output_df) + 2):
                     cell = worksheet[f"{col_letter}{row_num}"]
                     cell.number_format = date_format
+
+    def _apply_auto_filters(
+        self, worksheet: Worksheet, output_df: pd.DataFrame
+    ) -> None:
+        """Apply auto-filters to the worksheet."""
+        try:
+            # Calculate the range for the filter
+            # Start from A1 (header row) to the last data row and column
+            start_col = 1  # Column A
+            end_col = len(output_df.columns)  # Last column
+            start_row = 1  # Header row
+            end_row = len(output_df) + 1  # Last data row (including header)
+
+            # Create range string (e.g., "A1:G10")
+            start_letter = self._get_column_letter_by_position(
+                start_col - 1
+            )  # Convert to 0-based
+            end_letter = self._get_column_letter_by_position(
+                end_col - 1
+            )  # Convert to 0-based
+            range_str = f"{start_letter}{start_row}:{end_letter}{end_row}"
+
+            # Apply auto-filter to the entire range
+            worksheet.auto_filter.ref = range_str
+
+        except Exception as e:
+            # If auto-filter fails, just continue without it
+            print(f"Warning: Could not apply auto-filter: {e}")
+            pass
 
     def _apply_bookmark_formulas(
         self, worksheet: Worksheet, output_df: pd.DataFrame
