@@ -18,6 +18,7 @@ from column_mapper import ColumnMapper
 # Import our modular classes
 from excel_processor import ExcelProcessor
 from pdf_processor import PDFProcessor
+from pdf_validator import PDFValidator
 
 
 class AbstractRenumberGUI:
@@ -31,6 +32,12 @@ class AbstractRenumberGUI:
         self.backup_enabled: tk.BooleanVar = tk.BooleanVar(
             value=True
         )  # Backup enabled by default
+        self.sort_bookmarks_enabled: tk.BooleanVar = tk.BooleanVar(
+            value=False
+        )  # Sort bookmarks disabled by default
+        self.reorder_pages_enabled: tk.BooleanVar = tk.BooleanVar(
+            value=False
+        )  # Reorder pages disabled by default
 
         self.setup_window()
         self.setup_gui()
@@ -160,6 +167,43 @@ class AbstractRenumberGUI:
             row=1, column=0, sticky=tk.W, padx=(20, 0), pady=(2, 0)
         )
 
+        # Sort PDF Bookmarks checkbox
+        sort_bookmarks_frame = ttk.Frame(options_frame)
+        sort_bookmarks_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(15, 5))
+        sort_bookmarks_frame.grid_columnconfigure(1, weight=1)
+
+        self.sort_bookmarks_checkbox = ttk.Checkbutton(
+            sort_bookmarks_frame,
+            text="Sort PDF Bookmarks",
+            variable=self.sort_bookmarks_enabled,
+            command=self._on_sort_bookmarks_option_changed,
+        )
+        self.sort_bookmarks_checkbox.grid(row=0, column=0, sticky=tk.W)
+
+        # Reorder Pages checkbox (initially disabled)
+        reorder_pages_frame = ttk.Frame(options_frame)
+        reorder_pages_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=5)
+        reorder_pages_frame.grid_columnconfigure(1, weight=1)
+
+        self.reorder_pages_checkbox = ttk.Checkbutton(
+            reorder_pages_frame,
+            text="Reorder Pages to Match Bookmarks",
+            variable=self.reorder_pages_enabled,
+            state="disabled",  # Initially disabled
+        )
+        self.reorder_pages_checkbox.grid(row=0, column=0, sticky=tk.W, padx=(20, 0))
+
+        # Info label for reorder pages option
+        self.reorder_pages_info_label = ttk.Label(
+            reorder_pages_frame,
+            text="Requires 'Sort PDF Bookmarks' to be enabled",
+            foreground="gray",
+            font=("Arial", 9),
+        )
+        self.reorder_pages_info_label.grid(
+            row=1, column=0, sticky=tk.W, padx=(40, 0), pady=(2, 0)
+        )
+
     def _on_backup_option_changed(self) -> None:
         """Handle changes to the backup option checkbox."""
         if self.backup_enabled.get():
@@ -171,6 +215,24 @@ class AbstractRenumberGUI:
             self.backup_info_label.config(
                 text="⚠️  Warning: Original files will be overwritten directly",
                 foreground="orange",
+            )
+
+    def _on_sort_bookmarks_option_changed(self) -> None:
+        """Handle changes to the sort bookmarks option checkbox."""
+        if self.sort_bookmarks_enabled.get():
+            # Enable and check the reorder pages checkbox when sort bookmarks is checked
+            self.reorder_pages_checkbox.config(state="normal")
+            self.reorder_pages_enabled.set(True)  # Auto-check by default
+            self.reorder_pages_info_label.config(
+                text="Optional: Physically reorder pages to match sorted bookmarks",
+                foreground="green",
+            )
+        else:
+            # Disable and uncheck the reorder pages checkbox when sort bookmarks is unchecked
+            self.reorder_pages_enabled.set(False)
+            self.reorder_pages_checkbox.config(state="disabled")
+            self.reorder_pages_info_label.config(
+                text="Requires 'Sort PDF Bookmarks' to be enabled", foreground="gray"
             )
 
     def _create_status_area(self, parent: ttk.Frame) -> None:
@@ -251,6 +313,14 @@ class AbstractRenumberGUI:
         """Return whether backup creation is enabled."""
         return self.backup_enabled.get()
 
+    def get_sort_bookmarks_enabled(self) -> bool:
+        """Return whether PDF bookmark sorting is enabled."""
+        return self.sort_bookmarks_enabled.get()
+
+    def get_reorder_pages_enabled(self) -> bool:
+        """Return whether page reordering is enabled."""
+        return self.reorder_pages_enabled.get()
+
 
 class AbstractRenumberTool:
     """Main application controller that orchestrates the components."""
@@ -278,6 +348,10 @@ class AbstractRenumberTool:
         """Main processing function that orchestrates Excel and PDF file processing."""
         try:
             excel_file, pdf_file = self.gui.get_selected_files()
+
+            # Early validation: Check for PDF bookmark conflicts before any processing
+            if not self._validate_pdf_bookmarks(pdf_file):
+                return
 
             # Process Excel file
             if not self._process_excel_file(excel_file):
@@ -355,6 +429,55 @@ class AbstractRenumberTool:
                 self._handle_error("Mapping Error", f"Column mapping failed:\n{str(e)}")
                 return False
         else:
+            return False
+
+    def _validate_pdf_bookmarks(self, pdf_file: str) -> bool:
+        """Validate PDF bookmarks for conflicts before processing.
+
+        Args:
+            pdf_file: Path to the PDF file to validate
+
+        Returns:
+            bool: True if validation passes, False if conflicts found
+        """
+        try:
+            self.gui.log_status("Validating PDF bookmarks...")
+
+            # Use existing PDFProcessor to extract bookmarks (DRY principle)
+            temp_pdf_processor = PDFProcessor()
+            temp_pdf_processor.load_pdf(pdf_file)
+            bookmarks = temp_pdf_processor.bookmarks
+
+            # Validate bookmarks using PDFValidator (Single Responsibility)
+            conflicts = PDFValidator.validate_bookmark_page_conflicts(bookmarks)
+
+            if conflicts:
+                # Format error message with conflict details
+                conflict_details = []
+                for conflict in conflicts["conflicts"]:
+                    page = conflict["page"]
+                    bookmark_titles = conflict["bookmarks"]
+                    conflict_details.append(
+                        f"Page {page}: {', '.join(bookmark_titles)}"
+                    )
+
+                error_message = (
+                    "PDF bookmark conflicts detected!\n\n"
+                    "Multiple bookmarks point to the same page(s):\n"
+                    + "\n".join(conflict_details)
+                    + "\n\nPlease fix these conflicts before processing."
+                )
+
+                self._handle_error("Bookmark Conflicts", error_message)
+                return False
+
+            self.gui.log_status("PDF bookmark validation passed.")
+            return True
+
+        except Exception as e:
+            self._handle_error(
+                "Validation Error", f"Failed to validate PDF bookmarks: {str(e)}"
+            )
             return False
 
     def _handle_error(self, title: str, message: str):
@@ -446,7 +569,18 @@ class AbstractRenumberTool:
             )
 
             # Update bookmarks with new titles
-            self.pdf_processor.update_bookmarks_with_new_titles(new_titles)
+            sort_bookmarks = self.gui.get_sort_bookmarks_enabled()
+            self.pdf_processor.update_bookmarks_with_new_titles(
+                new_titles, sort_naturally=sort_bookmarks
+            )
+
+            # Conditional page reordering based on user options
+            reorder_pages = self.gui.get_reorder_pages_enabled()
+
+            if reorder_pages:
+                self.gui.log_status("Reordering PDF pages to match bookmark order...")
+                self.pdf_processor.reorder_pages_by_bookmarks()
+                self.gui.log_status("PDF pages reordered successfully.")
 
             # Save the updated PDF
             self.pdf_processor.save_pdf(pdf_output_path)

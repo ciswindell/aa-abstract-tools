@@ -9,7 +9,9 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+from natsort import natsorted, ns
 from PyPDF2 import PdfReader, PdfWriter
+from PyPDF2.generic import Fit
 
 
 class PDFProcessor:
@@ -290,19 +292,22 @@ class PDFProcessor:
 
         return None
 
-    def update_bookmarks_with_new_titles(self, new_titles: Dict[str, str]) -> bool:
+    def update_bookmarks_with_new_titles(
+        self, new_titles: Dict[str, str], sort_naturally: bool = False
+    ) -> bool:
         """Update PDF bookmarks with new titles while preserving non-matching bookmarks.
 
         Args:
             new_titles: Dictionary mapping original index (as string) to new bookmark title
+            sort_naturally: If True, sort bookmarks naturally before adding to PDF
         """
         if not self.writer or not self.bookmarks:
             return False
 
-        # Process existing bookmarks: preserve non-matching ones, update matching ones
+        # Prepare bookmarks with updated titles
+        updated_bookmarks = []
         for bookmark in self.bookmarks:
             bookmark_title = bookmark.get("title", "")
-            page_num = bookmark.get("page", 1) - 1  # Convert to 0-based index
 
             # Try to extract index from bookmark title (returns string for alphanumeric support)
             extracted_index = self.extract_original_index_from_bookmark(bookmark_title)
@@ -311,14 +316,44 @@ class PDFProcessor:
             if extracted_index is not None and extracted_index in new_titles:
                 # This bookmark matches our format and has a new title - update it
                 new_title = new_titles[extracted_index]
-                if 0 <= page_num < len(self.writer.pages):
-                    self.writer.add_outline_item(new_title, page_num)
+                updated_bookmark = bookmark.copy()
+                updated_bookmark["title"] = new_title
+                updated_bookmarks.append(updated_bookmark)
             else:
                 # This bookmark doesn't match our format - preserve it
-                if 0 <= page_num < len(self.writer.pages):
-                    self.writer.add_outline_item(bookmark_title, page_num)
+                updated_bookmarks.append(bookmark)
 
-        return True
+        # Sort bookmarks if requested
+        if sort_naturally:
+            updated_bookmarks = natsorted(
+                updated_bookmarks,
+                key=lambda bookmark: bookmark.get("title", ""),
+                alg=ns.IGNORECASE,  # Case-insensitive natural sorting
+            )
+
+        # Add all bookmarks to writer in the correct order
+        bookmarks_added = 0
+        for bookmark in updated_bookmarks:
+            bookmark_title = bookmark.get("title", "")
+            page_num = bookmark.get("page", 1) - 1  # Convert to 0-based index
+
+            if 0 <= page_num < len(self.writer.pages):
+                try:
+                    page_obj = self.writer.pages[page_num]
+                    # Create a fit that inherits current zoom (XYZ with null zoom factor)
+                    inherit_zoom_fit = Fit.xyz(left=None, top=None, zoom=None)
+                    self.writer.add_outline_item(
+                        bookmark_title, page_obj, fit=inherit_zoom_fit
+                    )
+                    bookmarks_added += 1
+                except Exception:
+                    # Silently skip failed bookmarks
+                    pass
+
+        # Update internal bookmarks list to match what was added
+        self.bookmarks = updated_bookmarks
+
+        return bookmarks_added > 0
 
     def _create_bookmark_page_mapping(
         self, new_titles: Dict[str, str]
@@ -349,9 +384,21 @@ class PDFProcessor:
 
     def save_pdf(self, output_path: str) -> bool:
         """Save the updated PDF with new bookmarks to the specified path."""
-        with open(output_path, "wb") as output_file:
-            self.writer.write(output_file)
-        return True
+        if not self.writer:
+            return False
+
+        # Set the page mode to show outlines (bookmarks) by default
+        try:
+            self.writer.page_mode = "/UseOutlines"
+        except Exception:
+            pass  # Not critical if this fails
+
+        try:
+            with open(output_path, "wb") as output_file:
+                self.writer.write(output_file)
+            return True
+        except Exception:
+            return False
 
     def get_bookmark_update_summary(self, new_titles: Dict[str, str]) -> Dict[str, any]:
         """Get summary of bookmark updates for user feedback.
@@ -388,3 +435,143 @@ class PDFProcessor:
             ],  # Show first 5 as preview
             "original_bookmark_count": len(self.bookmarks),
         }
+
+    def sort_bookmarks_naturally(self) -> bool:
+        """
+        Sort PDF outline/bookmarks naturally using natsort library.
+
+        Note: This method is now a no-op since sorting happens during bookmark update.
+        The sorting is handled by passing sort_naturally=True to update_bookmarks_with_new_titles().
+
+        Returns:
+            bool: True (always succeeds since sorting happens elsewhere)
+        """
+        return True
+
+    def detect_bookmark_page_ranges(self) -> Dict[str, Dict[str, int]]:
+        """
+        Detect consecutive pages belonging to each bookmark.
+
+        Each bookmark is assumed to cover pages from its bookmark page
+        up to (but not including) the next bookmark's page.
+
+        Returns:
+            Dict mapping bookmark title to {"start": int, "end": int} page ranges.
+            Page numbers are 1-based (same as bookmark pages).
+
+        Example:
+            {
+                "1-Assignment": {"start": 3, "end": 5},
+                "2-Document": {"start": 6, "end": 8},
+                "3-Report": {"start": 9, "end": 12}
+            }
+        """
+        if not self.bookmarks:
+            return {}
+
+        # Sort bookmarks by page number to determine ranges
+        sorted_by_page = sorted(self.bookmarks, key=lambda b: b.get("page", 1))
+
+        page_ranges = {}
+        total_pages = (
+            self.pages_count
+            if hasattr(self, "pages_count")
+            else len(self.reader.pages) if self.reader else 0
+        )
+
+        for i, bookmark in enumerate(sorted_by_page):
+            title = bookmark.get("title", "")
+            start_page = bookmark.get("page", 1)
+
+            # Determine end page (up to next bookmark or end of PDF)
+            if i + 1 < len(sorted_by_page):
+                # End at the page before the next bookmark
+                end_page = sorted_by_page[i + 1].get("page", 1) - 1
+            else:
+                # Last bookmark goes to end of PDF
+                end_page = total_pages
+
+            # Ensure valid range
+            if end_page < start_page:
+                end_page = start_page
+
+            page_ranges[title] = {"start": start_page, "end": end_page}
+
+        return page_ranges
+
+    def reorder_pages_by_bookmarks(self) -> bool:
+        """
+        Physically reorder PDF pages to match current bookmark sequence.
+
+        Pages are reordered based on the current bookmark order in self.bookmarks.
+        Page ranges move together as units. Bookmark page references are updated
+        to match new positions.
+
+        Returns:
+            bool: True if reordering was successful
+        """
+        if not self.writer or not self.bookmarks or not self.reader:
+            return False
+
+        try:
+            # Get page ranges for current bookmarks
+            page_ranges = self.detect_bookmark_page_ranges()
+
+            if not page_ranges:
+                return False
+
+            # Create new writer for reordered pages
+            new_writer = PdfWriter()
+
+            # Track new page positions for bookmark updates
+            bookmark_page_updates = {}
+            current_new_page = 1  # 1-based page numbering
+
+            # Reorder pages according to current bookmark sequence
+            for bookmark in self.bookmarks:
+                title = bookmark.get("title", "")
+
+                if title in page_ranges:
+                    page_range = page_ranges[title]
+                    start_page = page_range["start"]
+                    end_page = page_range["end"]
+
+                    # Record new position for this bookmark
+                    bookmark_page_updates[title] = current_new_page
+
+                    # Add all pages in this bookmark's range
+                    for page_num in range(start_page, end_page + 1):
+                        if 1 <= page_num <= len(self.reader.pages):
+                            page_index = page_num - 1  # Convert to 0-based
+                            new_writer.add_page(self.reader.pages[page_index])
+                            current_new_page += 1
+
+            # Update self.writer with reordered pages
+            self.writer = new_writer
+
+            # Update bookmark page references to new positions
+            for bookmark in self.bookmarks:
+                title = bookmark.get("title", "")
+                if title in bookmark_page_updates:
+                    bookmark["page"] = bookmark_page_updates[title]
+
+            # Re-add all bookmarks to the new writer (the new writer has no bookmarks since it was just created)
+            for bookmark in self.bookmarks:
+                bookmark_title = bookmark.get("title", "")
+                page_num = bookmark.get("page", 1) - 1  # Convert to 0-based index
+
+                if 0 <= page_num < len(self.writer.pages):
+                    try:
+                        page_obj = self.writer.pages[page_num]
+                        # Create a fit that inherits current zoom (XYZ with null zoom factor)
+                        inherit_zoom_fit = Fit.xyz(left=None, top=None, zoom=None)
+                        self.writer.add_outline_item(
+                            bookmark_title, page_obj, fit=inherit_zoom_fit
+                        )
+                    except Exception:
+                        pass  # Silently skip failed bookmarks
+
+            return True
+
+        except Exception as e:
+            raise ValueError(f"Failed to reorder pages by bookmarks: {str(e)}")
