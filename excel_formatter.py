@@ -34,6 +34,7 @@ class ExcelFormatter:
             self._apply_text_wrapping(ws, output_df)
             self._apply_date_formatting(ws, output_df)
             self._apply_auto_filters(ws, output_df)
+            self._apply_freeze_panes(ws, output_df)
 
             # Apply bookmark formulas if needed
             if self.bookmark_formula_column:
@@ -171,6 +172,17 @@ class ExcelFormatter:
         except Exception as e:
             # If auto-filter fails, just continue without it
             print(f"Warning: Could not apply auto-filter: {e}")
+            pass
+
+    def _apply_freeze_panes(
+        self, worksheet: Worksheet, output_df: pd.DataFrame
+    ) -> None:
+        """Freeze the top row of the worksheet."""
+        try:
+            # Freeze the first row (header)
+            worksheet.freeze_panes = "A2"
+        except Exception as e:
+            print(f"Warning: Could not freeze panes: {e}")
             pass
 
     def _apply_bookmark_formulas(
