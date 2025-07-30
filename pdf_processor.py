@@ -13,7 +13,12 @@ from PyPDF2 import PdfReader, PdfWriter
 
 
 class PDFProcessor:
-    """Handles PDF file operations and bookmark management."""
+    """Handles PDF file operations and bookmark management.
+
+    This class processes PDF bookmarks with support for alphanumeric Index# values.
+    Bookmark matching uses string comparison to support formats like "A1", "B5", "AGH42", etc.,
+    while maintaining backward compatibility with numeric-only Index# values.
+    """
 
     def __init__(self) -> None:
         self.pdf_path: Optional[str] = None
@@ -160,9 +165,17 @@ class PDFProcessor:
         return self.writer is not None and len(self.writer.pages) > 0
 
     def generate_new_bookmark_titles(
-        self, excel_data: List[Dict], index_mapping: Dict[int, int]
-    ) -> Dict[int, str]:
-        """Generate new bookmark titles using Excel data and index mapping."""
+        self, excel_data: List[Dict], index_mapping: Dict[str, int]
+    ) -> Dict[str, str]:
+        """Generate new bookmark titles using Excel data and index mapping.
+
+        Args:
+            excel_data: List of dictionaries containing Excel row data
+            index_mapping: Dictionary mapping original index (as string) to new index (as int)
+
+        Returns:
+            Dict[str, str]: Mapping from original index (as string) to new bookmark title
+        """
         if not excel_data or not index_mapping:
             return {}
 
@@ -171,7 +184,7 @@ class PDFProcessor:
         for row_data in excel_data:
             try:
                 # Get original and new index numbers
-                original_index = int(row_data.get("Original_Index", 0))
+                original_index = str(row_data.get("Original_Index", "")).strip()
                 new_index = index_mapping.get(original_index)
 
                 if new_index is None:
@@ -253,22 +266,36 @@ class PDFProcessor:
 
     def extract_original_index_from_bookmark(
         self, bookmark_title: str
-    ) -> Optional[int]:
-        """Extract original index number from existing bookmark title."""
+    ) -> Optional[str]:
+        """Extract original index from existing bookmark title.
+
+        Supports alphanumeric index values (e.g., "A1", "B5", "AGH42") by returning
+        the index part as a string rather than converting to integer.
+
+        Args:
+            bookmark_title: The bookmark title to extract index from
+
+        Returns:
+            Optional[str]: Original index as string, or None if not found
+        """
         if not bookmark_title:
             return None
 
         try:
             if "-" in bookmark_title:
                 index_part = bookmark_title.split("-")[0].strip()
-                return int(index_part)
+                return index_part
         except (ValueError, IndexError):
             pass
 
         return None
 
-    def update_bookmarks_with_new_titles(self, new_titles: Dict[int, str]) -> bool:
-        """Update PDF bookmarks with new titles while preserving non-matching bookmarks."""
+    def update_bookmarks_with_new_titles(self, new_titles: Dict[str, str]) -> bool:
+        """Update PDF bookmarks with new titles while preserving non-matching bookmarks.
+
+        Args:
+            new_titles: Dictionary mapping original index (as string) to new bookmark title
+        """
         if not self.writer or not self.bookmarks:
             return False
 
@@ -277,9 +304,10 @@ class PDFProcessor:
             bookmark_title = bookmark.get("title", "")
             page_num = bookmark.get("page", 1) - 1  # Convert to 0-based index
 
-            # Try to extract index from bookmark title
+            # Try to extract index from bookmark title (returns string for alphanumeric support)
             extracted_index = self.extract_original_index_from_bookmark(bookmark_title)
 
+            # Use string comparison for bookmark matching (supports alphanumeric values like A1, B5, etc.)
             if extracted_index is not None and extracted_index in new_titles:
                 # This bookmark matches our format and has a new title - update it
                 new_title = new_titles[extracted_index]
@@ -293,19 +321,24 @@ class PDFProcessor:
         return True
 
     def _create_bookmark_page_mapping(
-        self, new_titles: Dict[int, str]
-    ) -> Dict[int, int]:
-        """Create mapping from original index to page number for bookmarks."""
+        self, new_titles: Dict[str, str]
+    ) -> Dict[str, int]:
+        """Create mapping from original index to page number for bookmarks.
+
+        Returns:
+            Dict[str, int]: Mapping from original index (as string) to page number
+        """
         page_mapping = {}
 
         for original_index in new_titles.keys():
-            # Find the original bookmark with this index
+            # Find the original bookmark with this index using string comparison
             for bookmark in self.bookmarks:
                 bookmark_title = bookmark.get("title", "")
                 extracted_index = self.extract_original_index_from_bookmark(
                     bookmark_title
                 )
 
+                # Use string comparison for matching (supports alphanumeric values)
                 if extracted_index == original_index:
                     # Found the matching bookmark, get its page number
                     page_num = bookmark.get("page", 1) - 1  # Convert to 0-based index
@@ -320,11 +353,11 @@ class PDFProcessor:
             self.writer.write(output_file)
         return True
 
-    def get_bookmark_update_summary(self, new_titles: Dict[int, str]) -> Dict[str, any]:
+    def get_bookmark_update_summary(self, new_titles: Dict[str, str]) -> Dict[str, any]:
         """Get summary of bookmark updates for user feedback.
 
         Args:
-            new_titles (Dict[int, str]): Dictionary of new bookmark titles
+            new_titles (Dict[str, str]): Dictionary of new bookmark titles
 
         Returns:
             Dict[str, any]: Dictionary containing:
@@ -333,7 +366,7 @@ class PDFProcessor:
                 - new_titles_preview (List[str]): Preview of first 5 new titles
                 - original_bookmark_count (int): Original number of bookmarks
         """
-        # Count how many existing bookmarks match our format
+        # Count how many existing bookmarks match our format using string comparison
         matching_bookmarks = 0
         non_matching_bookmarks = 0
 
@@ -341,6 +374,7 @@ class PDFProcessor:
             bookmark_title = bookmark.get("title", "")
             extracted_index = self.extract_original_index_from_bookmark(bookmark_title)
 
+            # Use string comparison for matching (supports alphanumeric values)
             if extracted_index is not None and extracted_index in new_titles:
                 matching_bookmarks += 1
             else:

@@ -44,7 +44,13 @@ class ColumnInfo:
 
 
 class ExcelProcessor:
-    """Handles Excel file operations and validation."""
+    """Handles Excel file operations and validation.
+
+    This class processes Excel files with support for alphanumeric Index# values.
+    Index# values are treated as strings throughout the processing pipeline to support
+    formats like "A1", "B5", "AGH42", etc., while maintaining backward compatibility
+    with numeric-only Index# values.
+    """
 
     def __init__(self, required_columns: List[str]):
         self.required_columns = required_columns
@@ -189,17 +195,39 @@ class ExcelProcessor:
         return result
 
     def _process_data_types(self) -> None:
-        """Process data types for specific columns to optimize sorting and display."""
+        """Process data types for specific columns to optimize sorting and display.
+
+        Index# column is treated as string type to support alphanumeric values.
+        Original Index# values are preserved for PDF bookmark mapping.
+        """
         if self.df is None:
             return
 
-        # Convert Index# to numeric if it exists
+        # Handle Index# column - keep as string to support alphanumeric values like A1, B1, etc.
         if "Index#" in self.df.columns:
-            try:
-                self.df["Index#"] = pd.to_numeric(self.df["Index#"], errors="coerce")
-                self.processed_columns.add("Index#")
-            except (ValueError, TypeError):
-                pass
+            # Ensure Index# is treated as string to handle alphanumeric values
+            self.df["Index#"] = self.df["Index#"].astype(str).str.strip()
+            self.df["Index#"] = self.df["Index#"].replace("nan", "")
+
+            # Additional cleaning and validation for Index# values
+            self.df["Index#"] = self.df["Index#"].str.replace(
+                r"\s+", "", regex=True
+            )  # Remove all whitespace
+            self.df["Index#"] = self.df["Index#"].replace(
+                "", "N/A"
+            )  # Replace empty strings with placeholder
+
+            # Check for duplicate Index# values (for validation only - don't modify to preserve PDF bookmark matching)
+            if self.df["Index#"].duplicated().any():
+                # Log warning about duplicates but don't modify values to preserve PDF bookmark matching
+                duplicate_values = self.df["Index#"][
+                    self.df["Index#"].duplicated()
+                ].unique()
+                print(
+                    f"Warning: Duplicate Index# values found: {duplicate_values}. These may cause issues with PDF bookmark mapping."
+                )
+
+            self.processed_columns.add("Index#")
 
         # Convert date columns to datetime if they exist - this is more comprehensive than before
         date_columns = ["Document Date", "Received Date"]
@@ -325,8 +353,13 @@ class ExcelProcessor:
                     self.df[col] = self.df[col].astype(str).str.strip()
 
     def _renumber_index(self) -> None:
-        """Renumber the Index# column starting from 1 and incrementing by 1."""
+        """Renumber the Index# column starting from 1 and incrementing by 1.
+
+        This method always creates sequential integer values (1, 2, 3, etc.) regardless
+        of the original Index# format (numeric, alphanumeric, or mixed).
+        """
         if "Index#" in self.df.columns:
+            # Always create sequential integers for the final Index# column
             self.df["Index#"] = range(1, len(self.df) + 1)
             self.processed_columns.add("Index#")
 
@@ -411,7 +444,8 @@ class ExcelProcessor:
     def _add_original_index_column(self) -> None:
         """Add Original_Index column to preserve original Index# values for PDF bookmark mapping."""
         if "Index#" in self.df.columns:
-            self.df["Original_Index"] = self.df["Index#"].copy()
+            # Ensure Index# values are preserved as strings for alphanumeric support
+            self.df["Original_Index"] = self.df["Index#"].astype(str).copy()
             self.processed_columns.add("Original_Index")
 
             # Add column info for Original_Index
@@ -426,8 +460,12 @@ class ExcelProcessor:
             )
             self.columns.append(original_index_col_info)
 
-    def get_original_index_mapping(self) -> Dict[int, int]:
-        """Get mapping from original index values to new index values."""
+    def get_original_index_mapping(self) -> Dict[str, int]:
+        """Get mapping from original index values to new index values.
+
+        Returns:
+            Dict[str, int]: Mapping from original index (as string) to new index (as int)
+        """
         if (
             self.df is None
             or "Original_Index" not in self.df.columns
@@ -435,10 +473,10 @@ class ExcelProcessor:
         ):
             return {}
 
-        # Create mapping: original_index -> new_index
+        # Create mapping: original_index (as string) -> new_index (as int)
         mapping = {}
         for _, row in self.df.iterrows():
-            original_idx = int(row["Original_Index"])
+            original_idx = str(row["Original_Index"]).strip()
             new_idx = int(row["Index#"])
             mapping[original_idx] = new_idx
 
