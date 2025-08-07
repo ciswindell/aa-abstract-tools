@@ -6,6 +6,7 @@ Handles Excel file loading, validation, and data operations.
 
 import os
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Dict, List, Optional
 
 import pandas as pd
@@ -229,17 +230,12 @@ class ExcelProcessor:
 
             self.processed_columns.add("Index#")
 
-        # Convert date columns to datetime if they exist - this is more comprehensive than before
+        # Process date columns with robust handling to prevent data loss
         date_columns = ["Document Date", "Received Date"]
         for col in date_columns:
             if col in self.df.columns:
-                try:
-                    # Convert to datetime but preserve original format in string representation
-                    self.df[col] = pd.to_datetime(self.df[col], errors="coerce")
-                    self.processed_columns.add(col)
-                except (ValueError, TypeError, pd.errors.OutOfBoundsDatetime):
-                    # If conversion fails, keep as string
-                    pass
+                self._process_date_column_robust(col)
+                self.processed_columns.add(col)
 
         # Clean text columns
         text_columns = ["Legal Description", "Grantee", "Grantor", "Document Type"]
@@ -253,6 +249,118 @@ class ExcelProcessor:
                     self.processed_columns.add(col)
                 except (ValueError, TypeError, AttributeError):
                     pass
+
+    def _process_date_column_robust(self, col: str) -> None:
+        """
+        Robust date processing that preserves original values and prevents data loss.
+
+        Strategy:
+        1. Store original values as backup
+        2. Try multiple parsing approaches
+        3. Use original value if all parsing fails
+        4. Never lose data
+        """
+        if col not in self.df.columns:
+            return
+
+        # Store original values as backup
+        original_col_name = f"{col}_original"
+        self.df[original_col_name] = self.df[col].copy()
+
+        # Process each value individually for maximum robustness
+        processed_values = []
+
+        for idx, value in enumerate(self.df[col]):
+            processed_value = self._parse_date_value_robust(value, idx, col)
+            processed_values.append(processed_value)
+
+        # Update the column with processed values
+        self.df[col] = processed_values
+
+        # Log conversion summary
+        converted_count = sum(
+            1 for v in processed_values if isinstance(v, (pd.Timestamp, datetime))
+        )
+        original_count = len(processed_values)
+        non_null_count = sum(
+            1 for v in processed_values if pd.notna(v) and str(v).strip() != ""
+        )
+
+        print(
+            f"Date processing for {col}: {converted_count}/{non_null_count} values successfully converted to dates"
+        )
+
+    def _parse_date_value_robust(self, value, idx: int, col_name: str):
+        """
+        Robust date parsing that tries multiple approaches and never loses data.
+
+        Args:
+            value: The original date value
+            idx: Row index for debugging
+            col_name: Column name for debugging
+
+        Returns:
+            Parsed datetime or original value if parsing fails
+        """
+        # Handle null/empty values
+        if pd.isna(value) or value is None:
+            return value
+
+        # If already a datetime object, return as-is
+        if isinstance(value, (datetime, pd.Timestamp)):
+            return value
+
+        # Convert to string for processing
+        str_value = str(value).strip()
+
+        # Handle empty strings
+        if str_value == "" or str_value.lower() == "nan":
+            return value
+
+        # Try pandas default parsing first (handles most formats)
+        try:
+            parsed = pd.to_datetime(str_value, errors="raise")
+            if pd.notna(parsed):
+                return parsed
+        except:
+            pass
+
+        # Try common date formats manually
+        common_formats = [
+            "%m/%d/%Y",  # 1/30/1959
+            "%m/%d/%y",  # 1/30/59
+            "%m-%d-%Y",  # 1-30-1959
+            "%m-%d-%y",  # 1-30-59
+            "%Y-%m-%d",  # 1959-01-30
+            "%Y/%m/%d",  # 1959/01/30
+            "%d/%m/%Y",  # 30/1/1959
+            "%d-%m-%Y",  # 30-1-1959
+            "%B %d, %Y",  # January 30, 1959
+            "%b %d, %Y",  # Jan 30, 1959
+            "%Y-%m-%d %H:%M:%S",  # 1959-01-30 00:00:00
+        ]
+
+        for fmt in common_formats:
+            try:
+                parsed = datetime.strptime(str_value, fmt)
+                return pd.Timestamp(parsed)
+            except:
+                continue
+
+        # Try with dateutil parser (very flexible)
+        try:
+            from dateutil.parser import parse
+
+            parsed = parse(str_value)
+            return pd.Timestamp(parsed)
+        except:
+            pass
+
+        # If all parsing fails, keep original value and log
+        print(
+            f"Warning: Could not parse date '{str_value}' in {col_name} row {idx+1}. Keeping original value."
+        )
+        return value
 
     def check_duplicate_columns(self) -> List[str]:
         """Check for duplicate column names in the loaded DataFrame."""
@@ -344,13 +452,20 @@ class ExcelProcessor:
                 self.df[col] = self.df[col].replace("nan", "")
 
         # Ensure date columns are properly formatted for sorting
+        # Note: Date columns are already processed robustly in _process_data_types()
+        # This just ensures any remaining issues are handled
         date_columns = ["Document Date", "Received Date"]
         for col in date_columns:
             if col in self.df.columns:
-                try:
-                    self.df[col] = pd.to_datetime(self.df[col], errors="coerce")
-                except (ValueError, TypeError, pd.errors.OutOfBoundsDatetime):
-                    self.df[col] = self.df[col].astype(str).str.strip()
+                # Check if any values are still not datetime/timestamp
+                non_datetime_mask = ~self.df[col].apply(
+                    lambda x: isinstance(x, (pd.Timestamp, datetime)) or pd.isna(x)
+                )
+                if non_datetime_mask.any():
+                    print(
+                        f"Warning: Some {col} values are not datetime objects. Re-processing..."
+                    )
+                    self._process_date_column_robust(col)
 
     def _renumber_index(self) -> None:
         """Renumber the Index# column starting from 1 and incrementing by 1.
