@@ -252,20 +252,15 @@ class ExcelProcessor:
 
     def _process_date_column_robust(self, col: str) -> None:
         """
-        Robust date processing that preserves original values and prevents data loss.
+        Robust date processing that prevents data loss.
 
         Strategy:
-        1. Store original values as backup
-        2. Try multiple parsing approaches
-        3. Use original value if all parsing fails
-        4. Never lose data
+        1. Try multiple parsing approaches
+        2. Use original value if all parsing fails
+        3. Never lose data
         """
         if col not in self.df.columns:
             return
-
-        # Store original values as backup
-        original_col_name = f"{col}_original"
-        self.df[original_col_name] = self.df[col].copy()
 
         # Process each value individually for maximum robustness
         processed_values = []
