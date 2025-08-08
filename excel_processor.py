@@ -281,9 +281,7 @@ class ExcelProcessor:
             1 for v in processed_values if pd.notna(v) and str(v).strip() != ""
         )
 
-        print(
-            f"Date processing for {col}: {converted_count}/{non_null_count} values successfully converted to dates"
-        )
+        # Date processing completed silently
 
     def _parse_date_value_robust(self, value, idx: int, col_name: str):
         """
@@ -351,10 +349,7 @@ class ExcelProcessor:
         except:
             pass
 
-        # If all parsing fails, keep original value and log
-        print(
-            f"Warning: Could not parse date '{str_value}' in {col_name} row {idx+1}. Keeping original value."
-        )
+        # If all parsing fails, keep original value silently
         return value
 
     def check_duplicate_columns(self) -> List[str]:
@@ -457,9 +452,7 @@ class ExcelProcessor:
                     lambda x: isinstance(x, (pd.Timestamp, datetime)) or pd.isna(x)
                 )
                 if non_datetime_mask.any():
-                    print(
-                        f"Warning: Some {col} values are not datetime objects. Re-processing..."
-                    )
+                    # Re-process date column silently
                     self._process_date_column_robust(col)
 
     def _renumber_index(self) -> None:

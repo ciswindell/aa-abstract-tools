@@ -6,12 +6,11 @@ A class-based application for sorting Excel data and renumbering PDF bookmarks.
 
 import os
 import shutil
-import time
 import tkinter as tk
 from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from column_mapper import ColumnMapper
 
@@ -38,6 +37,17 @@ class AbstractRenumberGUI:
         self.reorder_pages_enabled: tk.BooleanVar = tk.BooleanVar(
             value=False
         )  # Reorder pages disabled by default
+
+        # Initialize GUI components
+        self.excel_label: Optional[ttk.Label] = None
+        self.pdf_label: Optional[ttk.Label] = None
+        self.process_button: Optional[ttk.Button] = None
+        self.status_text: Optional[tk.Text] = None
+        self.backup_checkbox: Optional[ttk.Checkbutton] = None
+        self.backup_info_label: Optional[ttk.Label] = None
+        self.sort_bookmarks_checkbox: Optional[ttk.Checkbutton] = None
+        self.reorder_pages_checkbox: Optional[ttk.Checkbutton] = None
+        self.reorder_pages_info_label: Optional[ttk.Label] = None
 
         self.setup_window()
         self.setup_gui()
@@ -343,6 +353,7 @@ class AbstractRenumberTool:
         self.excel_processor = ExcelProcessor(self.required_columns)
         self.column_mapper = ColumnMapper(self.required_columns)
         self.gui = AbstractRenumberGUI(self.root, self)
+        self.pdf_processor: Optional[PDFProcessor] = None
 
     def process_files(self):
         """Main processing function that orchestrates Excel and PDF file processing."""
@@ -360,7 +371,7 @@ class AbstractRenumberTool:
             # Perform Excel processing (sorting, renumbering)
             self._perform_excel_processing()
 
-        except Exception as e:
+        except (ValueError, OSError, RuntimeError) as e:
             self.gui.log_status(f"Error: {str(e)}")
             messagebox.showerror("Processing Error", f"Processing failed: {str(e)}")
 
@@ -378,7 +389,7 @@ class AbstractRenumberTool:
             if duplicates:
                 messagebox.showwarning(
                     "Duplicate Columns",
-                    f"The Excel file has duplicate column names:\n"
+                    "The Excel file has duplicate column names:\n"
                     + "\n".join(f"• {col}" for col in duplicates)
                     + "\n\nThis may cause issues.",
                 )
@@ -405,7 +416,7 @@ class AbstractRenumberTool:
         except ValueError as e:
             self._handle_error("Invalid File", str(e))
             return False
-        except Exception as e:
+        except OSError as e:
             self._handle_error(
                 "Error",
                 f"Failed to load Excel file:\n{str(e)}\n\n"
@@ -425,7 +436,7 @@ class AbstractRenumberTool:
             try:
                 self.excel_processor.apply_column_mapping(mapping)
                 return True
-            except Exception as e:
+            except (ValueError, OSError, RuntimeError) as e:
                 self._handle_error("Mapping Error", f"Column mapping failed:\n{str(e)}")
                 return False
         else:
@@ -474,7 +485,7 @@ class AbstractRenumberTool:
             self.gui.log_status("PDF bookmark validation passed.")
             return True
 
-        except Exception as e:
+        except (ValueError, OSError, RuntimeError) as e:
             self._handle_error(
                 "Validation Error", f"Failed to validate PDF bookmarks: {str(e)}"
             )
@@ -499,9 +510,7 @@ class AbstractRenumberTool:
 
             # Create backups if enabled
             if backup_enabled:
-                excel_backup_path, pdf_backup_path = self._create_backup_files(
-                    excel_file, pdf_file
-                )
+                self._create_backup_files(excel_file, pdf_file)
 
             # Sort the data
             self.excel_processor.sort_data()
@@ -519,7 +528,7 @@ class AbstractRenumberTool:
             self._show_completion_success(excel_output_path, pdf_output_path)
             return True
 
-        except Exception as e:
+        except (ValueError, OSError, RuntimeError) as e:
             self.gui.log_status(f"Error: {str(e)}")
             messagebox.showerror("Processing Error", f"Processing failed: {str(e)}")
             return False
@@ -527,6 +536,7 @@ class AbstractRenumberTool:
     def _show_completion_success(
         self, excel_output_path: str, pdf_output_path: str
     ) -> None:
+        # pdf_output_path is unused but kept for API consistency
         """Show simple completion success message."""
         self.gui.log_status("Complete!")
 
@@ -542,18 +552,18 @@ class AbstractRenumberTool:
         try:
             self.excel_processor.save_with_formulas(excel_output_path)
             return True
-        except Exception as e:
-            raise Exception(f"Failed to save Excel file: {str(e)}")
+        except (ValueError, OSError, RuntimeError) as e:
+            raise RuntimeError(f"Failed to save Excel file: {str(e)}") from e
 
     def _save_updated_pdf_file(self, pdf_output_path: str) -> bool:
         """Save the updated PDF file with basic error handling."""
         try:
             # Initialize PDFProcessor if needed
-            if not hasattr(self, "pdf_processor"):
+            if self.pdf_processor is None:
                 self.pdf_processor = PDFProcessor()
 
             # Load PDF file
-            excel_file, pdf_file = self.gui.get_selected_files()
+            _, pdf_file = self.gui.get_selected_files()
             self.pdf_processor.load_pdf(pdf_file)
 
             # Copy pages to writer
@@ -587,8 +597,8 @@ class AbstractRenumberTool:
 
             return True
 
-        except Exception as e:
-            raise Exception(f"Failed to save PDF file: {str(e)}")
+        except (ValueError, OSError, RuntimeError) as e:
+            raise RuntimeError(f"Failed to save PDF file: {str(e)}") from e
 
     def _generate_backup_filename(self, original_path: str) -> str:
         """Generate simple backup filename with timestamp."""
