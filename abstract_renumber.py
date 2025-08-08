@@ -534,9 +534,8 @@ class AbstractRenumberTool:
             return False
 
     def _show_completion_success(
-        self, excel_output_path: str, pdf_output_path: str
+        self, excel_output_path: str, pdf_output_path: str  # noqa: ARG002
     ) -> None:
-        # pdf_output_path is unused but kept for API consistency
         """Show simple completion success message."""
         self.gui.log_status("Complete!")
 
