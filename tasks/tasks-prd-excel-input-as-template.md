@@ -43,7 +43,7 @@
 - [ ] 6.0 Integrate preservation flow with existing processing without functional changes (SOLID/DRY)
   - [x] 6.1 Wire the template-preserving exporter into current pipeline entry points.
   - [x] 6.2 Verify no change to formula handling or renumbering results on valid inputs.
-  - [ ] 6.3 Add integration tests (<1,000 rows) confirming identical formatting except intended data changes.
-  - [ ] 6.4 Update README/usage notes only where behavior is clarified (no functional change).
+  - [x] 6.3 Add integration tests (<1,000 rows) confirming identical formatting except intended data changes.
+  - [x] 6.4 Update README/usage notes only where behavior is clarified (no functional change).
 
 

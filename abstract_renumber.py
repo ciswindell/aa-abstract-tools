@@ -14,6 +14,8 @@ from tkinter import filedialog, messagebox, ttk
 from typing import List, Optional, Tuple
 
 
+from openpyxl import load_workbook
+
 # Import our modular classes
 from excel_processor import ExcelProcessor
 from pdf_processor import PDFProcessor
@@ -438,10 +440,8 @@ class AbstractRenumberTool:
             return False
 
     def _prompt_user_select_sheet(self, file_path: str) -> Optional[str]:
-        """Show a simple GUI to select a sheet if the target is not found."""
+        """Show a dropdown (readonly) of sheet names to select from."""
         try:
-            from openpyxl import load_workbook
-
             wb = load_workbook(file_path, read_only=True, data_only=True)
             names = wb.sheetnames
             wb.close()
@@ -449,26 +449,65 @@ class AbstractRenumberTool:
             if not names:
                 return None
 
-            # Simple dialog using tkinter
-            from tkinter import simpledialog
+            # Determine default selection (prefer configured 'Index')
+            desired = (self.get_processing_sheet_name() or "").lower()
+            default_index = 0
+            for i, n in enumerate(names):
+                if n.lower() == desired:
+                    default_index = i
+                    break
 
+            # Modal dialog with dropdown
             self.gui.log_status("Select processing sheet...")
-            # Ensure we have a root window context
             self.root.update()
 
-            selection = simpledialog.askstring(
-                "Select Sheet",
-                "Enter the sheet name to process:\n\nAvailable:\n" + "\n".join(names),
-                parent=self.root,
+            dialog = tk.Toplevel(self.root)
+            dialog.title("Select Sheet")
+            dialog.transient(self.root)
+            dialog.grab_set()
+
+            ttk.Label(dialog, text="Choose the sheet to process:").grid(
+                row=0, column=0, columnspan=2, padx=12, pady=(12, 6), sticky=tk.W
             )
 
-            if selection and selection in names:
-                return selection
-            # Try case-insensitive matching
-            lower_to_name = {n.lower(): n for n in names}
-            if selection and selection.lower() in lower_to_name:
-                return lower_to_name[selection.lower()]
-            return None
+            selected_var = tk.StringVar(value=names[default_index])
+            combo = ttk.Combobox(
+                dialog,
+                state="readonly",
+                values=names,
+                textvariable=selected_var,
+                width=40,
+            )
+            combo.grid(
+                row=1,
+                column=0,
+                columnspan=2,
+                padx=12,
+                pady=(0, 12),
+                sticky=(tk.W, tk.E),
+            )
+            combo.current(default_index)
+
+            chosen = {"value": None}
+
+            def on_ok():
+                chosen["value"] = selected_var.get()
+                dialog.destroy()
+
+            def on_cancel():
+                chosen["value"] = None
+                dialog.destroy()
+
+            ok_btn = ttk.Button(dialog, text="OK", command=on_ok)
+            cancel_btn = ttk.Button(dialog, text="Cancel", command=on_cancel)
+            ok_btn.grid(row=2, column=0, padx=(12, 6), pady=(0, 12), sticky=tk.E)
+            cancel_btn.grid(row=2, column=1, padx=(6, 12), pady=(0, 12), sticky=tk.W)
+
+            dialog.bind("<Return>", lambda _: on_ok())
+            dialog.bind("<Escape>", lambda _: on_cancel())
+            dialog.wait_window(dialog)
+
+            return chosen["value"]
         except PermissionError as e:
             self._handle_error(
                 "Permission Error",
@@ -496,8 +535,6 @@ class AbstractRenumberTool:
         If the configured sheet name is not found, return None to trigger GUI picker later.
         """
         try:
-            from openpyxl import load_workbook
-
             wb = load_workbook(file_path, read_only=True, data_only=True)
             desired = (self.get_processing_sheet_name() or "").lower()
             names = wb.sheetnames

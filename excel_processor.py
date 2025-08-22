@@ -4,7 +4,6 @@ Excel processing module for the Abstract Renumber Tool.
 Handles Excel file loading, validation, and data operations.
 """
 
-import os
 from dataclasses import dataclass
 from collections import Counter
 from datetime import datetime
@@ -12,6 +11,7 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 from openpyxl import load_workbook
+from dateutil.parser import parse
 
 from excel_formatter import ExcelFormatter
 
@@ -348,8 +348,6 @@ class ExcelProcessor:
 
         # Try with dateutil parser (very flexible)
         try:
-            from dateutil.parser import parse
-
             parsed = parse(str_value)
             return pd.Timestamp(parsed)
         except:
