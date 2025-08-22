@@ -6,6 +6,7 @@ Handles Excel file loading, validation, and data operations.
 
 import os
 from dataclasses import dataclass
+from collections import Counter
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -64,11 +65,16 @@ class ExcelProcessor:
             {}
         )  # Store original column widths by position
 
-    def load_file(self, file_path: str) -> bool:
-        """Load Excel file with basic validation."""
+    def load_file(self, file_path: str, sheet_name: Optional[str] = None) -> bool:
+        """Load Excel file with basic validation.
+
+        Args:
+            file_path: Path to the Excel file
+            sheet_name: Optional sheet name to load (case-sensitive exact as in file)
+        """
         try:
             # Load Excel file
-            self.df = pd.read_excel(file_path, dtype=str)
+            self.df = pd.read_excel(file_path, dtype=str, sheet_name=sheet_name)
             self.original_file_path = file_path
 
             if self.df.empty:
@@ -360,7 +366,25 @@ class ExcelProcessor:
         """Check for required columns and return list of missing ones."""
         if self.df is None:
             return self.required_columns
-        return [col for col in self.required_columns if col not in self.df.columns]
+        present_lower = {str(c).lower() for c in self.df.columns}
+        missing = [
+            col
+            for col in self.required_columns
+            if str(col).lower() not in present_lower
+        ]
+        return missing
+
+    def get_required_duplicate_columns(self) -> List[str]:
+        """Return required column names that appear more than once (case-insensitive)."""
+        if self.df is None:
+            return []
+        required_lower = {str(c).lower() for c in self.required_columns}
+        counts = Counter(
+            str(c).lower() for c in self.df.columns if str(c).lower() in required_lower
+        )
+        return [
+            rc for rc in self.required_columns if counts.get(str(rc).lower(), 0) > 1
+        ]
 
     def apply_column_mapping(self, mapping: Dict[str, str]) -> bool:
         """Apply column name mappings to the DataFrame."""
@@ -492,21 +516,76 @@ class ExcelProcessor:
             return []
         return [col for col in self.df.columns if col not in self.processed_columns]
 
-    def save_with_formulas(self, output_path: str) -> bool:
-        """Save Excel file preserving formatting."""
-        # Create output DataFrame
-        output_df = self._create_output_dataframe()
+    def save_with_formulas(
+        self, output_path: str, processing_sheet_name: Optional[str] = None
+    ) -> bool:
+        """Save Excel file preserving formatting.
 
-        # Save to Excel
-        output_df.to_excel(output_path, index=False)
+        Writes values into the existing output workbook (a copy of the input)
+        to retain all sheets and formatting. Only the active/processing sheet is modified.
+        """
+        try:
+            # Create output DataFrame with original column names
+            output_df = self._create_output_dataframe()
 
-        # Update column positions for the final output
-        self._update_column_positions_for_output(output_df)
+            # Open the copied workbook and select the processing sheet or fallback to active
+            wb = load_workbook(output_path)
+            # Require explicit processing sheet; no fallback to active sheet
+            if not processing_sheet_name:
+                wb.close()
+                raise RuntimeError("Processing sheet name not provided")
+            lower_to_name = {name.lower(): name for name in wb.sheetnames}
+            match_name = lower_to_name.get(str(processing_sheet_name).lower())
+            if not match_name:
+                wb.close()
+                raise RuntimeError(
+                    f"Processing sheet '{processing_sheet_name}' not found in output workbook"
+                )
+            ws = wb[match_name]
 
-        # Apply formatting
-        formatter = ExcelFormatter(self.columns, self.bookmark_formula_column)
-        formatter.apply_formatting(output_path, output_df)
-        return True
+            # Build a case-insensitive header map from the first row
+            header_values = []
+            for cell in ws[1]:
+                header_values.append(
+                    "" if cell.value is None else str(cell.value).strip()
+                )
+            header_to_col = {
+                h.lower(): idx + 1 for idx, h in enumerate(header_values) if h != ""
+            }
+
+            # Write DataFrame values into matching columns by header name
+            for df_col in output_df.columns:
+                target_col_idx = header_to_col.get(str(df_col).strip().lower())
+                if not target_col_idx:
+                    # Skip columns that do not exist in the target sheet
+                    continue
+
+                values = output_df[df_col].tolist()
+                for row_idx, value in enumerate(
+                    values, start=2
+                ):  # Start at row 2 (after header)
+                    ws.cell(row=row_idx, column=target_col_idx, value=value)
+
+            # Keep the selected sheet as active for downstream formatting
+            try:
+                wb.active = wb.sheetnames.index(ws.title)
+            except Exception:
+                pass
+
+            # Save workbook with updated values
+            wb.save(output_path)
+            wb.close()
+
+            # Update column positions for the final output
+            self._update_column_positions_for_output(output_df)
+
+            # Apply formatting (only affects the active/processing sheet)
+            formatter = ExcelFormatter(self.columns, self.bookmark_formula_column)
+            formatter.apply_formatting(output_path, output_df)
+            return True
+
+        except Exception as e:
+            raise RuntimeError(f"Failed to save Excel file: {str(e)}") from e
 
     def _create_output_dataframe(self) -> pd.DataFrame:
         """Create DataFrame with original column names for export, excluding internal columns."""

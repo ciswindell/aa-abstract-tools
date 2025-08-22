@@ -29,7 +29,6 @@ class ExcelFormatter:
             ws = wb.active
 
             # Apply all formatting
-            self._apply_column_widths(ws)
             self._apply_cell_alignments(ws, output_df)
             self._apply_text_wrapping(ws, output_df)
             self._apply_date_formatting(ws, output_df)

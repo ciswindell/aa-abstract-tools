@@ -9,15 +9,16 @@ import shutil
 import tkinter as tk
 from datetime import datetime
 from pathlib import Path
+import tempfile
 from tkinter import filedialog, messagebox, ttk
 from typing import List, Optional, Tuple
 
-from column_mapper import ColumnMapper
 
 # Import our modular classes
 from excel_processor import ExcelProcessor
 from pdf_processor import PDFProcessor
 from pdf_validator import PDFValidator
+from validators.input_sheet_validator import validate as validate_sheet
 
 
 class AbstractRenumberGUI:
@@ -348,12 +349,19 @@ class AbstractRenumberTool:
             "Received Date",
         ]
 
+        # Configured processing sheet name (case-insensitive match)
+        self.processing_sheet_name: Optional[str] = "Index"
+        self.selected_processing_sheet_name: Optional[str] = None
+
         # Initialize components
         self.root = tk.Tk()
         self.excel_processor = ExcelProcessor(self.required_columns)
-        self.column_mapper = ColumnMapper(self.required_columns)
         self.gui = AbstractRenumberGUI(self.root, self)
         self.pdf_processor: Optional[PDFProcessor] = None
+
+    def get_processing_sheet_name(self) -> Optional[str]:
+        """Return the configured processing sheet name if any."""
+        return self.processing_sheet_name
 
     def process_files(self):
         """Main processing function that orchestrates Excel and PDF file processing."""
@@ -379,7 +387,15 @@ class AbstractRenumberTool:
         """Process Excel file with validation and mapping."""
         try:
             # Load file
-            self.excel_processor.load_file(file_path)
+            target_sheet = self._resolve_processing_sheet_name(file_path)
+            if target_sheet is None:
+                # Prompt user to select a sheet
+                target_sheet = self._prompt_user_select_sheet(file_path)
+                if target_sheet is None:
+                    return False
+            # Remember the chosen sheet for save phase
+            self.selected_processing_sheet_name = target_sheet
+            self.excel_processor.load_file(file_path, sheet_name=target_sheet)
 
             # Get file info
             info = self.excel_processor.get_column_info()
@@ -394,18 +410,65 @@ class AbstractRenumberTool:
                     + "\n\nThis may cause issues.",
                 )
 
-            # Validate columns
-            missing_columns = self.excel_processor.get_missing_columns()
-            if missing_columns:
-                return self._handle_missing_columns(
-                    missing_columns, info["column_names"]
-                )
+            # Validate columns via validator (case-insensitive, required-only duplicates)
+            results = validate_sheet(
+                self.excel_processor.get_dataframe(), self.required_columns
+            )
+            missing_columns = results["missing"]
+            required_dupes = results["duplicates"]
+            if missing_columns or required_dupes:
+                details = []
+                if missing_columns:
+                    details.append(
+                        "Missing required columns:\n"
+                        + "\n".join(f"• {c}" for c in missing_columns)
+                    )
+                if required_dupes:
+                    details.append(
+                        "Duplicate required columns:\n"
+                        + "\n".join(f"• {c}" for c in required_dupes)
+                    )
+                messagebox.showerror("Column Validation Error", "\n\n".join(details))
+                return False
 
             return True
 
         except FileNotFoundError as e:
             self._handle_error("File Not Found", str(e))
             return False
+
+    def _prompt_user_select_sheet(self, file_path: str) -> Optional[str]:
+        """Show a simple GUI to select a sheet if the target is not found."""
+        try:
+            from openpyxl import load_workbook
+
+            wb = load_workbook(file_path, read_only=True, data_only=True)
+            names = wb.sheetnames
+            wb.close()
+
+            if not names:
+                return None
+
+            # Simple dialog using tkinter
+            from tkinter import simpledialog
+
+            self.gui.log_status("Select processing sheet...")
+            # Ensure we have a root window context
+            self.root.update()
+
+            selection = simpledialog.askstring(
+                "Select Sheet",
+                "Enter the sheet name to process:\n\nAvailable:\n" + "\n".join(names),
+                parent=self.root,
+            )
+
+            if selection and selection in names:
+                return selection
+            # Try case-insensitive matching
+            lower_to_name = {n.lower(): n for n in names}
+            if selection and selection.lower() in lower_to_name:
+                return lower_to_name[selection.lower()]
+            return None
         except PermissionError as e:
             self._handle_error(
                 "Permission Error",
@@ -423,24 +486,38 @@ class AbstractRenumberTool:
                 "Please ensure the file is a valid Excel file.",
             )
             return False
+        except Exception as e:
+            self._handle_error("Sheet Selection Error", str(e))
+            return None
+
+    def _resolve_processing_sheet_name(self, file_path: str) -> Optional[str]:
+        """Resolve the processing sheet name, case-insensitively defaulting to 'Index'.
+
+        If the configured sheet name is not found, return None to trigger GUI picker later.
+        """
+        try:
+            from openpyxl import load_workbook
+
+            wb = load_workbook(file_path, read_only=True, data_only=True)
+            desired = (self.get_processing_sheet_name() or "").lower()
+            names = wb.sheetnames
+            lower_to_name = {n.lower(): n for n in names}
+            wb.close()
+            if desired and desired in lower_to_name:
+                return lower_to_name[desired]
+            return None
+        except Exception:
+            return None
 
     def _handle_missing_columns(
         self, missing_columns: List[str], available_columns: List[str]
     ) -> bool:
-        """Handle missing columns with mapping dialog."""
-        mapping = self.column_mapper.show_mapping_dialog(
-            self.root, available_columns, missing_columns
+        """Handle missing columns by showing an error and aborting (no mapping)."""
+        message = "Missing required columns:\n" + "\n".join(
+            f"• {c}" for c in missing_columns
         )
-
-        if mapping:
-            try:
-                self.excel_processor.apply_column_mapping(mapping)
-                return True
-            except (ValueError, OSError, RuntimeError) as e:
-                self._handle_error("Mapping Error", f"Column mapping failed:\n{str(e)}")
-                return False
-        else:
-            return False
+        self._handle_error("Missing Columns", message)
+        return False
 
     def _validate_pdf_bookmarks(self, pdf_file: str) -> bool:
         """Validate PDF bookmarks for conflicts before processing.
@@ -520,8 +597,10 @@ class AbstractRenumberTool:
                 excel_file, pdf_file
             )
 
-            # Save files
-            self._save_processed_excel_file(excel_output_path)
+            # Save Excel using atomic temp-file then rename to final
+            self._save_excel_atomically(excel_file, excel_output_path)
+
+            # Save PDF
             self._save_updated_pdf_file(pdf_output_path)
 
             # Success
@@ -549,10 +628,68 @@ class AbstractRenumberTool:
     def _save_processed_excel_file(self, excel_output_path: str) -> bool:
         """Save the processed Excel file with basic error handling."""
         try:
-            self.excel_processor.save_with_formulas(excel_output_path)
+            # Use the resolved/selected sheet name; fail if not set
+            excel_file, _ = self.gui.get_selected_files()
+            final_sheet = (
+                self.selected_processing_sheet_name
+                or self._resolve_processing_sheet_name(excel_file)
+            )
+            if not final_sheet:
+                raise RuntimeError("Processing sheet not selected or found")
+            self.excel_processor.save_with_formulas(
+                excel_output_path,
+                processing_sheet_name=final_sheet,
+            )
             return True
         except (ValueError, OSError, RuntimeError) as e:
             raise RuntimeError(f"Failed to save Excel file: {str(e)}") from e
+
+    def _save_excel_atomically(
+        self, input_excel_path: str, final_output_path: str
+    ) -> None:
+        """Write Excel output atomically using a temp file then rename.
+
+        1. Copy input workbook to a temp file in the destination directory.
+        2. Write changes into the temp file (preserving formatting).
+        3. Atomically replace/move temp file to final output path.
+        4. Clean up temp file on any error.
+        """
+        dest_dir = os.path.dirname(final_output_path) or "."
+        temp_file = None
+        try:
+            # Create temp file path in same directory to ensure atomic rename
+            with tempfile.NamedTemporaryFile(
+                prefix=".tmp_excel_", suffix=".xlsx", dir=dest_dir, delete=False
+            ) as tf:
+                temp_file = tf.name
+
+            # Copy input workbook to temp (template preservation)
+            shutil.copy2(input_excel_path, temp_file)
+
+            # Determine processing sheet
+            excel_file, _ = self.gui.get_selected_files()
+            final_sheet = (
+                self.selected_processing_sheet_name
+                or self._resolve_processing_sheet_name(excel_file)
+            )
+            if not final_sheet:
+                raise RuntimeError("Processing sheet not selected or found")
+
+            # Write values and formatting into temp workbook
+            self.excel_processor.save_with_formulas(
+                temp_file, processing_sheet_name=final_sheet
+            )
+
+            # Atomically replace/move temp file to final output
+            os.replace(temp_file, final_output_path)
+            temp_file = None  # Prevent cleanup
+        finally:
+            # Ensure no temp remnants
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except Exception:
+                    pass
 
     def _save_updated_pdf_file(self, pdf_output_path: str) -> bool:
         """Save the updated PDF file with basic error handling."""
@@ -649,6 +786,27 @@ class AbstractRenumberTool:
         shutil.copy2(pdf_path, pdf_backup_path)
 
         return excel_backup_path, pdf_backup_path
+
+    def _prepare_output_excel_as_template(
+        self, input_excel_path: str, output_excel_path: str
+    ) -> None:
+        """Create the output Excel file as a direct copy of the input file.
+
+        This sets up the output workbook to retain all sheets and formatting.
+        If the output path equals the input path, no action is taken.
+        """
+        try:
+            if not input_excel_path or not output_excel_path:
+                return
+            if os.path.abspath(input_excel_path) == os.path.abspath(output_excel_path):
+                # No-op if target equals source (naming/backup policy may handle this later)
+                return
+            # Copy preserving metadata; subsequent steps will modify only intended cells
+            shutil.copy2(input_excel_path, output_excel_path)
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to prepare output Excel template: {str(e)}"
+            ) from e
 
     def run(self) -> None:
         """Start the GUI application."""

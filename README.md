@@ -8,7 +8,7 @@ A class-based Python application that automates the process of sorting Excel dat
 - **Index Renumbering**: Automatically renumber the Index# column starting from 1
 - **Bookmark Synchronization**: Update PDF bookmarks to match the new Excel order
 - **User-Friendly GUI**: Intuitive tkinter interface for file selection
-- **Column Mapping**: Handle Excel files with different column names through mapping interface
+- **Template-Preserving Excel Write**: Output workbook is created as a copy of the input to retain all sheets, widths, styles, filters, and layouts
 - **Safe Backup System**: Creates timestamped backup files before processing, preserving originals with automatic rollback on failure
 
 ## Requirements
@@ -55,8 +55,8 @@ A class-based Python application that automates the process of sorting Excel dat
    - **Process Files**: Click "Process Files" to begin sorting and renumbering
 
 4. The tool will:
-   - Validate that your Excel file has the required columns
-   - Show a column mapping dialog if columns need to be mapped
+   - Validate that your Excel file has the required columns (case-insensitive)
+   - Use the 'Index' sheet (case-insensitive); if not found, a GUI prompts you to choose a sheet
    - Create timestamped backup files of your original documents
    - Sort the data according to the specified criteria
    - Renumber the Index# column starting from 1
@@ -65,7 +65,7 @@ A class-based Python application that automates the process of sorting Excel dat
 
 ## Required Excel Columns
 
-Your Excel file must contain these columns (or you'll be prompted to map them):
+Your Excel file must contain these columns (order doesn't matter; names are case-insensitive):
 - **Index#**: Sequential number for each record
 - **Document Type**: Type of document (Release, Decision, etc.)
 - **Legal Description**: Property legal description
@@ -112,7 +112,7 @@ Example: `1-Release-2/20/1961`
 
 ## Troubleshooting
 
-- **Missing Columns**: If your Excel file has different column names, use the mapping dialog to match them to required columns
+- **Missing Required Columns**: The app shows which required columns are missing and aborts. Add the missing headers and retry.
 - **Date Formatting**: Ensure dates in Excel are properly formatted as dates, not text
 - **PDF Permissions**: Ensure the PDF is not password-protected or has restrictions that prevent modification
 - **File Permissions**: Ensure you have write permissions in the directory where files are located
