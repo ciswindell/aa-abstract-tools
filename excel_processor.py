@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
 from dateutil.parser import parse
 
 from excel_formatter import ExcelFormatter
@@ -563,6 +564,14 @@ class ExcelProcessor:
                     values, start=2
                 ):  # Start at row 2 (after header)
                     ws.cell(row=row_idx, column=target_col_idx, value=value)
+
+            # Clear hard-coded fills (keep conditional formatting)
+            empty_fill = PatternFill(fill_type=None)
+            for row in ws.iter_rows(
+                min_row=2, max_row=ws.max_row, max_col=ws.max_column
+            ):
+                for cell in row:
+                    cell.fill = empty_fill
 
             # Keep the selected sheet as active for downstream formatting
             try:

@@ -466,7 +466,12 @@ class AbstractRenumberTool:
             dialog.transient(self.root)
             dialog.grab_set()
 
-            ttk.Label(dialog, text="Choose the sheet to process:").grid(
+            expected = self.get_processing_sheet_name() or "Index"
+            msg = (
+                f"Warning: The Excel file does not contain a worksheet named '{expected}'.\n\n"
+                "Please select the worksheet that needs to be processed."
+            )
+            ttk.Label(dialog, text=msg, wraplength=420, justify=tk.LEFT).grid(
                 row=0, column=0, columnspan=2, padx=12, pady=(12, 6), sticky=tk.W
             )
 
