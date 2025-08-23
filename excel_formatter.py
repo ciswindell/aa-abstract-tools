@@ -65,13 +65,9 @@ class ExcelFormatter:
         except Exception as e:
             raise ValueError(f"Failed to apply formulas: {str(e)}")
 
-    # Removed: explicit width/align/wrap/filters/freeze; rely on template formatting
-
     def _get_column_letter_by_position(self, position: int) -> str:
         """Convert position to Excel column letter (0=A, 1=B, etc.)."""
         return index_to_col_letter(position)
-
-    # Removed: cell alignment, wrapping, date formats, auto-filters, freeze panes
 
     def _apply_bookmark_formulas(
         self, worksheet: Worksheet, output_df: pd.DataFrame

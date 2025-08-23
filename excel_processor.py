@@ -41,14 +41,10 @@ class ExcelProcessor:
             if self.df.empty:
                 raise ValueError("Excel file contains no data")
 
-            # Minimal load only; transforms and validators handle processing
-
             return True
 
         except Exception as e:
             raise ValueError(f"Failed to load Excel file: {str(e)}")
-
-    # Parsing/transform concerns are handled in core/transform/excel.py
 
     def check_duplicate_columns(self) -> List[str]:
         """Check for duplicate column names in the loaded DataFrame."""
@@ -78,8 +74,6 @@ class ExcelProcessor:
             rc for rc in self.required_columns if counts.get(str(rc).lower(), 0) > 1
         ]
 
-    # Removed: column mapping (template headers + validation are authoritative)
-
     def get_column_info(self) -> Dict[str, any]:
         """Get information about the loaded DataFrame."""
         if self.df is None:
@@ -93,16 +87,6 @@ class ExcelProcessor:
             Optional[pd.DataFrame]: The loaded pandas DataFrame, or None if no file loaded
         """
         return self.df
-
-    # Sorting/renumbering/type prep/missing-value handling are in transforms
-
-    # Removed: processed/unprocessed columns accessors (unused)
-
-    # Removed deprecated save_with_formulas; adapter is the write path
-
-    # Removed export helpers; adapter handles template-preserving writes
-
-    # Removed: update of column positions (adapter resolves headers)
 
     def get_bookmark_formula_column(self) -> Optional[str]:
         """Return the name of the bookmark formula column if detected.
@@ -118,8 +102,6 @@ class ExcelProcessor:
             # Ensure Index# values are preserved as strings for alphanumeric support
             self.df["Original_Index"] = self.df["Index#"].astype(str).copy()
             self.processed_columns.add("Original_Index")
-
-            # Column metadata no longer tracked
 
     def get_original_index_mapping(self) -> Dict[str, int]:
         """Get mapping from original index values to new index values.

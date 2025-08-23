@@ -436,8 +436,6 @@ class PDFProcessor:
             "original_bookmark_count": len(self.bookmarks),
         }
 
-    # Removed: natural sort method; sorting handled in update_bookmarks_with_new_titles
-
     def detect_bookmark_page_ranges(self) -> Dict[str, Dict[str, int]]:
         """
         Detect consecutive pages belonging to each bookmark.

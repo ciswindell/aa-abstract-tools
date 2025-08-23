@@ -663,9 +663,6 @@ class AbstractRenumberTool:
             if backup_enabled:
                 self._create_backup_files(excel_file, pdf_file)
 
-            # Sort the data
-            self.excel_processor.sort_data()
-
             # Generate output filenames
             excel_output_path, pdf_output_path = self._generate_output_filenames(
                 excel_file, pdf_file
