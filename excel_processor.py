@@ -48,7 +48,7 @@ class ExcelProcessor:
         except Exception as e:
             raise ValueError(f"Failed to load Excel file: {str(e)}")
 
-    # All parsing/transform concerns are handled in core/transform/excel.py
+    # Parsing/transform concerns are handled in core/transform/excel.py
 
     def check_duplicate_columns(self) -> List[str]:
         """Check for duplicate column names in the loaded DataFrame."""
@@ -78,30 +78,13 @@ class ExcelProcessor:
             rc for rc in self.required_columns if counts.get(str(rc).lower(), 0) > 1
         ]
 
-    def apply_column_mapping(self, mapping: Dict[str, str]) -> bool:
-        """Apply column name mappings to the DataFrame."""
-        # Apply mappings to DataFrame
-        self.df.rename(columns=mapping, inplace=True)
-
-        # Verify all required columns are now present
-        still_missing = self.get_missing_columns()
-        if still_missing:
-            raise ValueError(f"Still missing columns after mapping: {still_missing}")
-
-        # Reprocess data types after column mapping
-        self._process_data_types()
-        return True
+    # Removed: column mapping (template headers + validation are authoritative)
 
     def get_column_info(self) -> Dict[str, any]:
         """Get information about the loaded DataFrame."""
         if self.df is None:
             return {}
-
-        return {
-            "rows": len(self.df),
-            "columns": len(self.df.columns),
-            "column_names": self.df.columns.tolist(),
-        }
+        return {"rows": len(self.df), "columns": len(self.df.columns)}
 
     def get_dataframe(self) -> Optional[pd.DataFrame]:
         """Get the loaded DataFrame.
@@ -111,118 +94,13 @@ class ExcelProcessor:
         """
         return self.df
 
-    # Sorting/renumbering now lives in core/transform.excel
+    # Sorting/renumbering/type prep/missing-value handling are in transforms
 
-    # Removed type prep; handled in transforms
+    # Removed: processed/unprocessed columns accessors (unused)
 
-    # Renumbering handled in transforms
+    # Removed deprecated save_with_formulas; adapter is the write path
 
-    # Missing values handled in transforms
-
-    def get_processed_columns(self) -> set:
-        """Return set of columns that have been processed/modified.
-
-        Returns:
-            set: Set of column names that have been processed or modified
-        """
-        return self.processed_columns.copy()
-
-    def get_unprocessed_columns(self) -> List[str]:
-        """Return list of columns that haven't been processed.
-
-        Returns:
-            List[str]: List of column names that have not been processed or modified
-        """
-        if self.df is None:
-            return []
-        return [col for col in self.df.columns if col not in self.processed_columns]
-
-    def save_with_formulas(
-        self, output_path: str, processing_sheet_name: Optional[str] = None
-    ) -> bool:
-        """Save Excel file preserving formatting.
-
-        Writes values into the existing output workbook (a copy of the input)
-        to retain all sheets and formatting. Only the active/processing sheet is modified.
-        """
-        try:
-            # Create output DataFrame with original column names
-            output_df = self._create_output_dataframe()
-
-            # Open the copied workbook and select the processing sheet or fallback to active
-            wb = load_workbook(output_path)
-            # Require explicit processing sheet; no fallback to active sheet
-            if not processing_sheet_name:
-                wb.close()
-                raise RuntimeError("Processing sheet name not provided")
-            lower_to_name = {name.lower(): name for name in wb.sheetnames}
-            match_name = lower_to_name.get(str(processing_sheet_name).lower())
-            if not match_name:
-                wb.close()
-                raise RuntimeError(
-                    f"Processing sheet '{processing_sheet_name}' not found in output workbook"
-                )
-            ws = wb[match_name]
-
-            # Build a case-insensitive header map from the first row
-            header_values = []
-            for cell in ws[1]:
-                header_values.append(
-                    "" if cell.value is None else str(cell.value).strip()
-                )
-            header_to_col = {
-                h.lower(): idx + 1 for idx, h in enumerate(header_values) if h != ""
-            }
-
-            # Write DataFrame values into matching columns by header name
-            for df_col in output_df.columns:
-                target_col_idx = header_to_col.get(str(df_col).strip().lower())
-                if not target_col_idx:
-                    # Skip columns that do not exist in the target sheet
-                    continue
-
-                values = output_df[df_col].tolist()
-                for row_idx, value in enumerate(
-                    values, start=2
-                ):  # Start at row 2 (after header)
-                    ws.cell(row=row_idx, column=target_col_idx, value=value)
-
-            # Clear hard-coded fills (keep conditional formatting)
-            empty_fill = PatternFill(fill_type=None)
-            for row in ws.iter_rows(
-                min_row=2, max_row=ws.max_row, max_col=ws.max_column
-            ):
-                for cell in row:
-                    cell.fill = empty_fill
-
-            # Keep the selected sheet as active for downstream formatting
-            try:
-                wb.active = wb.sheetnames.index(ws.title)
-            except Exception:
-                pass
-
-            # Save workbook with updated values
-            wb.save(output_path)
-            wb.close()
-
-            # Adapter handles formatting via template in refactor; legacy path ends here
-            return True
-
-        except Exception as e:
-            raise RuntimeError(f"Failed to save Excel file: {str(e)}") from e
-
-    def _create_output_dataframe(self) -> pd.DataFrame:
-        """Create DataFrame with original column names for export, excluding internal columns."""
-        output_df = self.df.copy()
-
-        # Remove the Original_Index column - it's only used internally for PDF bookmark mapping
-        # and should not appear in the final Excel output
-        if "Original_Index" in output_df.columns:
-            output_df = output_df.drop(columns=["Original_Index"])
-
-        # No renaming here; headers in the template are authoritative
-
-        return output_df
+    # Removed export helpers; adapter handles template-preserving writes
 
     # Removed: update of column positions (adapter resolves headers)
 

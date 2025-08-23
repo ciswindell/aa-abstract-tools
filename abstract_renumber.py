@@ -710,9 +710,12 @@ class AbstractRenumberTool:
             )
             if not final_sheet:
                 raise RuntimeError("Processing sheet not selected or found")
-            self.excel_processor.save_with_formulas(
-                excel_output_path,
-                processing_sheet_name=final_sheet,
+            # Adapter-driven save now handles formulas via template
+            ExcelOpenpyxlRepo().save(
+                self.excel_processor.get_dataframe(),
+                template_path=excel_file,
+                target_sheet=final_sheet,
+                out_path=excel_output_path,
             )
             return True
         except (ValueError, OSError, RuntimeError) as e:
@@ -750,8 +753,11 @@ class AbstractRenumberTool:
                 raise RuntimeError("Processing sheet not selected or found")
 
             # Write values and formatting into temp workbook
-            self.excel_processor.save_with_formulas(
-                temp_file, processing_sheet_name=final_sheet
+            ExcelOpenpyxlRepo().save(
+                self.excel_processor.get_dataframe(),
+                template_path=input_excel_path,
+                target_sheet=final_sheet,
+                out_path=temp_file,
             )
 
             # Atomically replace/move temp file to final output

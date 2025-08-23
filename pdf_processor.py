@@ -436,17 +436,7 @@ class PDFProcessor:
             "original_bookmark_count": len(self.bookmarks),
         }
 
-    def sort_bookmarks_naturally(self) -> bool:
-        """
-        Sort PDF outline/bookmarks naturally using natsort library.
-
-        Note: This method is now a no-op since sorting happens during bookmark update.
-        The sorting is handled by passing sort_naturally=True to update_bookmarks_with_new_titles().
-
-        Returns:
-            bool: True (always succeeds since sorting happens elsewhere)
-        """
-        return True
+    # Removed: natural sort method; sorting handled in update_bookmarks_with_new_titles
 
     def detect_bookmark_page_ranges(self) -> Dict[str, Dict[str, int]]:
         """
