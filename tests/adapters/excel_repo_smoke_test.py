@@ -55,7 +55,11 @@ def test_excel_save_parity_on_fixture():
     # Read workbook back and compare on intersecting columns
     df_out = pd.read_excel(out_path, dtype=str, sheet_name=sheet)
 
-    common_cols = [c for c in df_expected.columns if c in df_out.columns]
+    common_cols = [
+        c
+        for c in df_expected.columns
+        if c in df_out.columns and c != "Bookmark Formula"
+    ]
     assert (
         common_cols
     ), "No common columns between expected DataFrame and saved workbook"

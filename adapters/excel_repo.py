@@ -12,6 +12,7 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
 from fileops.files import atomic_write_with_template
 
 from excel_formatter import ExcelFormatter
@@ -62,6 +63,7 @@ class ExcelOpenpyxlRepo:
             return None
 
         bookmark_col_name = _detect_bookmark_col_name()
+        apply_formulas_flag: Optional[bool] = None
 
         def _write_into(temp_path: str) -> None:
             wb = load_workbook(temp_path)
@@ -85,11 +87,26 @@ class ExcelOpenpyxlRepo:
                     h.lower(): idx + 1 for idx, h in enumerate(header_values) if h != ""
                 }
 
+                # Detect if bookmark formula column already contains formulas in template
+                if bookmark_col_name:
+                    b_idx = header_to_col.get(bookmark_col_name.strip().lower())
+                    if b_idx:
+                        cell = ws.cell(row=2, column=b_idx)
+                        has_formula = False
+                        try:
+                            has_formula = (getattr(cell, "data_type", None) == "f") or (
+                                isinstance(cell.value, str)
+                                and cell.value.startswith("=")
+                            )
+                        except Exception:
+                            has_formula = False
+                        apply_formulas_flag = not has_formula
+
                 # Write values by matching header names
                 for df_col in df.columns:
                     # Keep formulas: do not write values into the bookmark formula column
                     if (
-                        bookmark_col_name is not None
+                        bookmark_col_name
                         and str(df_col).strip().lower()
                         == bookmark_col_name.strip().lower()
                     ):
@@ -106,6 +123,14 @@ class ExcelOpenpyxlRepo:
                     wb.active = wb.sheetnames.index(ws.title)
                 except Exception:
                     pass
+
+                # Clear hard-coded fills (reset temporary highlights), keep CF rules
+                empty_fill = PatternFill(fill_type=None)
+                for row in ws.iter_rows(
+                    min_row=2, max_row=ws.max_row, max_col=ws.max_column
+                ):
+                    for cell in row:
+                        cell.fill = empty_fill
 
                 # Save workbook with updated values
                 wb.save(temp_path)
@@ -140,11 +165,16 @@ class ExcelOpenpyxlRepo:
             finally:
                 wbr.close()
 
-            # Apply formatting on the temp file
-            formatter = ExcelFormatter(
-                columns_meta, bookmark_formula_column=bookmark_col_name
-            )
-            formatter.apply_formatting(temp_path, df)
+            # Apply only formulas if needed; otherwise rely entirely on template formatting
+            if apply_formulas_flag:
+                formatter = ExcelFormatter(
+                    columns_meta, bookmark_formula_column=bookmark_col_name
+                )
+                try:
+                    formatter.apply_formulas_only(temp_path, df)
+                except AttributeError:
+                    # Fallback to full formatting if helper not available
+                    formatter.apply_formatting(temp_path, df)
 
         atomic_write_with_template(
             template_path=template_path,

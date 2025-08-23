@@ -39,6 +39,12 @@ class ExcelFormatter:
             if self.bookmark_formula_column:
                 self._apply_bookmark_formulas(ws, output_df)
 
+            # Force Excel to recalculate formulas on open
+            try:
+                wb.calculation_properties.fullCalcOnLoad = True  # type: ignore[attr-defined]
+            except Exception:
+                pass
+
             wb.save(workbook_path)
             wb.close()
 
@@ -46,6 +52,26 @@ class ExcelFormatter:
 
         except Exception as e:
             raise ValueError(f"Failed to apply formatting: {str(e)}")
+
+    def apply_formulas_only(self, workbook_path: str, output_df: pd.DataFrame) -> bool:
+        """Apply only bookmark formulas; leave existing formatting intact."""
+        try:
+            wb = load_workbook(workbook_path)
+            ws = wb.active
+
+            if self.bookmark_formula_column:
+                self._apply_bookmark_formulas(ws, output_df)
+
+            try:
+                wb.calculation_properties.fullCalcOnLoad = True  # type: ignore[attr-defined]
+            except Exception:
+                pass
+
+            wb.save(workbook_path)
+            wb.close()
+            return True
+        except Exception as e:
+            raise ValueError(f"Failed to apply formulas: {str(e)}")
 
     def _apply_column_widths(self, worksheet: Worksheet) -> None:
         """Apply column widths from source file."""
