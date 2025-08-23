@@ -5,17 +5,15 @@ RenumberService: orchestrates Excel/PDF load, validate, transform, and save.
 
 from typing import Any, Mapping, Sequence
 
-import pandas as pd
-
 from core.interfaces import ExcelRepo, Logger, PdfRepo
 from core.models import Options, Result
 from core.services.validate import ValidationService
 from core.transform.excel import (
     clean_types,
     sort_and_renumber,
-    build_original_index_mapping,
 )
-from core.transform.pdf import make_titles
+from core.transform.pdf import make_titles, extract_original_index, detect_page_ranges
+from natsort import natsorted, ns
 
 
 class RenumberService:
@@ -49,7 +47,6 @@ class RenumberService:
             self._log.info("Transforming Excel data...")
             df1 = clean_types(df)
             df2 = sort_and_renumber(df1)
-            mapping = build_original_index_mapping(df2)
 
             self._log.info("Generating PDF bookmark titles...")
             titles_map = make_titles(df2)
@@ -70,7 +67,64 @@ class RenumberService:
             updated_bookmarks = _merge_bookmarks_with_titles(
                 bookmarks, titles_map, opts.sort_bookmarks
             )
-            self._pdf.write(pages=pages, bookmarks=updated_bookmarks, out_path=pdf_path)
+
+            if opts.reorder_pages:
+                # Determine desired order by the DataFrame's Original_Index column
+                desired_original_indices = [
+                    str(x).strip() for x in df2.get("Original_Index", [])
+                ]
+
+                # Build ranges from original bookmarks (keyed by original title)
+                original_ranges_by_title = detect_page_ranges(bookmarks, total_pages)
+                # Map original index -> level and original title
+                original_index_to_level: dict[str, int] = {}
+                original_index_to_title: dict[str, str] = {}
+                for bm in bookmarks:
+                    orig_title = str(bm.get("title", ""))
+                    orig_idx = extract_original_index(orig_title) or ""
+                    if orig_idx:
+                        original_index_to_level[orig_idx] = int(bm.get("level", 0))
+                        original_index_to_title[orig_idx] = orig_title
+
+                # Reorder physical pages by concatenating each bookmark's original page range
+                new_pages: list[Any] = []
+                new_bookmarks: list[dict[str, Any]] = []
+                current_start_page = 1
+                for orig_idx in desired_original_indices:
+                    title_key = original_index_to_title.get(orig_idx)
+                    if not title_key:
+                        continue
+                    rng = original_ranges_by_title.get(title_key)
+                    if not rng:
+                        continue
+                    start, end = int(rng["start"]), int(rng["end"])
+                    # Append page objects for this range (1-based to 0-based)
+                    for p in range(start, end + 1):
+                        if 1 <= p <= len(pages):
+                            new_pages.append(pages[p - 1])
+
+                    # Emit corresponding bookmark with updated title and new page start
+                    new_title = titles_map.get(orig_idx)
+                    if new_title:
+                        new_bookmarks.append(
+                            {
+                                "title": new_title,
+                                "page": current_start_page,
+                                "level": original_index_to_level.get(orig_idx, 0),
+                            }
+                        )
+                    # Advance current_start_page by the length of this segment
+                    current_start_page += max(0, end - start + 1)
+
+                self._pdf.write(
+                    pages=new_pages or pages,
+                    bookmarks=new_bookmarks or updated_bookmarks,
+                    out_path=pdf_path,
+                )
+            else:
+                self._pdf.write(
+                    pages=pages, bookmarks=updated_bookmarks, out_path=pdf_path
+                )
 
             self._log.info("Complete.")
             return Result(success=True, message="OK")
@@ -87,16 +141,10 @@ def _merge_bookmarks_with_titles(
 ):
     """Return updated bookmarks with new titles for those with mappable indices."""
 
-    try:
-        from natsort import natsorted, ns
-    except Exception:
-        natsorted = None  # type: ignore
-        ns = None  # type: ignore
-
     updated = []
     for bm in bookmarks:
         title = str(bm.get("title", ""))
-        original = title.split("-", 1)[0].strip() if "-" in title else None
+        original = extract_original_index(title)
         if original and original in titles_map:
             new_bm = dict(bm)
             new_bm["title"] = titles_map[original]
@@ -104,7 +152,7 @@ def _merge_bookmarks_with_titles(
         else:
             updated.append(dict(bm))
 
-    if sort_naturally and natsorted is not None and ns is not None:
+    if sort_naturally:
         updated = natsorted(
             updated, key=lambda b: b.get("title", ""), alg=ns.IGNORECASE
         )

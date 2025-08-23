@@ -3,8 +3,6 @@
 Excel-related utilities shared across modules.
 """
 
-from typing import Optional
-
 
 def index_to_col_letter(position: int) -> str:
     """Convert 0-based column index to Excel column letter (A, B, ..., AA, AB, ...).

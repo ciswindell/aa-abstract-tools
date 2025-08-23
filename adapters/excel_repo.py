@@ -63,7 +63,6 @@ class ExcelOpenpyxlRepo:
             return None
 
         bookmark_col_name = _detect_bookmark_col_name()
-        apply_formulas_flag: Optional[bool] = None
 
         def _write_into(temp_path: str) -> None:
             wb = load_workbook(temp_path)
@@ -88,6 +87,7 @@ class ExcelOpenpyxlRepo:
                 }
 
                 # Detect if bookmark formula column already contains formulas in template
+                apply_formulas_flag: bool = False
                 if bookmark_col_name:
                     b_idx = header_to_col.get(bookmark_col_name.strip().lower())
                     if b_idx:

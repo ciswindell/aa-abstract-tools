@@ -8,7 +8,6 @@ import pandas as pd
 from core.transform.excel import (
     clean_types,
     sort_and_renumber,
-    build_original_index_mapping,
 )
 
 
@@ -40,12 +39,7 @@ def test_sort_and_renumber_assigns_sequential_indices():
     assert list(df2["Index#"]) == [1, 2, 3]
 
 
-def test_build_original_index_mapping_maps_original_to_new():
-    df = pd.DataFrame(
-        {
-            "Index#": [1, 2, 3],
-            "Original_Index": ["A", "B", "C"],
-        }
-    )
-    mapping = build_original_index_mapping(df)
-    assert mapping == {"A": 1, "B": 2, "C": 3}
+def test_original_index_column_present_after_clean_types():
+    df = pd.DataFrame({"Index#": ["A", "B", "C"]})
+    out = clean_types(df)
+    assert list(out["Original_Index"]) == ["A", "B", "C"]

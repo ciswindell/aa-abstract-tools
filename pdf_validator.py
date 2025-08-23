@@ -4,7 +4,7 @@ PDF validation module for the Abstract Renumber Tool.
 Handles PDF validation logic including bookmark conflict detection.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 
 class PDFValidator:

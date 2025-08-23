@@ -80,24 +80,3 @@ def sort_and_renumber(
         new_df[index_col] = range(1, len(new_df) + 1)
 
     return new_df
-
-
-def build_original_index_mapping(
-    df: pd.DataFrame,
-    index_col: str = "Index#",
-    original_index_col: str = "Original_Index",
-) -> Dict[str, int]:
-    """Map original index string to new sequential index integer."""
-
-    if index_col not in df.columns or original_index_col not in df.columns:
-        return {}
-
-    mapping: Dict[str, int] = {}
-    for _, row in df.iterrows():
-        original = str(row[original_index_col]).strip()
-        try:
-            new_val = int(row[index_col])
-        except Exception:
-            continue
-        mapping[original] = new_val
-    return mapping
