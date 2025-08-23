@@ -13,6 +13,8 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 from dateutil.parser import parse
+from utils.excel_utils import index_to_col_letter
+from utils.dates import parse_robust
 
 from excel_formatter import ExcelFormatter
 
@@ -38,12 +40,7 @@ class ColumnInfo:
 
     def _position_to_excel_letter(self, pos: int) -> str:
         """Convert position to Excel column letter (0=A, 1=B, etc.)."""
-        result = ""
-        col = pos
-        while col >= 0:
-            result = chr(col % 26 + ord("A")) + result
-            col = col // 26 - 1
-        return result
+        return index_to_col_letter(pos)
 
 
 class ExcelProcessor:
@@ -196,11 +193,7 @@ class ExcelProcessor:
 
     def _get_excel_column_letter(self, col_index: int) -> str:
         """Convert column index to Excel column letter (0=A, 1=B, etc.)."""
-        result = ""
-        while col_index >= 0:
-            result = chr(col_index % 26 + ord("A")) + result
-            col_index = col_index // 26 - 1
-        return result
+        return index_to_col_letter(col_index)
 
     def _process_data_types(self) -> None:
         """Process data types for specific columns to optimize sorting and display.
@@ -302,60 +295,8 @@ class ExcelProcessor:
         Returns:
             Parsed datetime or original value if parsing fails
         """
-        # Handle null/empty values
-        if pd.isna(value) or value is None:
-            return value
-
-        # If already a datetime object, return as-is
-        if isinstance(value, (datetime, pd.Timestamp)):
-            return value
-
-        # Convert to string for processing
-        str_value = str(value).strip()
-
-        # Handle empty strings
-        if str_value == "" or str_value.lower() == "nan":
-            return value
-
-        # Try pandas default parsing first (handles most formats)
-        try:
-            parsed = pd.to_datetime(str_value, errors="raise")
-            if pd.notna(parsed):
-                return parsed
-        except:
-            pass
-
-        # Try common date formats manually
-        common_formats = [
-            "%m/%d/%Y",  # 1/30/1959
-            "%m/%d/%y",  # 1/30/59
-            "%m-%d-%Y",  # 1-30-1959
-            "%m-%d-%y",  # 1-30-59
-            "%Y-%m-%d",  # 1959-01-30
-            "%Y/%m/%d",  # 1959/01/30
-            "%d/%m/%Y",  # 30/1/1959
-            "%d-%m-%Y",  # 30-1-1959
-            "%B %d, %Y",  # January 30, 1959
-            "%b %d, %Y",  # Jan 30, 1959
-            "%Y-%m-%d %H:%M:%S",  # 1959-01-30 00:00:00
-        ]
-
-        for fmt in common_formats:
-            try:
-                parsed = datetime.strptime(str_value, fmt)
-                return pd.Timestamp(parsed)
-            except:
-                continue
-
-        # Try with dateutil parser (very flexible)
-        try:
-            parsed = parse(str_value)
-            return pd.Timestamp(parsed)
-        except:
-            pass
-
-        # If all parsing fails, keep original value silently
-        return value
+        # Delegate robust parsing to shared utility to keep behavior consistent
+        return parse_robust(value)
 
     def check_duplicate_columns(self) -> List[str]:
         """Check for duplicate column names in the loaded DataFrame."""

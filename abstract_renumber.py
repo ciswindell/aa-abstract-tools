@@ -22,6 +22,14 @@ from pdf_processor import PDFProcessor
 from pdf_validator import PDFValidator
 from validators.input_sheet_validator import validate as validate_sheet
 
+# New architecture imports
+from adapters.excel_repo import ExcelOpenpyxlRepo
+from adapters.pdf_repo import PdfPyPDF2Repo
+from adapters.logger_tk import TkLogger
+from core.models import Options
+from core.services.validate import ValidationService
+from core.services.renumber import RenumberService
+
 
 class AbstractRenumberGUI:
     """Handles the GUI components and user interactions."""
@@ -366,20 +374,44 @@ class AbstractRenumberTool:
         return self.processing_sheet_name
 
     def process_files(self):
-        """Main processing function that orchestrates Excel and PDF file processing."""
+        """Main processing function that orchestrates processing via RenumberService."""
         try:
             excel_file, pdf_file = self.gui.get_selected_files()
 
-            # Early validation: Check for PDF bookmark conflicts before any processing
-            if not self._validate_pdf_bookmarks(pdf_file):
-                return
+            # Resolve/select processing sheet name to match legacy UX
+            target_sheet = self._resolve_processing_sheet_name(excel_file)
+            if target_sheet is None:
+                target_sheet = self._prompt_user_select_sheet(excel_file)
+                if target_sheet is None:
+                    return
+            self.selected_processing_sheet_name = target_sheet
 
-            # Process Excel file
-            if not self._process_excel_file(excel_file):
-                return
+            # Backups (preserve legacy behavior)
+            backup_enabled = self.gui.get_backup_enabled()
+            if backup_enabled:
+                self._create_backup_files(excel_file, pdf_file)
 
-            # Perform Excel processing (sorting, renumbering)
-            self._perform_excel_processing()
+            # Build service and options
+            logger = TkLogger(self.gui.log_status)
+            excel_repo = ExcelOpenpyxlRepo()
+            pdf_repo = PdfPyPDF2Repo()
+            validator = ValidationService(self.required_columns)
+            service = RenumberService(excel_repo, pdf_repo, validator, logger)
+
+            opts = Options(
+                backup=backup_enabled,
+                sort_bookmarks=self.gui.get_sort_bookmarks_enabled(),
+                reorder_pages=self.gui.get_reorder_pages_enabled(),
+                sheet_name=target_sheet,
+            )
+
+            # Run service
+            result = service.run(excel_file, pdf_file, opts)
+            if not result.success:
+                raise RuntimeError(result.message or "Unknown error")
+
+            # Completion (preserve simple success dialog)
+            self._show_completion_success(excel_file, pdf_file)
 
         except (ValueError, OSError, RuntimeError) as e:
             self.gui.log_status(f"Error: {str(e)}")

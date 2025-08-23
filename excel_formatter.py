@@ -9,8 +9,8 @@ from typing import Any, List, Optional
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
-from openpyxl.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
+from utils.excel_utils import index_to_col_letter
 
 
 class ExcelFormatter:
@@ -61,14 +61,7 @@ class ExcelFormatter:
 
     def _get_column_letter_by_position(self, position: int) -> str:
         """Convert position to Excel column letter (0=A, 1=B, etc.)."""
-        if position < 0:
-            return ""
-
-        result = ""
-        while position >= 0:
-            result = chr(position % 26 + ord("A")) + result
-            position = position // 26 - 1
-        return result
+        return index_to_col_letter(position)
 
     def _apply_cell_alignments(
         self, worksheet: Worksheet, output_df: pd.DataFrame
