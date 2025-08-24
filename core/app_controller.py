@@ -84,7 +84,7 @@ class AppController:
             if desired and desired in lower_to_name:
                 return lower_to_name[desired]
             return None
-        except Exception:
+        except (OSError, ValueError, PermissionError):
             return None
 
     def _prompt_user_select_sheet(self, file_path: str) -> Optional[str]:
@@ -101,7 +101,7 @@ class AppController:
                 file_path, names, self.processing_sheet_name
             )
 
-        except Exception as e:
+        except (OSError, ValueError, PermissionError) as e:
             self.ui.show_error("Sheet Selection Error", str(e))
             return None
 
