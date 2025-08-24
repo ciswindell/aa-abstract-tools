@@ -7,7 +7,7 @@ import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 from openpyxl import load_workbook
 
@@ -16,7 +16,6 @@ from adapters.logger_tk import TkLogger
 from adapters.pdf_repo import PdfPyPDF2Repo
 from core.config import DEFAULT_REQUIRED_COLUMNS, DEFAULT_SHEET_NAME
 from core.interfaces import UIController
-from core.models import Options
 from core.services.renumber import RenumberService
 from core.services.validate import ValidationService
 
