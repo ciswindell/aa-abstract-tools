@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Mapping, Optional
 import pandas as pd
 
 from validators.input_sheet_validator import validate as validate_sheet
-from pdf_validator import PDFValidator
+from validators.pdf_validator import PDFValidator
 
 
 class ValidationService:

@@ -3,27 +3,16 @@
 Tkinter application wiring for the Abstract Renumber Tool.
 """
 
-from typing import List, Optional, Tuple
+import tkinter as tk
+from tkinter import filedialog, ttk
+from typing import Optional, Tuple
 
 import os
-import shutil
-import tkinter as tk
 from datetime import datetime
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
 
-from openpyxl import load_workbook
-
-from adapters.excel_repo import ExcelOpenpyxlRepo
-from adapters.logger_tk import TkLogger
-from adapters.pdf_repo import PdfPyPDF2Repo
-from core.models import Options
-from core.config import (
-    DEFAULT_REQUIRED_COLUMNS,
-    DEFAULT_SHEET_NAME,
-)
-from core.services.renumber import RenumberService
-from core.services.validate import ValidationService
+from adapters.ui_tkinter import TkinterUIAdapter
+from core.app_controller import AppController
 
 
 class AbstractRenumberGUI:
@@ -339,269 +328,20 @@ class AbstractRenumberGUI:
 
 
 class AbstractRenumberTool:
-    """Main application controller that orchestrates the components."""
+    """Main application that wires up GUI and controller."""
 
     def __init__(self):
-        """Initialize the Abstract Renumber Tool with required configuration."""
-        # Configuration
-        self.required_columns = list(DEFAULT_REQUIRED_COLUMNS)
-
-        # Configured processing sheet name (case-insensitive match)
-        self.processing_sheet_name: Optional[str] = DEFAULT_SHEET_NAME
-        self.selected_processing_sheet_name: Optional[str] = None
-
-        # Initialize components
+        """Initialize the Abstract Renumber Tool."""
         self.root = tk.Tk()
         self.gui = AbstractRenumberGUI(self.root, self)
 
-    def get_processing_sheet_name(self) -> Optional[str]:
-        """Return the configured processing sheet name if any."""
-        return self.processing_sheet_name
+        # Wire up UI abstraction
+        self.ui_adapter = TkinterUIAdapter(self.gui)
+        self.controller = AppController(self.ui_adapter)
 
     def process_files(self):
-        """Main processing function that orchestrates processing via RenumberService."""
-        try:
-            excel_file, pdf_file = self.gui.get_selected_files()
-
-            # Resolve/select processing sheet name to match legacy UX
-            target_sheet = self._resolve_processing_sheet_name(excel_file)
-            if target_sheet is None:
-                target_sheet = self._prompt_user_select_sheet(excel_file)
-                if target_sheet is None:
-                    return
-            self.selected_processing_sheet_name = target_sheet
-
-            # Backups (preserve legacy behavior)
-            backup_enabled = self.gui.get_backup_enabled()
-            if backup_enabled:
-                self._create_backup_files(excel_file, pdf_file)
-
-            # Build service and options
-            logger = TkLogger(self.gui.log_status)
-            excel_repo = ExcelOpenpyxlRepo()
-            pdf_repo = PdfPyPDF2Repo()
-            validator = ValidationService(self.required_columns)
-            service = RenumberService(excel_repo, pdf_repo, validator, logger)
-
-            opts = Options(
-                backup=backup_enabled,
-                sort_bookmarks=self.gui.get_sort_bookmarks_enabled(),
-                reorder_pages=self.gui.get_reorder_pages_enabled(),
-                sheet_name=target_sheet,
-            )
-
-            # Run service
-            result = service.run(excel_file, pdf_file, opts)
-            if not result.success:
-                raise RuntimeError(result.message or "Unknown error")
-
-            # Completion (preserve simple success dialog)
-            self._show_completion_success(excel_file, pdf_file)
-
-        except (ValueError, OSError, RuntimeError) as e:
-            self.gui.log_status(f"Error: {str(e)}")
-            messagebox.showerror("Processing Error", f"Processing failed: {str(e)}")
-
-    # Removed legacy Excel processor workflow
-
-    def _prompt_user_select_sheet(self, file_path: str) -> Optional[str]:
-        """Show a dropdown (readonly) of sheet names to select from."""
-        try:
-            wb = load_workbook(file_path, read_only=True, data_only=True)
-            names = wb.sheetnames
-            wb.close()
-
-            if not names:
-                return None
-
-            # Determine default selection (prefer configured 'Index')
-            desired = (self.get_processing_sheet_name() or "").lower()
-            default_index = 0
-            for i, n in enumerate(names):
-                if n.lower() == desired:
-                    default_index = i
-                    break
-
-            # Modal dialog with dropdown
-            self.gui.log_status("Select processing sheet...")
-            self.root.update()
-
-            dialog = tk.Toplevel(self.root)
-            dialog.title("Select Sheet")
-            dialog.transient(self.root)
-            dialog.grab_set()
-
-            expected = self.get_processing_sheet_name() or "Index"
-            msg = (
-                f"Warning: The Excel file does not contain a worksheet named '{expected}'.\n\n"
-                "Please select the worksheet that needs to be processed."
-            )
-            ttk.Label(dialog, text=msg, wraplength=420, justify=tk.LEFT).grid(
-                row=0, column=0, columnspan=2, padx=12, pady=(12, 6), sticky=tk.W
-            )
-
-            selected_var = tk.StringVar(value=names[default_index])
-            combo = ttk.Combobox(
-                dialog,
-                state="readonly",
-                values=names,
-                textvariable=selected_var,
-                width=40,
-            )
-            combo.grid(
-                row=1,
-                column=0,
-                columnspan=2,
-                padx=12,
-                pady=(0, 12),
-                sticky=(tk.W, tk.E),
-            )
-            combo.current(default_index)
-
-            chosen = {"value": None}
-
-            def on_ok():
-                chosen["value"] = selected_var.get()
-                dialog.destroy()
-
-            def on_cancel():
-                chosen["value"] = None
-                dialog.destroy()
-
-            ok_btn = ttk.Button(dialog, text="OK", command=on_ok)
-            cancel_btn = ttk.Button(dialog, text="Cancel", command=on_cancel)
-            ok_btn.grid(row=2, column=0, padx=(12, 6), pady=(0, 12), sticky=tk.E)
-            cancel_btn.grid(row=2, column=1, padx=(6, 12), pady=(0, 12), sticky=tk.W)
-
-            dialog.bind("<Return>", lambda _: on_ok())
-            dialog.bind("<Escape>", lambda _: on_cancel())
-            dialog.wait_window(dialog)
-
-            return chosen["value"]
-        except PermissionError as e:
-            self._handle_error(
-                "Permission Error",
-                f"Cannot access Excel file:\n{str(e)}\n\n"
-                "Please check file permissions and ensure the file is not open.",
-            )
-            return False
-        except ValueError as e:
-            self._handle_error("Invalid File", str(e))
-            return False
-        except OSError as e:
-            self._handle_error(
-                "Error",
-                f"Failed to load Excel file:\n{str(e)}\n\n"
-                "Please ensure the file is a valid Excel file.",
-            )
-            return False
-        except Exception as e:
-            self._handle_error("Sheet Selection Error", str(e))
-            return None
-
-    def _resolve_processing_sheet_name(self, file_path: str) -> Optional[str]:
-        """Resolve the processing sheet name, case-insensitively defaulting to 'Index'.
-
-        If the configured sheet name is not found, return None to trigger GUI picker later.
-        """
-        try:
-            wb = load_workbook(file_path, read_only=True, data_only=True)
-            desired = (self.get_processing_sheet_name() or "").lower()
-            names = wb.sheetnames
-            lower_to_name = {n.lower(): n for n in names}
-            wb.close()
-            if desired and desired in lower_to_name:
-                return lower_to_name[desired]
-            return None
-        except Exception:
-            return None
-
-    def _handle_missing_columns(
-        self, missing_columns: List[str], available_columns: List[str]
-    ) -> bool:
-        """Handle missing columns by showing an error and aborting (no mapping)."""
-        message = "Missing required columns:\n" + "\n".join(
-            f"• {c}" for c in missing_columns
-        )
-        self._handle_error("Missing Columns", message)
-        return False
-
-    # Removed legacy PDF processor validation
-
-    def _handle_error(self, title: str, message: str):
-        """Handle errors with consistent logging and user feedback."""
-        self.gui.log_status(f"Error: {message}")
-        messagebox.showerror(title, message)
-
-    def _show_completion_success(
-        self, excel_output_path: str, pdf_output_path: str  # noqa: ARG002
-    ) -> None:
-        """Show simple completion success message."""
-        self.gui.log_status("Complete!")
-
-        # Simple success dialog
-        message = (
-            f"Files processed successfully!\n\n"
-            f"Saved to: {os.path.dirname(excel_output_path)}"
-        )
-        messagebox.showinfo("Processing Complete", message)
-
-    # Removed legacy Excel save using ExcelProcessor
-
-    # Removed legacy atomic Excel save path using ExcelProcessor
-
-    # Removed legacy PDF update path using PDFProcessor
-
-    def _generate_backup_filename(self, original_path: str) -> str:
-        """Generate simple backup filename with timestamp."""
-        original_file = Path(original_path)
-        file_stem = original_file.stem
-        file_suffix = original_file.suffix
-        file_dir = original_file.parent
-
-        # Simple timestamp with seconds for uniqueness
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_filename = f"{file_stem}_backup_{timestamp}{file_suffix}"
-
-        return str(file_dir / backup_filename)
-
-    def _ensure_unique_backup_filename(self, backup_path: str) -> str:
-        """Return the backup path as-is since seconds provide sufficient uniqueness."""
-        return backup_path
-
-    def _generate_output_filenames(
-        self, excel_path: str, pdf_path: str
-    ) -> Tuple[str, str]:
-        """Generate output filenames using original names (no '_renumbered' suffix)."""
-        # New strategy: output files use original filenames
-        # The original files will be backed up before processing
-        return excel_path, pdf_path
-
-    def _generate_backup_filenames(
-        self, excel_path: str, pdf_path: str
-    ) -> Tuple[str, str]:
-        """Generate backup filenames with timestamp."""
-        excel_backup = self._generate_backup_filename(excel_path)
-        pdf_backup = self._generate_backup_filename(pdf_path)
-
-        # Ensure uniqueness (now simplified)
-        excel_backup = self._ensure_unique_backup_filename(excel_backup)
-        pdf_backup = self._ensure_unique_backup_filename(pdf_backup)
-
-        return excel_backup, pdf_backup
-
-    def _create_backup_files(self, excel_path: str, pdf_path: str) -> Tuple[str, str]:
-        """Create simple backup copies with timestamp suffix."""
-        # Generate backup filenames
-        excel_backup_path, pdf_backup_path = self._generate_backup_filenames(
-            excel_path, pdf_path
-        )
-
-        # Copy files
-        shutil.copy2(excel_path, excel_backup_path)
-        shutil.copy2(pdf_path, pdf_backup_path)
-
-        return excel_backup_path, pdf_backup_path
+        """Delegate to the controller."""
+        self.controller.process_files()
 
     def run(self) -> None:
         """Start the GUI application."""

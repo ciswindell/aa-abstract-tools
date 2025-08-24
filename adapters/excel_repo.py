@@ -7,7 +7,6 @@ back into an existing workbook template and sheet, then applies
 formatting via `ExcelFormatter`.
 """
 
-from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 import pandas as pd
@@ -15,19 +14,11 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 from fileops.files import atomic_write_with_template
 
-from excel_formatter import ExcelFormatter
-
-
-@dataclass
-class _ColumnInfoLite:
-    """Lightweight column metadata to satisfy ExcelFormatter expectations."""
-
-    original_name: str
-    current_name: str
-    position: int  # 0-based worksheet column index
-    width: float = 15.0
-    horizontal_alignment: str = "left"
-    vertical_alignment: str = "top"
+from utils.bookmark_formulas import (
+    apply_bookmark_formulas,
+    detect_bookmark_column,
+    has_bookmark_formulas,
+)
 
 
 class ExcelOpenpyxlRepo:
@@ -53,16 +44,8 @@ class ExcelOpenpyxlRepo:
         if not target_sheet:
             raise RuntimeError("Target sheet name not provided")
 
-        # Detect bookmark formula column name in the DataFrame (by header text)
-        def _detect_bookmark_col_name() -> Optional[str]:
-            candidates = ["Bookmark Formula", "Bookmark", "Bookmark Text", "Formula"]
-            for col in df.columns:
-                for name in candidates:
-                    if name.lower() in str(col).lower():
-                        return str(col)
-            return None
-
-        bookmark_col_name = _detect_bookmark_col_name()
+        # Detect bookmark formula column name in the DataFrame
+        bookmark_col_name = detect_bookmark_column(df)
 
         def _write_into(temp_path: str) -> None:
             wb = load_workbook(temp_path)
@@ -86,21 +69,10 @@ class ExcelOpenpyxlRepo:
                     h.lower(): idx + 1 for idx, h in enumerate(header_values) if h != ""
                 }
 
-                # Detect if bookmark formula column already contains formulas in template
-                apply_formulas_flag: bool = False
-                if bookmark_col_name:
-                    b_idx = header_to_col.get(bookmark_col_name.strip().lower())
-                    if b_idx:
-                        cell = ws.cell(row=2, column=b_idx)
-                        has_formula = False
-                        try:
-                            has_formula = (getattr(cell, "data_type", None) == "f") or (
-                                isinstance(cell.value, str)
-                                and cell.value.startswith("=")
-                            )
-                        except Exception:
-                            has_formula = False
-                        apply_formulas_flag = not has_formula
+                # Check if bookmark column needs formulas
+                apply_formulas_flag = bookmark_col_name and not has_bookmark_formulas(
+                    temp_path, bookmark_col_name
+                )
 
                 # Write values by matching header names
                 for df_col in df.columns:
@@ -137,44 +109,9 @@ class ExcelOpenpyxlRepo:
             finally:
                 wb.close()
 
-            # Prepare columns metadata for formatter based on worksheet positions
-            columns_meta: List[_ColumnInfoLite] = []
-            # Re-open read-only to compute positions reliably
-            wbr = load_workbook(temp_path, read_only=True, data_only=True)
-            try:
-                ws_r = wbr[target_sheet]
-                header_values_r: List[str] = [
-                    "" if cell.value is None else str(cell.value).strip()
-                    for cell in ws_r[1]
-                ]
-                header_to_col_r: Dict[str, int] = {
-                    h.lower(): idx + 1
-                    for idx, h in enumerate(header_values_r)
-                    if h != ""
-                }
-                for df_pos, name in enumerate(df.columns):
-                    key = str(name).strip().lower()
-                    col_idx = header_to_col_r.get(key, df_pos + 1)
-                    columns_meta.append(
-                        _ColumnInfoLite(
-                            original_name=name,
-                            current_name=name,
-                            position=col_idx - 1,
-                        )
-                    )
-            finally:
-                wbr.close()
-
-            # Apply only formulas if needed; otherwise rely entirely on template formatting
-            if apply_formulas_flag:
-                formatter = ExcelFormatter(
-                    columns_meta, bookmark_formula_column=bookmark_col_name
-                )
-                try:
-                    formatter.apply_formulas_only(temp_path, df)
-                except AttributeError:
-                    # Fallback to full formatting if helper not available
-                    formatter.apply_formatting(temp_path, df)
+            # Apply bookmark formulas if needed
+            if apply_formulas_flag and bookmark_col_name:
+                apply_bookmark_formulas(temp_path, df, bookmark_col_name)
 
         atomic_write_with_template(
             template_path=template_path,

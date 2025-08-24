@@ -8,6 +8,7 @@ Defines minimal contracts to decouple UI and IO from core logic.
 from typing import Any, Mapping, Optional, Protocol, Sequence, Tuple, List
 
 import pandas as pd
+from core.models import Options
 
 
 class Logger(Protocol):
@@ -48,3 +49,30 @@ class PdfRepo(Protocol):
         out_path: str,
     ) -> None:
         """Write pages and bookmarks to output PDF path."""
+
+
+class UIController(Protocol):
+    """Interface for UI controllers that handle user interactions."""
+
+    def get_file_paths(self) -> Tuple[Optional[str], Optional[str]]:
+        """Get selected Excel and PDF file paths."""
+
+    def get_options(self) -> Options:
+        """Get processing options from UI."""
+
+    def log_status(self, message: str) -> None:
+        """Log a status message to the UI."""
+
+    def show_error(self, title: str, message: str) -> None:
+        """Show an error message to the user."""
+
+    def show_success(self, message: str) -> None:
+        """Show a success message to the user."""
+
+    def prompt_sheet_selection(
+        self,
+        file_path: str,
+        sheet_names: List[str],
+        default_sheet: Optional[str] = None,
+    ) -> Optional[str]:
+        """Prompt user to select a sheet from available options."""
