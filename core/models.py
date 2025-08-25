@@ -50,6 +50,25 @@ class PageRange:
 
 
 @dataclass
+class DocumentLink:
+    """Links an Excel row to its corresponding PDF bookmark.
+
+    Attributes:
+        document_id: Unique hash identifier for the document.
+        excel_row_index: Position in the DataFrame (0-based).
+        original_bookmark_title: Original PDF bookmark title.
+        original_bookmark_page: Original PDF bookmark page number (1-based).
+        original_bookmark_level: Original PDF bookmark level.
+    """
+
+    document_id: str
+    excel_row_index: int
+    original_bookmark_title: str
+    original_bookmark_page: int
+    original_bookmark_level: int
+
+
+@dataclass
 class Record:
     """Excel row wrapper; stores raw column values.
 
