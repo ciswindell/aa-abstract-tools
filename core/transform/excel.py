@@ -5,10 +5,75 @@ Pure Excel DataFrame transforms.
 Functions here are side‑effect free and return new DataFrames.
 """
 
+import hashlib
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 import pandas as pd
 from utils.dates import parse_robust
+
+
+def generate_document_id(
+    original_index: str, source_path: str, row_position: int
+) -> str:
+    """Generate unique document ID from source file, position, and original index.
+
+    Args:
+        original_index: Original index value from Excel (e.g., "A5", "12")
+        source_path: Path to the source Excel file
+        row_position: 0-based row position in the DataFrame
+
+    Returns:
+        8-character hash string that uniquely identifies the document
+
+    Raises:
+        ValueError: If hash generation fails due to invalid inputs
+    """
+    try:
+        # Use full filename + row position + original index for uniqueness
+        source_name = Path(source_path).name  # Full filename with extension
+        composite = f"{source_name}_{row_position}_{original_index}"
+
+        # Create short hash (8 chars) for compactness
+        hash_obj = hashlib.md5(composite.encode())
+        return hash_obj.hexdigest()[:8]
+    except Exception as e:
+        raise ValueError(
+            f"Failed to generate document ID for {original_index}: {e}"
+        ) from e
+
+
+def add_document_ids(
+    df: pd.DataFrame,
+    source_path: str,
+    index_col: str = "Index#",
+) -> pd.DataFrame:
+    """Add Document_ID column to DataFrame using source file path.
+
+    Single responsibility: Generate unique document identifiers.
+
+    Args:
+        df: Input DataFrame with cleaned index column
+        source_path: Path to source file for ID generation
+        index_col: Name of the index column (default "Index#")
+
+    Returns:
+        DataFrame with Document_ID column added
+
+    Raises:
+        ValueError: If index column is missing or Document_ID generation fails
+    """
+    if index_col not in df.columns:
+        raise ValueError(f"Index column '{index_col}' not found in DataFrame")
+
+    new_df = df.copy()
+    if "Document_ID" not in new_df.columns:
+        new_df["Document_ID"] = [
+            generate_document_id(str(orig_idx), source_path, row_pos)
+            for row_pos, orig_idx in enumerate(new_df[index_col])
+        ]
+
+    return new_df
 
 
 def clean_types(
@@ -18,6 +83,8 @@ def clean_types(
     date_columns: Optional[Iterable[str]] = None,
 ) -> pd.DataFrame:
     """Return a copy of df with light type cleaning.
+
+    Single responsibility: Clean and normalize data types.
 
     - Ensures index_col is a trimmed string and preserves an "Original_Index" copy
     - Normalizes common text columns to trimmed strings

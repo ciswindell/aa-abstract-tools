@@ -21,18 +21,18 @@ Based on PRD: `prd-hash-based-document-linking.md`
 
 ## Tasks
 
-- [ ] 1.0 Create DocumentLink DataClass and Hash Generation Utilities
+- [x] 1.0 Create DocumentLink DataClass and Hash Generation Utilities
   - [x] 1.1 Add DocumentLink dataclass to core/models.py with required fields
-  - [ ] 1.2 Create generate_document_id() function using MD5 hash of file path + row position + original index
-  - [ ] 1.3 Add type hints and docstrings following existing code patterns
-  - [ ] 1.4 Write unit tests for hash generation function
+  - [x] 1.2 Create generate_document_id() function using MD5 hash of file path + row position + original index
+  - [x] 1.3 Add type hints and docstrings following existing code patterns
+  - [x] 1.4 Write unit tests for hash generation function
 
-- [ ] 2.0 Update Excel Transform Functions to Use Document_ID
-  - [ ] 2.1 Modify clean_types() to accept optional source_path parameter
-  - [ ] 2.2 Replace Original_Index column creation with Document_ID generation
-  - [ ] 2.3 Ensure backward compatibility when source_path is None
-  - [ ] 2.4 Update existing tests to verify Document_ID column presence
-  - [ ] 2.5 Add new tests for hash generation with source_path
+- [x] 2.0 Update Excel Transform Functions to Use Document_ID
+  - [x] 2.1 Modify clean_types() to accept optional source_path parameter
+  - [x] 2.2 Replace Original_Index column creation with Document_ID generation
+  - [x] 2.3 Ensure backward compatibility when source_path is None
+  - [x] 2.4 Update existing tests to verify Document_ID column presence
+  - [x] 2.5 Add new tests for hash generation with source_path
 
 - [ ] 3.0 Update PDF Transform Functions to Use Document_ID
   - [ ] 3.1 Update make_titles() to use Document_ID column instead of Original_Index
