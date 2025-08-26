@@ -9,7 +9,9 @@ from core.interfaces import ExcelRepo, Logger, PdfRepo
 from core.models import Options, Result
 from core.services.validate import ValidationService
 from core.transform.excel import (
+    add_document_ids,
     clean_types,
+    create_document_links,
     sort_and_renumber,
 )
 from core.transform.pdf import make_titles, extract_original_index, detect_page_ranges
@@ -46,16 +48,17 @@ class RenumberService:
 
             self._log.info("Transforming Excel data...")
             df1 = clean_types(df)
-            df2 = sort_and_renumber(df1)
+            df2 = add_document_ids(df1, excel_path)
+            df3 = sort_and_renumber(df2)
 
             self._log.info("Generating PDF bookmark titles...")
-            titles_map = make_titles(df2)
+            titles_map = make_titles(df3)
 
             # Save Excel back into template (in-place responsibility left to caller via backups)
             self._log.info("Saving Excel output...")
             target_sheet = opts.sheet_name or "Index"
             self._excel.save(
-                df2,
+                df3,
                 template_path=excel_path,
                 target_sheet=target_sheet,
                 out_path=excel_path,
@@ -64,53 +67,62 @@ class RenumberService:
             # Recreate PDF output with updated bookmarks (no reordering here)
             self._log.info("Saving PDF output...")
             pages = self._pdf.pages(pdf_path)
+            # Create DocumentLink objects for bookmark title mapping
+            document_links = create_document_links(df1, bookmarks, excel_path)
+
             updated_bookmarks = _merge_bookmarks_with_titles(
-                bookmarks, titles_map, opts.sort_bookmarks
+                bookmarks, titles_map, opts.sort_bookmarks, document_links
             )
 
             if opts.reorder_pages:
-                # Determine desired order by the DataFrame's Original_Index column
-                desired_original_indices = [
-                    str(x).strip() for x in df2.get("Original_Index", [])
-                ]
 
                 # Build ranges from original bookmarks (keyed by original title)
                 original_ranges_by_title = detect_page_ranges(bookmarks, total_pages)
-                # Map original index -> level and original title
-                original_index_to_level: dict[str, int] = {}
-                original_index_to_title: dict[str, str] = {}
-                for bm in bookmarks:
-                    orig_title = str(bm.get("title", ""))
-                    orig_idx = extract_original_index(orig_title) or ""
-                    if orig_idx:
-                        original_index_to_level[orig_idx] = int(bm.get("level", 0))
-                        original_index_to_title[orig_idx] = orig_title
 
-                # Reorder physical pages by concatenating each bookmark's original page range
+                # Create mapping from Document_ID to original bookmark info using DocumentLinks
+                doc_id_to_original_title: dict[str, str] = {}
+                doc_id_to_level: dict[str, int] = {}
+
+                for link in document_links:
+                    doc_id_to_original_title[link.document_id] = (
+                        link.original_bookmark_title
+                    )
+                    doc_id_to_level[link.document_id] = link.original_bookmark_level
+
+                # Reorder pages by the new sequential Index# order (1, 2, 3...)
                 new_pages: list[Any] = []
                 new_bookmarks: list[dict[str, Any]] = []
                 current_start_page = 1
-                for orig_idx in desired_original_indices:
-                    title_key = original_index_to_title.get(orig_idx)
-                    if not title_key:
+
+                # Iterate through df3 in order (which is already sorted 1, 2, 3...)
+                for _, row in df3.iterrows():
+                    doc_id = str(row.get("Document_ID", "")).strip()
+                    if not doc_id:
                         continue
-                    rng = original_ranges_by_title.get(title_key)
+
+                    original_title = doc_id_to_original_title.get(doc_id)
+                    if not original_title:
+                        continue
+
+                    rng = original_ranges_by_title.get(original_title)
                     if not rng:
                         continue
+
                     start, end = int(rng["start"]), int(rng["end"])
+
                     # Append page objects for this range (1-based to 0-based)
                     for p in range(start, end + 1):
                         if 1 <= p <= len(pages):
                             new_pages.append(pages[p - 1])
 
-                    # Emit corresponding bookmark with updated title and new page start
-                    new_title = titles_map.get(orig_idx)
+                    # Get new title from titles_map using Document_ID
+                    new_title = titles_map.get(doc_id)
                     if new_title:
                         new_bookmarks.append(
                             {
                                 "title": new_title,
                                 "page": current_start_page,
-                                "level": original_index_to_level.get(orig_idx, 0),
+                                "level": doc_id_to_level.get(doc_id, 0),
                             }
                         )
                     # Advance current_start_page by the length of this segment
@@ -138,16 +150,30 @@ def _merge_bookmarks_with_titles(
     bookmarks: Sequence[Mapping[str, Any]],
     titles_map: Mapping[str, str],
     sort_naturally: bool,
+    document_links: Sequence[Any],  # DocumentLink objects
 ):
-    """Return updated bookmarks with new titles for those with mappable indices."""
+    """Return updated bookmarks with new titles using DocumentLink mapping.
+
+    Args:
+        bookmarks: Original PDF bookmarks
+        titles_map: Map from Document_ID to new title
+        document_links: DocumentLink objects that map bookmarks to Excel rows
+        sort_naturally: Whether to sort bookmarks naturally
+    """
+
+    # Create mapping from original bookmark title to Document_ID
+    title_to_doc_id = {}
+    for link in document_links:
+        title_to_doc_id[link.original_bookmark_title] = link.document_id
 
     updated = []
     for bm in bookmarks:
-        title = str(bm.get("title", ""))
-        original = extract_original_index(title)
-        if original and original in titles_map:
+        original_title = str(bm.get("title", ""))
+        doc_id = title_to_doc_id.get(original_title)
+
+        if doc_id and doc_id in titles_map:
             new_bm = dict(bm)
-            new_bm["title"] = titles_map[original]
+            new_bm["title"] = titles_map[doc_id]
             updated.append(new_bm)
         else:
             updated.append(dict(bm))

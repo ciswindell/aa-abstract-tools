@@ -14,18 +14,48 @@ def test_extract_original_index():
     assert extract_original_index("") is None
 
 
-def test_make_titles_happy_path():
+def test_make_titles_with_document_id_basic():
+    """Test make_titles with Document_ID column (basic functionality)."""
     df = pd.DataFrame(
         {
-            "Original_Index": ["A", "B"],
+            "Document_ID": ["abc12345", "def67890"],
             "Index#": [1, 2],
             "Document Type": ["Doc", "Doc"],
             "Received Date": ["2024-01-01", "2024-01-02"],
         }
     )
     titles = make_titles(df)
-    assert titles.get("A", "").startswith("1-Doc-")
-    assert titles.get("B", "").startswith("2-Doc-")
+    assert titles.get("abc12345", "").startswith("1-Doc-")
+    assert titles.get("def67890", "").startswith("2-Doc-")
+
+
+def test_make_titles_with_document_id():
+    """Test make_titles with Document_ID column (new functionality)."""
+    df = pd.DataFrame(
+        {
+            "Document_ID": ["abc12345", "def67890"],
+            "Index#": [1, 2],
+            "Document Type": ["Deed", "Lien"],
+            "Received Date": ["2024-01-01", "2024-01-02"],
+        }
+    )
+    titles = make_titles(df)
+    assert titles.get("abc12345", "").startswith("1-Deed-")
+    assert titles.get("def67890", "").startswith("2-Lien-")
+
+
+def test_make_titles_requires_document_id():
+    """Test that make_titles requires Document_ID column."""
+    df = pd.DataFrame(
+        {
+            "Index#": [1, 2],
+            "Document Type": ["Doc", "Doc"],
+            "Received Date": ["2024-01-01", "2024-01-02"],
+        }
+    )
+    # Should return empty dict when Document_ID column is missing
+    titles = make_titles(df)
+    assert titles == {}
 
 
 def test_detect_page_ranges_sequential():

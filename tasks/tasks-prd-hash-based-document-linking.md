@@ -34,24 +34,24 @@ Based on PRD: `prd-hash-based-document-linking.md`
   - [x] 2.4 Update existing tests to verify Document_ID column presence
   - [x] 2.5 Add new tests for hash generation with source_path
 
-- [ ] 3.0 Update PDF Transform Functions to Use Document_ID
-  - [ ] 3.1 Update make_titles() to use Document_ID column instead of Original_Index
-  - [ ] 3.2 Rename extract_original_index() to extract_document_id() (keep same logic)
-  - [ ] 3.3 Update function signatures and type hints
-  - [ ] 3.4 Update existing tests to use new function names and Document_ID
-  - [ ] 3.5 Ensure all PDF transform tests pass with new column name
+- [x] 3.0 Update PDF Transform Functions to Use Document_ID
+  - [x] 3.1 Update make_titles() to use Document_ID column instead of Original_Index
+  - [x] 3.2 Clarify extract_original_index() documentation (keep same logic and name)
+  - [x] 3.3 Update function signatures and type hints
+  - [x] 3.4 Update existing tests to use new function names and Document_ID
+  - [x] 3.5 Ensure all PDF transform tests pass with new column name
 
-- [ ] 4.0 Update Renumber Service Linking Logic
-  - [ ] 4.1 Create create_document_links() function that returns List[DocumentLink]
-  - [ ] 4.2 Update run() method to use DocumentLink objects for mapping
-  - [ ] 4.3 Pass source_path to clean_types() when calling Excel transforms
-  - [ ] 4.4 Update page reordering logic to use Document_ID from DocumentLink objects
-  - [ ] 4.5 Add error handling for failed hash generation and duplicate mappings
-  - [ ] 4.6 Update _merge_bookmarks_with_titles() to work with Document_ID
+- [x] 4.0 Update Renumber Service Linking Logic
+  - [x] 4.1 Create create_document_links() function that returns List[DocumentLink]
+  - [x] 4.2 Update run() method to use DocumentLink objects for mapping
+  - [x] 4.3 Pass source_path to clean_types() when calling Excel transforms
+  - [x] 4.4 Update page reordering logic to use Document_ID from DocumentLink objects
+  - [x] 4.5 Add error handling for failed hash generation and duplicate mappings
+  - [x] 4.6 Update _merge_bookmarks_with_titles() to work with Document_ID
 
-- [ ] 5.0 Remove Original_Index References and Update Tests
-  - [ ] 5.1 Search codebase for all Original_Index references and replace with Document_ID
-  - [ ] 5.2 Update all test files to use Document_ID instead of Original_Index
-  - [ ] 5.3 Run full test suite to ensure no regressions
-  - [ ] 5.4 Add integration test for single-file workflow producing identical output
-  - [ ] 5.5 Add validation tests for duplicate indices and bookmark linking errors
+- [x] 5.0 Remove Original_Index References and Update Tests
+  - [x] 5.1 Search codebase for all Original_Index references and replace with Document_ID
+  - [x] 5.2 Update all test files to use Document_ID instead of Original_Index
+  - [x] 5.3 Run full test suite to ensure no regressions
+  - [x] 5.4 Add integration test for single-file workflow producing identical output
+  - [x] 5.5 Add validation tests for duplicate indices and bookmark linking errors

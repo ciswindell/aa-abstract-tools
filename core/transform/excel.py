@@ -7,9 +7,11 @@ Functions here are side‑effect free and return new DataFrames.
 
 import hashlib
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
 import pandas as pd
+from core.models import DocumentLink
+from core.transform.pdf import extract_original_index
 from utils.dates import parse_robust
 
 
@@ -41,6 +43,79 @@ def generate_document_id(
         raise ValueError(
             f"Failed to generate document ID for {original_index}: {e}"
         ) from e
+
+
+def create_document_links(
+    df: pd.DataFrame,
+    bookmarks: Sequence[Mapping[str, Any]],
+    source_path: str,
+    index_col: str = "Index#",
+) -> List[DocumentLink]:
+    """Create DocumentLink objects mapping Excel rows to PDF bookmarks.
+
+    This is the core function implementing PRD requirement #7:
+    "Create explicit DocumentLink objects that map Excel rows to PDF bookmarks
+    before any renumbering occurs."
+
+    Args:
+        df: Excel DataFrame with original data (before renumbering)
+        bookmarks: PDF bookmark data
+        source_path: Path to source Excel file for hash generation
+        index_col: Name of the index column
+
+    Returns:
+        List of DocumentLink objects
+
+    Raises:
+        ValueError: If linking cannot be established (validation should happen elsewhere)
+    """
+    # Create mapping from original index to bookmark
+    bookmark_map = {}
+    for bm in bookmarks:
+        title = str(bm.get("title", ""))
+        original_idx = extract_original_index(title)
+        if original_idx:
+            if original_idx in bookmark_map:
+                raise ValueError(
+                    f"Multiple bookmarks found with same index '{original_idx}'. "
+                    f"This violates data integrity requirements."
+                )
+            bookmark_map[original_idx] = bm
+
+    # Create DocumentLink objects
+    document_links = []
+    for row_idx, row in df.iterrows():
+        original_index = str(row[index_col]).strip()
+
+        # Find matching bookmark
+        if original_index not in bookmark_map:
+            raise ValueError(
+                f"No PDF bookmark found for Excel row with Index# '{original_index}'. "
+                f"All Excel rows must have corresponding bookmarks."
+            )
+
+        bookmark = bookmark_map[original_index]
+
+        # Generate unique Document_ID
+        try:
+            document_id = generate_document_id(original_index, source_path, row_idx)
+        except Exception as e:
+            raise ValueError(
+                f"Failed to generate Document_ID for row {row_idx}: {e}"
+            ) from e
+
+        # Create DocumentLink object
+        document_links.append(
+            DocumentLink(
+                document_id=document_id,
+                excel_row_index=row_idx,
+                original_bookmark_title=str(bookmark.get("title", "")),
+                original_bookmark_page=int(bookmark.get("page", 1)),
+                original_bookmark_level=int(bookmark.get("level", 0)),
+            )
+        )
+
+    return document_links
 
 
 def add_document_ids(
@@ -86,7 +161,7 @@ def clean_types(
 
     Single responsibility: Clean and normalize data types.
 
-    - Ensures index_col is a trimmed string and preserves an "Original_Index" copy
+    - Ensures index_col is a trimmed string
     - Normalizes common text columns to trimmed strings
     - Attempts to parse date columns; leaves values unchanged on parse failure
     """
@@ -106,8 +181,6 @@ def clean_types(
     if index_col in new_df.columns:
         new_df[index_col] = new_df[index_col].astype(str).str.strip()
         new_df[index_col] = new_df[index_col].replace("nan", "")
-        if "Original_Index" not in new_df.columns:
-            new_df["Original_Index"] = new_df[index_col].astype(str)
 
     for col in text_columns:
         if col in new_df.columns:

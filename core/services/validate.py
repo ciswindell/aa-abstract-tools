@@ -37,16 +37,25 @@ class ValidationService:
             sheet_results = validate_sheet(df, self.required_columns)
             missing = sheet_results.get("missing", [])
             dupes = sheet_results.get("duplicates", [])
-            if missing or dupes:
+            duplicate_indices = sheet_results.get("duplicate_indices", [])
+
+            if missing or dupes or duplicate_indices:
                 details: List[str] = []
                 if missing:
                     details.append("Missing required columns: " + ", ".join(missing))
                 if dupes:
                     details.append("Duplicate required columns: " + ", ".join(dupes))
+                if duplicate_indices:
+                    duplicate_list = ", ".join(f"'{dup}'" for dup in duplicate_indices)
+                    details.append(
+                        f"Excel validation failed: Duplicate Index# values found: {duplicate_list}. "
+                        f"Each row must have a unique Index# value. Please check your Excel file and remove or rename duplicate entries."
+                    )
                 raise ValueError("; ".join(details))
             report["excel"] = {"ok": True}
 
         if bookmarks is not None:
+            # Check for page conflicts
             conflicts = PDFValidator.validate_bookmark_page_conflicts(list(bookmarks))
             if conflicts and conflicts.get("conflicts"):
                 formatted = "; ".join(
@@ -54,6 +63,29 @@ class ValidationService:
                     for c in conflicts.get("conflicts", [])
                 )
                 raise ValueError("PDF bookmark conflicts detected: " + formatted)
+
+            # Check for duplicate bookmark indices (PRD requirement #3)
+            index_duplicates = PDFValidator.validate_bookmark_index_duplicates(
+                list(bookmarks)
+            )
+            if index_duplicates and index_duplicates.get("duplicate_groups"):
+                duplicate_groups = index_duplicates.get("duplicate_groups", [])
+
+                # Build simple error message showing all problematic bookmarks
+                error_parts = ["These bookmarks have duplicate index numbers:\n"]
+
+                for group in duplicate_groups:
+                    titles = group["titles"]
+                    for title in titles:
+                        error_parts.append(f"\n  • {title}")
+
+                error_parts.append(
+                    f"\n\nEach bookmark must have a unique index number at the beginning of its title. "
+                    f"Please check your PDF bookmarks and ensure no index numbers are repeated."
+                )
+
+                raise ValueError("".join(error_parts))
+
             report["pdf"] = {"ok": True}
 
         return report

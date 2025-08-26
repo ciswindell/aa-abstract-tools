@@ -23,8 +23,8 @@ def test_clean_types_preserves_original_index_and_trims_text():
     )
 
     out = clean_types(df)
-    assert "Original_Index" in out.columns
-    assert out.loc[0, "Original_Index"] == "A1"
+    # clean_types only does data cleaning, no longer creates Original_Index
+    assert "Original_Index" not in out.columns
     assert out.loc[0, "Document Type"] == "Deed"
     # Dates become parseable timestamps or preserved
     assert out.loc[0, "Received Date"] is not None
@@ -41,10 +41,12 @@ def test_sort_and_renumber_assigns_sequential_indices():
     assert list(df2["Index#"]) == [1, 2, 3]
 
 
-def test_original_index_column_present_after_clean_types():
+def test_clean_types_no_longer_creates_original_index():
     df = pd.DataFrame({"Index#": ["A", "B", "C"]})
     out = clean_types(df)
-    assert list(out["Original_Index"]) == ["A", "B", "C"]
+    # clean_types only does data cleaning, Document_ID is created by add_document_ids()
+    assert "Original_Index" not in out.columns
+    assert "Document_ID" not in out.columns
 
 
 def test_generate_document_id_creates_unique_hashes():
@@ -109,9 +111,9 @@ def test_add_document_ids_creates_document_id_column():
     for doc_id in result["Document_ID"]:
         assert len(doc_id) == 8
 
-    # Should preserve existing columns
+    # Should preserve existing columns and add Document_ID
     assert "Index#" in result.columns
-    assert "Original_Index" in result.columns
+    assert "Document_ID" in result.columns
 
 
 def test_add_document_ids_with_different_files_creates_unique_ids():

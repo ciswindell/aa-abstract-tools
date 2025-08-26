@@ -50,18 +50,25 @@ class AppController:
             options = self.ui.get_options()
             options.sheet_name = target_sheet
 
-            # Create backups if enabled
-            if options.backup:
-                self._create_backup_files(excel_file, pdf_file)
-
-            # Build services
+            # Build services for early validation
             logger = TkLogger(self.ui.log_status)
             excel_repo = ExcelOpenpyxlRepo()
             pdf_repo = PdfPyPDF2Repo()
             validator = ValidationService(self.required_columns)
-            service = RenumberService(excel_repo, pdf_repo, validator, logger)
+
+            # Load and validate data BEFORE creating backups
+            logger.info("Loading and validating files...")
+            df = excel_repo.load(excel_file, target_sheet)
+            bookmarks, _ = pdf_repo.read(pdf_file)
+            validator.run(df=df, bookmarks=bookmarks)
+            logger.info("Validation passed.")
+
+            # Create backups if enabled (only after validation passes)
+            if options.backup:
+                self._create_backup_files(excel_file, pdf_file)
 
             # Run processing
+            service = RenumberService(excel_repo, pdf_repo, validator, logger)
             result = service.run(excel_file, pdf_file, options)
             if not result.success:
                 raise RuntimeError(result.message or "Unknown error")
@@ -71,7 +78,7 @@ class AppController:
             self.ui.show_success(message)
 
         except (ValueError, OSError, RuntimeError) as e:
-            self.ui.show_error("Processing Error", f"Processing failed: {str(e)}")
+            self.ui.show_error("Processing Error", str(e))
 
     def _resolve_processing_sheet_name(self, file_path: str) -> Optional[str]:
         """Resolve the processing sheet name, case-insensitively."""

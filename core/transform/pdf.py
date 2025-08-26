@@ -13,11 +13,14 @@ from utils.dates import format_mdy
 
 
 def extract_original_index(bookmark_title: str) -> Optional[str]:
-    """Return the index segment before the first '-' in a bookmark title.
+    """Return the original index number before the first '-' in a bookmark title.
+
+    This extracts the original Excel Index# value that was used to create the bookmark.
+    The hash-based Document_ID is never user-facing and never appears in bookmark titles.
 
     Examples:
-        "12-Assignment-1/1/2024" -> "12"
-        "A5-Deed-2/2/2024" -> "A5"
+        "12-Assignment-1/1/2024" -> "12"  (original Excel Index#)
+        "A5-Deed-2/2/2024" -> "A5"       (original Excel Index#)
     """
 
     if not bookmark_title:
@@ -31,13 +34,13 @@ def extract_original_index(bookmark_title: str) -> Optional[str]:
 def make_titles(df: pd.DataFrame) -> Dict[str, str]:
     """Generate new bookmark titles from a processed DataFrame.
 
-    Requires columns: "Original_Index", "Index#", "Document Type", "Received Date".
+    Requires columns: "Document_ID", "Index#", "Document Type", "Received Date".
 
-    Returns mapping: original_index (str) -> title (str) "{Index#}-{Document Type}-{M/D/YYYY}".
+    Returns mapping: document_id (str) -> title (str) "{Index#}-{Document Type}-{M/D/YYYY}".
     Rows missing required fields are skipped.
     """
 
-    required = ["Original_Index", "Index#", "Document Type", "Received Date"]
+    required = ["Document_ID", "Index#", "Document Type", "Received Date"]
     for col in required:
         if col not in df.columns:
             return {}
@@ -45,12 +48,12 @@ def make_titles(df: pd.DataFrame) -> Dict[str, str]:
     titles: Dict[str, str] = {}
     for _, row in df.iterrows():
         try:
-            original = str(row["Original_Index"]).strip()
+            doc_id = str(row["Document_ID"]).strip()
             new_idx = int(row["Index#"])  # must be sequential int
             doc_type = str(row["Document Type"]).strip()
             received = row["Received Date"]
             date_text = format_mdy(received)
-            titles[original] = f"{new_idx}-{doc_type}-{date_text}"
+            titles[doc_id] = f"{new_idx}-{doc_type}-{date_text}"
         except Exception:
             continue
     return titles
