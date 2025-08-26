@@ -2,7 +2,7 @@
 
 ## Relevant Files
 
-- `abstract_renumber.py` - Main application class with tkinter GUI and core processing logic (created)
+- `main.py` - Main application class with tkinter GUI and core processing logic (created)
 - `excel_processor.py` - Class for handling Excel file operations and data sorting
 - `excel_formatter.py` - Class for handling Excel formatting operations (column widths, alignment, text wrapping, date formatting)
 - `pdf_processor.py` - Class for handling PDF bookmark operations (created)
@@ -14,7 +14,7 @@
 
 - This is a standalone Python application using tkinter for the GUI
 - Use `python3 -m pip install -r requirements.txt` to install dependencies
-- The application should be executable directly with `python3 abstract_renumber.py`
+- The application should be executable directly with `python3 main.py`
 
 ## Tasks
 

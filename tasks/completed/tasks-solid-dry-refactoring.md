@@ -9,7 +9,7 @@
 - `src/services/config_service.py` - Simple configuration management service
 - `src/workflows/abstract_renumber_workflow.py` - Current renumbering workflow implementation
 - `src/workflows/workflow_factory.py` - Factory for creating workflow instances
-- `abstract_renumber.py` - Modified main application file (refactored GUI and controller)
+- `main.py` - Modified main application file (refactored GUI and controller)
 - `excel_processor.py` - Refactored to follow single responsibility principle
 - `pdf_processor.py` - Refactored to follow single responsibility principle
 - `column_mapper.py` - Refactored for better separation of concerns

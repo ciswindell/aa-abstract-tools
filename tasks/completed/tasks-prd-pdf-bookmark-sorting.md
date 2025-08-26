@@ -1,6 +1,6 @@
 ## Relevant Files
 
-- `abstract_renumber.py` - Main GUI class needs new checkbox and integration with sorting workflow (COMPLETED: Added BooleanVar attributes, both checkboxes, dependency logic, getter methods, layout improvements, PDF validation integration, conditional sorting workflow)
+- `main.py` - Main GUI class needs new checkbox and integration with sorting workflow (COMPLETED: Added BooleanVar attributes, both checkboxes, dependency logic, getter methods, layout improvements, PDF validation integration, conditional sorting workflow)
 - `pdf_processor.py` - Core PDF processing class needs natural sorting and page reordering methods (COMPLETED: Added sort_bookmarks_naturally using natsort library, page range detection, page reordering)
 - `pdf_validator.py` - New validation class for bookmark conflict detection and PDF validation logic (COMPLETED: Clean static validation methods, no file I/O)
 - `requirements.txt` - Added natsort>=8.0.0 for natural sorting functionality (ADDED)

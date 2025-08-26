@@ -4,7 +4,7 @@
 
 - `excel_processor.py` - Contains the main Excel processing logic that needs to be updated to handle alphanumeric Index# values
 - `pdf_processor.py` - Contains PDF bookmark processing logic that needs to be updated for string-based index mapping
-- `abstract_renumber.py` - Main application file that may need minor updates for error handling
+- `main.py` - Main application file that may need minor updates for error handling
 - `test_excel_processor.py` - Unit tests for Excel processor functionality
 - `test_pdf_processor.py` - Unit tests for PDF processor functionality
 - `test_integration.py` - Integration tests for the complete workflow with alphanumeric Index# values

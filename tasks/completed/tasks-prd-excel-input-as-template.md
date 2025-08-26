@@ -1,6 +1,6 @@
 ## Relevant Files
 
-- `abstract_renumber.py` - Orchestrates processing; integrate input-as-template flow and UX hooks (SOLID/DRY).
+- `main.py` - Orchestrates processing; integrate input-as-template flow and UX hooks (SOLID/DRY).
 - `excel_processor.py` - Excel read/write pipeline; adopt template-preserving operations and atomic writes.
 - `excel_formatter.py` - Current formatting logic; adapt to preservation-first strategy, minimize width logic.
 - `column_mapper.py` - To be removed; replace mapping with a simple validator.

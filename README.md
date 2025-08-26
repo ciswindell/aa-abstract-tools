@@ -46,7 +46,7 @@ A class-based Python application that automates the process of sorting Excel dat
 
 2. Run the application:
    ```bash
-   python3 abstract_renumber.py
+   python3 main.py
    ```
 
 3. The GUI will open with the following steps:
