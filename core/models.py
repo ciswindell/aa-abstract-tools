@@ -4,7 +4,7 @@ Core models (dataclasses) used by application services and adapters.
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List, Tuple
 
 
 @dataclass
@@ -16,12 +16,23 @@ class Options:
         sort_bookmarks: Whether to sort PDF bookmarks naturally.
         reorder_pages: Whether to reorder pages to match bookmark order.
         sheet_name: Excel sheet name to process (None = resolve/prompt).
+        filter_enabled: Whether filtering is enabled in the UI.
+        filter_column: Name of the Excel column to filter by (None = no filter).
+        filter_values: Values to keep in the selected filter column.
+        merge_pairs: List of (excel_path, pdf_path) pairs to merge (None = no merge).
+        merge_pairs_with_sheets: Optional list of (excel_path, pdf_path, sheet_name) for
+            per-file sheet selection during merge.
     """
 
     backup: bool
     sort_bookmarks: bool
     reorder_pages: bool
     sheet_name: Optional[str]
+    filter_enabled: bool = False
+    filter_column: Optional[str] = None
+    filter_values: Optional[List[str]] = None
+    merge_pairs: Optional[List[Tuple[str, str]]] = None
+    merge_pairs_with_sheets: Optional[List[Tuple[str, str, str]]] = None
 
 
 @dataclass

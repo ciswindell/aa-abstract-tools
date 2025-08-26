@@ -7,7 +7,7 @@ back into an existing workbook template and sheet, then applies
 formatting via `ExcelFormatter`.
 """
 
-from typing import List, Optional
+from typing import Optional
 
 import pandas as pd
 from openpyxl import load_workbook
@@ -54,6 +54,13 @@ class ExcelOpenpyxlRepo:
             header_to_col = {
                 h.lower(): idx + 1 for idx, h in enumerate(header_values) if h != ""
             }
+
+            # Clear all existing data cell values (preserve formatting)
+            if ws.max_row > 1:
+                max_row = ws.max_row
+                for row_idx in range(2, max_row + 1):
+                    for col_idx in header_to_col.values():
+                        ws.cell(row=row_idx, column=col_idx, value="")
 
             # Write DataFrame values
             for df_col in df.columns:

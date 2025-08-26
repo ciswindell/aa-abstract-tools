@@ -50,6 +50,10 @@ class AppController:
             options = self.ui.get_options()
             options.sheet_name = target_sheet
 
+            # If merging, disable backups regardless of checkbox (originals untouched)
+            if getattr(options, "merge_pairs", None):
+                options.backup = False
+
             # Build services for early validation
             logger = TkLogger(self.ui.log_status)
             excel_repo = ExcelOpenpyxlRepo()
@@ -63,9 +67,43 @@ class AppController:
             validator.run(df=df, bookmarks=bookmarks)
             logger.info("Validation passed.")
 
+            # If filter is enabled and no values chosen yet, prompt now
+            try:
+                if (
+                    getattr(options, "filter_enabled", False)
+                    and not options.filter_values
+                ):
+                    col, vals = self.ui.prompt_filter_selection(df)
+                    if col and vals:
+                        options.filter_column = col
+                        options.filter_values = vals
+            except Exception:
+                # Non-fatal: continue without filter if prompt fails
+                pass
+
             # Create backups if enabled (only after validation passes)
             if options.backup:
                 self._create_backup_files(excel_file, pdf_file)
+
+            # If merging, resolve sheet names for each pair using the same selection flow
+            if getattr(options, "merge_pairs", None):
+                # Always include the primary selection as the first pair
+                pairs_with_sheets = [(excel_file, pdf_file, target_sheet)]
+                seen = {(excel_file, pdf_file)}
+
+                # Append additional pairs, resolving sheet names per file
+                for x_path, p_path in options.merge_pairs or []:
+                    if (x_path, p_path) in seen:
+                        continue
+                    sheet_name = self._resolve_processing_sheet_name(x_path)
+                    if sheet_name is None:
+                        sheet_name = self._prompt_user_select_sheet(x_path)
+                        if sheet_name is None:
+                            continue
+                    pairs_with_sheets.append((x_path, p_path, sheet_name))
+                    seen.add((x_path, p_path))
+
+                options.merge_pairs_with_sheets = pairs_with_sheets
 
             # Run processing
             service = RenumberService(excel_repo, pdf_repo, validator, logger)

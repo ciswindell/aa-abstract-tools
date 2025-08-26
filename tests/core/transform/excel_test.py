@@ -10,6 +10,7 @@ from core.transform.excel import (
     clean_types,
     generate_document_id,
     sort_and_renumber,
+    filter_df,
 )
 
 
@@ -149,3 +150,12 @@ def test_add_document_ids_does_not_overwrite_existing_document_id():
 
     # Should preserve existing Document_ID values
     assert list(result["Document_ID"]) == ["existing1", "existing2"]
+
+
+def test_filter_df_filters_and_resets_index():
+    df = pd.DataFrame(
+        {"Index#": ["A", "B", "C"], "Type": ["X", "Y", "X"], "Val": [1, 2, 3]}
+    )
+    out = filter_df(df, "Type", ["X"])  # keep rows with X
+    assert list(out["Index#"]) == ["A", "C"]
+    assert list(out.index) == [0, 1]

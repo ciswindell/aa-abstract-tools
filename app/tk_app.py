@@ -33,6 +33,16 @@ class AbstractRenumberGUI:
             value=False
         )  # Reorder pages disabled by default
 
+        # Filter UI state (selection will be prompted during processing)
+        self.filter_enabled: tk.BooleanVar = tk.BooleanVar(value=False)
+        self.filter_column: Optional[str] = None
+        self.filter_values: list[str] = []
+        self._filter_prompt_requested: bool = False
+
+        # Merge UI state
+        self.merge_enabled: tk.BooleanVar = tk.BooleanVar(value=False)
+        self.merge_pairs: list[tuple[str, str]] = []
+
         # Initialize GUI components
         self.excel_label: Optional[ttk.Label] = None
         self.pdf_label: Optional[ttk.Label] = None
@@ -50,7 +60,7 @@ class AbstractRenumberGUI:
     def setup_window(self) -> None:
         """Setup main window properties."""
         self.root.title("Abstract Renumber Tool")
-        self.root.geometry("600x500")
+        self.root.geometry("900x700")
         self.root.resizable(True, True)
 
         # Center window
@@ -209,6 +219,93 @@ class AbstractRenumberGUI:
             row=1, column=0, sticky=tk.W, padx=(40, 0), pady=(2, 0)
         )
 
+        # Filter controls
+        filter_frame = ttk.Frame(options_frame)
+        filter_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=(15, 5))
+        filter_frame.grid_columnconfigure(2, weight=1)
+
+        ttk.Checkbutton(
+            filter_frame,
+            text="Enable Filter (choose values during processing)",
+            variable=self.filter_enabled,
+        ).grid(row=0, column=0, sticky=tk.W)
+
+        self.filter_summary_label = ttk.Label(
+            filter_frame,
+            text="",
+            foreground="gray",
+            font=("Arial", 9),
+        )
+        self.filter_summary_label.grid(
+            row=1, column=0, columnspan=2, sticky=tk.W, padx=(20, 0)
+        )
+
+        def on_filter_toggle(*_args):
+            if self.filter_enabled.get():
+                self.filter_summary_label.config(
+                    text="Will prompt for column and values after loading Excel",
+                    foreground="green",
+                )
+            else:
+                self.filter_summary_label.config(text="", foreground="gray")
+
+        self.filter_enabled.trace_add("write", on_filter_toggle)
+
+        # Merge controls
+        merge_frame = ttk.Frame(options_frame)
+        merge_frame.grid(row=4, column=0, sticky=(tk.W, tk.E), pady=(5, 5))
+        merge_frame.grid_columnconfigure(2, weight=1)
+
+        ttk.Checkbutton(
+            merge_frame,
+            text="Enable Merge (select pairs)",
+            variable=self.merge_enabled,
+        ).grid(row=0, column=0, sticky=tk.W)
+
+        merge_btn = ttk.Button(
+            merge_frame,
+            text="Pairs…",
+            command=self._on_choose_merge_pairs,
+            state="disabled",
+            width=10,
+        )
+        merge_btn.grid(row=0, column=1, padx=(12, 0), sticky=tk.W)
+
+        self.merge_summary_label = ttk.Label(
+            merge_frame,
+            text="",
+            foreground="gray",
+            font=("Arial", 9),
+        )
+        self.merge_summary_label.grid(
+            row=1, column=0, columnspan=2, sticky=tk.W, padx=(20, 0)
+        )
+
+        def on_merge_toggle(*_args):
+            if self.merge_enabled.get():
+                merge_btn.config(state="normal")
+                # Disable backups while merge is enabled
+                self.backup_enabled.set(False)
+                self.backup_checkbox.config(state="disabled")
+                self.backup_info_label.config(
+                    text="Backups disabled during merge (originals untouched)",
+                    foreground="gray",
+                )
+                self.merge_summary_label.config(
+                    text="Select one or more (Excel, PDF) pairs",
+                    foreground="green",
+                )
+            else:
+                merge_btn.config(state="disabled")
+                self.backup_checkbox.config(state="normal")
+                self.backup_info_label.config(
+                    text="✅ Recommended: Creates timestamped backups for safety",
+                    foreground="green",
+                )
+                self.merge_summary_label.config(text="", foreground="gray")
+
+        self.merge_enabled.trace_add("write", on_merge_toggle)
+
     def _on_backup_option_changed(self) -> None:
         """Handle changes to the backup option checkbox."""
         if self.backup_enabled.get():
@@ -239,6 +336,23 @@ class AbstractRenumberGUI:
             self.reorder_pages_info_label.config(
                 text="Requires 'Sort PDF Bookmarks' to be enabled", foreground="gray"
             )
+
+    # choose button removed; filter will be prompted during processing when enabled
+
+    def _on_choose_merge_pairs(self) -> None:
+        """Open pairs dialog via adapter and store results on the GUI."""
+        try:
+            pairs = self.controller.ui_adapter.prompt_merge_pairs()
+        except Exception:
+            pairs = None
+        self.merge_pairs = list(pairs or [])
+        if self.merge_pairs:
+            preview = len(self.merge_pairs)
+            self.merge_summary_label.config(
+                text=f"Pairs selected: {preview}", foreground="green"
+            )
+        else:
+            self.merge_summary_label.config(text="No pairs selected", foreground="gray")
 
     def _create_status_area(self, parent: ttk.Frame) -> None:
         """Create status text area with scrollbar."""
@@ -325,6 +439,30 @@ class AbstractRenumberGUI:
     def get_reorder_pages_enabled(self) -> bool:
         """Return whether page reordering is enabled."""
         return self.reorder_pages_enabled.get()
+
+    # Accessors for filter state (used by UI adapter/controller later)
+    def get_filter_enabled(self) -> bool:
+        return self.filter_enabled.get()
+
+    def get_filter_prompt_requested(self) -> bool:
+        return self._filter_prompt_requested
+
+    def set_filter_selection(self, column: Optional[str], values: list[str]) -> None:
+        self.filter_column = column
+        self.filter_values = list(values or [])
+        if column and values:
+            preview = ", ".join(values[:3]) + (" …" if len(values) > 3 else "")
+            self.filter_summary_label.config(
+                text=f"Filter: {column} ∈ [{preview}]", foreground="green"
+            )
+        else:
+            self.filter_summary_label.config(text="", foreground="gray")
+
+    def get_merge_enabled(self) -> bool:
+        return self.merge_enabled.get()
+
+    def get_merge_pairs(self) -> list[tuple[str, str]]:
+        return list(self.merge_pairs)
 
 
 class AbstractRenumberTool:

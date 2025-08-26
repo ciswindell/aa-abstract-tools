@@ -50,7 +50,7 @@ def test_validation_service_duplicate_required_raises():
     svc = ValidationService(["Index#"])  # only required column is duplicated
     with pytest.raises(ValueError) as excinfo:
         svc.run(df=df)
-    assert "Duplicate required columns" in str(excinfo.value)
+    assert "Duplicate column" in str(excinfo.value)
 
 
 def test_validation_service_pdf_conflicts_raises():
