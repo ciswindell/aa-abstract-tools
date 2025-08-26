@@ -36,15 +36,44 @@ class ValidationService:
         if df is not None:
             sheet_results = validate_sheet(df, self.required_columns)
             missing = sheet_results.get("missing", [])
-            dupes = sheet_results.get("duplicates", [])
+            duplicate_columns = sheet_results.get("duplicate_columns", [])
             duplicate_indices = sheet_results.get("duplicate_indices", [])
 
-            if missing or dupes or duplicate_indices:
+            if missing or duplicate_columns or duplicate_indices:
                 details: List[str] = []
+                if duplicate_columns:
+                    # Check if any columns have pandas auto-rename pattern (.1, .2, etc.)
+                    has_auto_renamed = any(
+                        "." in col and col.split(".")[-1].isdigit()
+                        for col in duplicate_columns
+                    )
+
+                    if has_auto_renamed:
+                        # Find the base column names that are duplicated
+                        base_names = set()
+                        for col in duplicate_columns:
+                            if "." in col and col.split(".")[-1].isdigit():
+                                base_names.add(col.split(".")[0])
+                            else:
+                                base_names.add(col)
+
+                        base_list = "\n".join(
+                            f"  • '{name}'" for name in sorted(base_names)
+                        )
+                        details.append(
+                            f"Your Excel file has duplicate column names:\n{base_list}\n\n"
+                            f"Please rename the duplicate columns so each column has a unique name."
+                        )
+                    else:
+                        duplicate_list = "\n".join(
+                            f"  • '{dup}'" for dup in duplicate_columns
+                        )
+                        details.append(
+                            f"Duplicate column names found:\n{duplicate_list}\n\n"
+                            f"Please rename the duplicate columns so each column has a unique name."
+                        )
                 if missing:
                     details.append("Missing required columns: " + ", ".join(missing))
-                if dupes:
-                    details.append("Duplicate required columns: " + ", ".join(dupes))
                 if duplicate_indices:
                     duplicate_list = ", ".join(f"'{dup}'" for dup in duplicate_indices)
                     details.append(

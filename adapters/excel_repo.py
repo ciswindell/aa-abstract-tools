@@ -70,7 +70,7 @@ class ExcelOpenpyxlRepo:
             # Clear fills and save
             empty_fill = PatternFill(fill_type=None)
             for row in ws.iter_rows(
-                min_row=2, max_row=ws.max_row, max_col=ws.max_column
+                min_row=1, max_row=ws.max_row, max_col=ws.max_column
             ):
                 for cell in row:
                     cell.fill = empty_fill

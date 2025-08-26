@@ -95,7 +95,7 @@ class AppController:
             return None
 
     def _prompt_user_select_sheet(self, file_path: str) -> Optional[str]:
-        """Prompt user to select a sheet from available options."""
+        """Prompt user to select a sheet from available options, or auto-select if only one sheet."""
         try:
             wb = load_workbook(file_path, read_only=True, data_only=True)
             names = wb.sheetnames
@@ -103,6 +103,10 @@ class AppController:
 
             if not names:
                 return None
+
+            # If there's only one sheet, automatically use it
+            if len(names) == 1:
+                return names[0]
 
             return self.ui.prompt_sheet_selection(
                 file_path, names, self.processing_sheet_name
