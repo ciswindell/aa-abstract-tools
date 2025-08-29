@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from core.services.validate import ValidationService
-from core.transform.excel import create_document_links
+from core.transform.excel import create_document_links, add_document_ids
 from validators.input_sheet_validator import find_duplicate_index_values
 from validators.pdf_validator import PDFValidator
 
@@ -151,7 +151,8 @@ def test_create_document_links_skips_rows_without_bookmarks():
         {"title": "B2-Lien-1/2/2024", "page": 3, "level": 0},
     ]
 
-    links = create_document_links(df, bookmarks, "/test/file.xlsx")
+    df = add_document_ids(df, "/test/file.xlsx")
+    links = create_document_links(df, bookmarks)
     assert len(links) == 2
 
 
@@ -167,8 +168,9 @@ def test_create_document_links_raises_on_duplicate_bookmarks():
         {"title": "B2-Lien-1/3/2024", "page": 5, "level": 0},
     ]
 
+    df = add_document_ids(df, "/test/file.xlsx")
     with pytest.raises(ValueError) as exc_info:
-        create_document_links(df, bookmarks, "/test/file.xlsx")
+        create_document_links(df, bookmarks)
 
     error_message = str(exc_info.value)
     assert (
@@ -188,7 +190,8 @@ def test_create_document_links_succeeds_with_valid_data():
     ]
 
     # Should succeed and return DocumentLink objects
-    links = create_document_links(df, bookmarks, "/test/file.xlsx")
+    df = add_document_ids(df, "/test/file.xlsx")
+    links = create_document_links(df, bookmarks)
 
     assert len(links) == 2, "Should create 2 DocumentLink objects"
     assert all(

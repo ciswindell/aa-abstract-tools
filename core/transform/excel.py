@@ -49,26 +49,24 @@ def generate_document_id(
 def create_document_links(
     df: pd.DataFrame,
     bookmarks: Sequence[Mapping[str, Any]],
-    source_path: str,
     index_col: str = "Index#",
 ) -> List[DocumentLink]:
     """Create DocumentLink objects mapping Excel rows to PDF bookmarks.
 
-    This is the core function implementing PRD requirement #7:
-    "Create explicit DocumentLink objects that map Excel rows to PDF bookmarks
-    before any renumbering occurs."
+    Assumes `Document_ID` already exists for each row. Rows without a matching
+    bookmark or without a `Document_ID` are skipped. Raises if duplicate
+    bookmark indices are detected.
 
     Args:
         df: Excel DataFrame with original data (before renumbering)
         bookmarks: PDF bookmark data
-        source_path: Path to source Excel file for hash generation
         index_col: Name of the index column
 
     Returns:
         List of DocumentLink objects
 
     Raises:
-        ValueError: If linking cannot be established (validation should happen elsewhere)
+        ValueError: If duplicate bookmarks share the same extracted original index
     """
     # Create mapping from original index to bookmark
     bookmark_map = {}
@@ -83,28 +81,21 @@ def create_document_links(
                 )
             bookmark_map[original_idx] = bm
 
-    # Create DocumentLink objects (skip Excel rows without matching bookmark)
+    # Create DocumentLink objects (skip Excel rows without matching bookmark or ID)
     document_links = []
     for row_idx, row in df.iterrows():
         original_index = str(row[index_col]).strip()
 
         # Find matching bookmark
         if original_index not in bookmark_map:
-            # Acceptable: Excel row may be missing a corresponding bookmark
-            # Skip linking for this row
             continue
 
         bookmark = bookmark_map[original_index]
 
-        # Use existing Document_ID if present; otherwise generate
+        # Require pre-existing Document_ID; skip row if missing
         document_id = str(row.get("Document_ID", "")).strip()
         if not document_id:
-            try:
-                document_id = generate_document_id(original_index, source_path, row_idx)
-            except Exception as e:
-                raise ValueError(
-                    f"Failed to generate Document_ID for row {row_idx}: {e}"
-                ) from e
+            continue
 
         # Create DocumentLink object
         document_links.append(

@@ -12,7 +12,7 @@ from adapters.excel_repo import ExcelOpenpyxlRepo
 from adapters.logger_tk import TkLogger
 from adapters.pdf_repo import PdfRepo
 from core.config import DEFAULT_REQUIRED_COLUMNS, DEFAULT_SHEET_NAME
-from core.interfaces import UIController
+from core.interfaces import UIController, ExcelRepo, PdfRepo as PdfRepoInterface, Logger
 from core.services.renumber import RenumberService
 from core.services.validate import ValidationService
 
@@ -20,11 +20,22 @@ from core.services.validate import ValidationService
 class AppController:
     """Application controller that orchestrates processing via UI abstraction."""
 
-    def __init__(self, ui: UIController) -> None:
-        """Initialize with UI controller."""
+    def __init__(
+        self,
+        ui: UIController,
+        excel_repo: Optional[ExcelRepo] = None,
+        pdf_repo: Optional[PdfRepoInterface] = None,
+        logger: Optional[Logger] = None,
+        validator: Optional[ValidationService] = None,
+    ) -> None:
+        """Initialize with UI controller and optional dependencies."""
         self.ui = ui
         self.required_columns = list(DEFAULT_REQUIRED_COLUMNS)
         self.processing_sheet_name = DEFAULT_SHEET_NAME
+        self._excel_repo = excel_repo
+        self._pdf_repo = pdf_repo
+        self._logger = logger
+        self._validator = validator
 
     def process_files(self) -> None:
         """Main processing function."""
@@ -51,11 +62,11 @@ class AppController:
             if options.merge_pairs:
                 options.backup = False
 
-            # Build services for early validation
-            logger = TkLogger(self.ui.log_status)
-            excel_repo = ExcelOpenpyxlRepo()
-            pdf_repo = PdfRepo()
-            validator = ValidationService(self.required_columns)
+            # Build services for early validation (use injected or defaults)
+            logger = self._logger or TkLogger(self.ui.log_status)
+            excel_repo = self._excel_repo or ExcelOpenpyxlRepo()
+            pdf_repo = self._pdf_repo or PdfRepo()
+            validator = self._validator or ValidationService(self.required_columns)
 
             # If filtering is enabled but values are not chosen yet, prompt now
             if options.filter_enabled and not options.filter_values:

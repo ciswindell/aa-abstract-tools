@@ -13,7 +13,7 @@ from pypdf import PdfReader as PyPdfReader, PdfWriter as PyPdfWriter
 from pypdf.generic import Fit as PyPdfFit
 
 
-class PdfRepo:
+class PypdfPdfRepo:
     """PDF repository using pypdf for read/pages/write with bookmarks."""
 
     def read(self, path: str) -> Tuple[List[Mapping[str, Any]], int]:
@@ -108,3 +108,7 @@ class PdfRepo:
         except AttributeError:
             pass
         return 1
+
+
+# Backwards compatibility alias
+PdfRepo = PypdfPdfRepo

@@ -46,70 +46,74 @@ class RenumberService:
             # Handle merge or single-file flow
             merged = bool(opts.merge_pairs)
 
+            # Predeclare shared variables to avoid conditional scope issues
+            bookmarks: List[Mapping[str, Any]] = []
+            pages: List[Any] = []
+            total_pages: int = 0
+            merged_links: List[Tuple[DocumentLink, int]] = []
+
             if merged:
                 self._log.info("Loading and validating multiple pairs for merge...")
-                combined_pages: List[Any] = []
-                combined_bookmarks: List[Mapping[str, Any]] = []
-                combined_links: List[Tuple[DocumentLink, int]] = []
-                df_parts: List[Any] = []
-                page_offset = 0
+                merged_pages: List[Any] = []
+                merged_bookmarks: List[Mapping[str, Any]] = []
+                merged_links: List[Tuple[DocumentLink, int]] = []
+                merged_df_parts: List[Any] = []
+                merged_page_offset = 0
 
                 # Each pair: load → validate → clean → link → add IDs → accumulate
                 # Prefer per-pair sheet if provided
-                pairs_iter = []
+                pair_descriptors = []
                 if opts.merge_pairs_with_sheets:
                     for (
                         excel_path_item,
                         pdf_path_item,
                         sheet_name_item,
                     ) in opts.merge_pairs_with_sheets:
-                        pairs_iter.append(
+                        pair_descriptors.append(
                             (excel_path_item, pdf_path_item, sheet_name_item)
                         )
                 else:
                     for excel_path_item, pdf_path_item in opts.merge_pairs or []:
-                        pairs_iter.append(
+                        pair_descriptors.append(
                             (excel_path_item, pdf_path_item, opts.sheet_name)
                         )
 
-                for pair_excel, pair_pdf, pair_sheet in pairs_iter:
-                    df_i = self._excel.load(pair_excel, pair_sheet)
-                    bms_i, total_pages_i = self._pdf.read(pair_pdf)
+                for pair_excel, pair_pdf, pair_sheet in pair_descriptors:
+                    pair_df = self._excel.load(pair_excel, pair_sheet)
+                    pair_bookmarks, pair_total_pages = self._pdf.read(pair_pdf)
 
                     # Validate inputs for this pair
-                    self._validator.run(df=df_i, bookmarks=bms_i)
+                    self._validator.run(df=pair_df, bookmarks=pair_bookmarks)
 
-                    # Clean and link before IDs for stable mapping
-                    clean_i = clean_types(df_i)
-                    links_i = create_document_links(clean_i, bms_i, pair_excel)
-
-                    # Add IDs per pair to keep IDs consistent with linking
-                    df_ids_i = add_document_ids(clean_i, pair_excel)
-                    df_parts.append(df_ids_i)
+                    # Clean and add IDs before linking
+                    pair_clean_df = clean_types(pair_df)
+                    pair_df_with_ids = add_document_ids(pair_clean_df, pair_excel)
+                    pair_links = create_document_links(pair_df_with_ids, pair_bookmarks)
+                    merged_df_parts.append(pair_df_with_ids)
 
                     # Accumulate pages and offset bookmarks
-                    pages_i = list(self._pdf.pages(pair_pdf))
-                    combined_pages.extend(pages_i)
-                    for bm in bms_i:
+                    pair_pages = list(self._pdf.pages(pair_pdf))
+                    merged_pages.extend(pair_pages)
+                    for bm in pair_bookmarks:
                         new_bm = dict(bm)
-                        new_bm["page"] = int(bm.get("page", 1)) + page_offset
-                        combined_bookmarks.append(new_bm)
+                        new_bm["page"] = int(bm.get("page", 1)) + merged_page_offset
+                        merged_bookmarks.append(new_bm)
 
                     # Store links and remember offset for later mapping via page
-                    for link in links_i:
+                    for link in pair_links:
                         # Attach offset info by creating a light tuple mapping
-                        combined_links.append((link, page_offset))
+                        merged_links.append((link, merged_page_offset))
 
-                    page_offset += int(total_pages_i)
+                    merged_page_offset += int(pair_total_pages)
 
                 # Combine DataFrames
-                if df_parts:
-                    df = pd.concat(df_parts, ignore_index=True)
+                if merged_df_parts:
+                    df = pd.concat(merged_df_parts, ignore_index=True)
                 else:
                     df = pd.DataFrame()
-                bookmarks = combined_bookmarks
-                pages = combined_pages
-                total_pages = len(combined_pages)
+                bookmarks = merged_bookmarks
+                pages = merged_pages
+                total_pages = len(merged_pages)
             else:
                 self._log.info("Loading Excel and PDF...")
                 df = self._excel.load(excel_path, opts.sheet_name)
@@ -125,27 +129,26 @@ class RenumberService:
             # Option-gated filter (keeps behavior identical when not set)
             if opts.filter_column and opts.filter_values:
                 df = filter_df(df, opts.filter_column, opts.filter_values)
-            # Preserve pre-ID/renumber snapshot for document link creation
-            pre_id_df = df
-            # Add IDs and sort/renumber
+            # Add IDs and preserve a pre-renumber snapshot for linking
             if merged:
                 # IDs already added per pair to keep consistency with links
-                pass
+                pre_id_df = df
             else:
                 df = add_document_ids(df, excel_path)
+                pre_id_df = df.copy()
+            # Sort and renumber after IDs
             df = sort_and_renumber(df)
 
             self._log.info("Generating PDF bookmark titles...")
             titles_map = make_titles(df)
 
             # Determine output paths
-
-            if merged:
-                excel_out_path = str(Path(excel_path).with_name("merged.xlsx"))
-                pdf_out_path = str(Path(pdf_path).with_name("merged.pdf"))
-            else:
-                excel_out_path = excel_path
-                pdf_out_path = pdf_path
+            excel_out_path = (
+                str(Path(excel_path).with_name("merged.xlsx")) if merged else excel_path
+            )
+            pdf_out_path = (
+                str(Path(pdf_path).with_name("merged.pdf")) if merged else pdf_path
+            )
 
             # Create backups if enabled (skip when merging), only after validation passes
             if opts.backup and not merged:
@@ -166,7 +169,7 @@ class RenumberService:
             if merged:
                 # Build resolver mapping for merged: (title, page) -> Document_ID
                 title_page_to_doc: dict[Tuple[str, int], str] = {}
-                for link, offset in combined_links:  # type: ignore[name-defined]
+                for link, offset in merged_links:
                     key = (
                         link.original_bookmark_title,
                         int(link.original_bookmark_page) + int(offset),
@@ -182,7 +185,7 @@ class RenumberService:
                 )
             else:
                 # Create DocumentLink objects and resolver for single-file
-                document_links = create_document_links(pre_id_df, bookmarks, excel_path)
+                document_links = create_document_links(pre_id_df, bookmarks)
                 title_to_doc_id = {
                     link.original_bookmark_title: link.document_id
                     for link in document_links
@@ -198,7 +201,7 @@ class RenumberService:
             if opts.reorder_pages:
                 if merged:
                     new_pages, new_bookmarks = _reorder_pages_merged(
-                        df, titles_map, pages, bookmarks, combined_links  # type: ignore[name-defined]
+                        df, titles_map, pages, bookmarks, merged_links
                     )
                 else:
                     new_pages, new_bookmarks = _reorder_pages_single(
@@ -227,77 +230,6 @@ class RenumberService:
         except (ValueError, OSError, RuntimeError) as exc:
             self._log.error(str(exc))
             return Result(success=False, message=str(exc))
-
-
-def _merge_bookmarks_with_titles(
-    bookmarks: Sequence[Mapping[str, Any]],
-    titles_map: Mapping[str, str],
-    sort_naturally: bool,
-    document_links: Sequence[DocumentLink],
-):
-    """Return updated bookmarks with new titles using DocumentLink mapping.
-
-    Args:
-        bookmarks: Original PDF bookmarks
-        titles_map: Map from Document_ID to new title
-        document_links: DocumentLink objects that map bookmarks to Excel rows
-        sort_naturally: Whether to sort bookmarks naturally
-    """
-
-    # Create mapping from original bookmark title to Document_ID
-    title_to_doc_id = {}
-    for link in document_links:
-        title_to_doc_id[link.original_bookmark_title] = link.document_id
-
-    updated = []
-    for bm in bookmarks:
-        original_title = str(bm.get("title", ""))
-        doc_id = title_to_doc_id.get(original_title)
-
-        if doc_id and doc_id in titles_map:
-            new_bm = dict(bm)
-            new_bm["title"] = titles_map[doc_id]
-            updated.append(new_bm)
-        else:
-            updated.append(dict(bm))
-
-    if sort_naturally:
-        updated = natsorted(
-            updated, key=lambda b: b.get("title", ""), alg=ns.IGNORECASE
-        )
-
-    return updated
-
-
-def _update_bookmarks_with_titles_merged(
-    bookmarks: Sequence[Mapping[str, Any]],
-    titles_map: Mapping[str, str],
-    links_with_offsets: Sequence[Tuple[DocumentLink, int]],
-):
-    """Update bookmark titles for merged flows using (title,page) mapping.
-
-    Uses original bookmark title and page (with offset) to resolve Document_ID
-    and then titles_map for the final label.
-    """
-    title_page_to_doc: dict[Tuple[str, int], str] = {}
-    for link, offset in links_with_offsets:
-        key = (
-            link.original_bookmark_title,
-            int(link.original_bookmark_page) + int(offset),
-        )
-        title_page_to_doc[key] = link.document_id
-
-    out: List[Mapping[str, Any]] = []
-    for bm in bookmarks:
-        key = (str(bm.get("title", "")), int(bm.get("page", 1)))
-        doc_id = title_page_to_doc.get(key)
-        if doc_id and doc_id in titles_map:
-            new_bm = dict(bm)
-            new_bm["title"] = titles_map[doc_id]
-            out.append(new_bm)
-        else:
-            out.append(dict(bm))
-    return out
 
 
 def _update_bookmarks_with_titles_generic(
@@ -411,7 +343,7 @@ def _reorder_pages_single(
     doc_id_to_original_title: dict[str, str] = {}
     doc_id_to_level: dict[str, int] = {}
 
-    document_links = create_document_links(pre_id_df, bookmarks, excel_path)
+    document_links = create_document_links(pre_id_df, bookmarks)
     for link in document_links:
         doc_id_to_original_title[link.document_id] = link.original_bookmark_title
         doc_id_to_level[link.document_id] = int(link.original_bookmark_level)
