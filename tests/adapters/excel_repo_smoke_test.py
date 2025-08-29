@@ -68,8 +68,8 @@ def test_excel_save_parity_on_fixture():
     left = df_expected[common_cols].astype(str).reset_index(drop=True)
     right = df_out[common_cols].astype(str).reset_index(drop=True)
     # Normalize NaN-like strings to empty and strip time from dates
-    left = left.applymap(lambda s: "" if str(s).lower() == "nan" else s)
-    right = right.applymap(lambda s: "" if str(s).lower() == "nan" else s)
+    left = left.map(lambda s: "" if str(s).lower() == "nan" else s)
+    right = right.map(lambda s: "" if str(s).lower() == "nan" else s)
     for date_col in ("Document Date", "Received Date"):
         if date_col in left.columns and date_col in right.columns:
             left[date_col] = left[date_col].map(lambda s: s.split(" ")[0])
