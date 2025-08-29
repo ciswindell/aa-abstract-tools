@@ -10,7 +10,7 @@ from openpyxl import load_workbook
 
 from adapters.excel_repo import ExcelOpenpyxlRepo
 from adapters.logger_tk import TkLogger
-from adapters.pdf_repo import PdfPyPDF2Repo
+from adapters.pdf_repo import PdfRepo
 from core.config import DEFAULT_REQUIRED_COLUMNS, DEFAULT_SHEET_NAME
 from core.interfaces import UIController
 from core.services.renumber import RenumberService
@@ -54,7 +54,7 @@ class AppController:
             # Build services for early validation
             logger = TkLogger(self.ui.log_status)
             excel_repo = ExcelOpenpyxlRepo()
-            pdf_repo = PdfPyPDF2Repo()
+            pdf_repo = PdfRepo()
             validator = ValidationService(self.required_columns)
 
             # If filtering is enabled but values are not chosen yet, prompt now

@@ -9,9 +9,9 @@ and asserts title order/content parity.
 from pathlib import Path
 import tempfile
 
-from PyPDF2 import PdfReader, PdfWriter
+from pypdf import PdfReader, PdfWriter
 
-from adapters.pdf_repo import PdfPyPDF2Repo, PdfRepoEngine
+from adapters.pdf_repo import PdfRepo
 
 
 def test_pdf_bookmark_parity_roundtrip(pdf_engine_env):
@@ -27,7 +27,7 @@ def test_pdf_bookmark_parity_roundtrip(pdf_engine_env):
         writer.write(fh)
 
     # Read pages from source using the configured repo engine
-    repo = PdfRepoEngine()
+    repo = PdfRepo()
     pages = repo.pages(str(src_path))
 
     # Define bookmarks to write (titles in order, 1-based page refs)

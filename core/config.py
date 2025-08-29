@@ -33,5 +33,5 @@ DEFAULT_SORT_COLUMNS = [
 # Default Excel sheet name used by the UI to resolve the processing sheet
 DEFAULT_SHEET_NAME = "Index"
 
-# PDF engine selection (override with env var PDF_ENGINE)
-PDF_ENGINE = os.getenv("PDF_ENGINE", "pypdf").strip().lower() or "pypdf"
+# PDF backend selection (override with env var PDF_BACKEND)
+PDF_BACKEND = os.getenv("PDF_BACKEND", "pypdf").strip().lower() or "pypdf"

@@ -21,11 +21,10 @@ def fake_logger():
     return _TestLogger()
 
 
-@pytest.fixture(params=["pypdf", "pypdf2"])
-def pdf_engine_env(monkeypatch, request):
-    """Parametrize tests to run with both PDF engines where applicable."""
-    monkeypatch.setenv("PDF_ENGINE", request.param)
-    yield request.param
-    # Restore to default behavior
-    if "PDF_ENGINE" in os.environ:
-        monkeypatch.delenv("PDF_ENGINE", raising=False)
+@pytest.fixture
+def pdf_engine_env(monkeypatch):
+    """Backwards compat: force pypdf backend; to be removed soon."""
+    monkeypatch.setenv("PDF_BACKEND", "pypdf")
+    yield "pypdf"
+    if "PDF_BACKEND" in os.environ:
+        monkeypatch.delenv("PDF_BACKEND", raising=False)
