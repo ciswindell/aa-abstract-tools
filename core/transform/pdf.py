@@ -2,7 +2,7 @@
 """
 Pure PDF bookmark transforms.
 
-All functions are side‑effect free and independent of PyPDF2 types.
+All functions are side‑effect free and independent of backend PDF types.
 """
 
 from typing import Any, Dict, List, Mapping, Optional

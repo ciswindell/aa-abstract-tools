@@ -17,7 +17,7 @@ A class-based Python application that automates the process of sorting Excel dat
 - tkinter (usually included with Python, but on some Linux systems install with: `sudo apt-get install python3-tk`)
 - Required packages (installed via requirements.txt):
   - pandas >= 1.5.0
-  - PyPDF2 >= 3.0.0
+  - pypdf == 4.2.0
   - openpyxl >= 3.0.0 (for Excel file reading)
 
 ## Installation
@@ -47,6 +47,13 @@ A class-based Python application that automates the process of sorting Excel dat
 2. Run the application:
    ```bash
    python3 main.py
+### PDF Backend Selection
+
+By default, the app uses `pypdf`. You can set the backend name for future flexibility:
+
+```bash
+export PDF_BACKEND=pypdf  # current and only supported backend
+```
    ```
 
 3. The GUI will open with the following steps:

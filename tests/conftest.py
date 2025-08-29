@@ -2,6 +2,7 @@
 """Shared pytest fixtures for tests."""
 
 import pytest
+import os
 
 
 class _TestLogger:
@@ -18,3 +19,12 @@ class _TestLogger:
 @pytest.fixture
 def fake_logger():
     return _TestLogger()
+
+
+@pytest.fixture
+def pdf_engine_env(monkeypatch):
+    """Backwards compat: force pypdf backend; to be removed soon."""
+    monkeypatch.setenv("PDF_BACKEND", "pypdf")
+    yield "pypdf"
+    if "PDF_BACKEND" in os.environ:
+        monkeypatch.delenv("PDF_BACKEND", raising=False)
