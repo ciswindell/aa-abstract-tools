@@ -4,10 +4,7 @@ Application controller that orchestrates processing using UI abstraction.
 """
 
 import os
-import shutil
-from datetime import datetime
-from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 from openpyxl import load_workbook
 
@@ -60,30 +57,18 @@ class AppController:
             pdf_repo = PdfPyPDF2Repo()
             validator = ValidationService(self.required_columns)
 
-            # Load and validate data BEFORE creating backups
-            logger.info("Loading and validating files...")
-            df = excel_repo.load(excel_file, target_sheet)
-            bookmarks, _ = pdf_repo.read(pdf_file)
-            validator.run(df=df, bookmarks=bookmarks)
-            logger.info("Validation passed.")
-
-            # If filter is enabled and no values chosen yet, prompt now
-            try:
-                if (
-                    getattr(options, "filter_enabled", False)
-                    and not options.filter_values
-                ):
-                    col, vals = self.ui.prompt_filter_selection(df)
+            # If filtering is enabled but values are not chosen yet, prompt now
+            if getattr(options, "filter_enabled", False) and not options.filter_values:
+                try:
+                    df_preview = excel_repo.load(excel_file, target_sheet)
+                    col, vals = self.ui.prompt_filter_selection(df_preview)
                     if col and vals:
                         options.filter_column = col
                         options.filter_values = vals
-            except Exception:
-                # Non-fatal: continue without filter if prompt fails
-                pass
+                except (ValueError, OSError, RuntimeError):
+                    pass
 
-            # Create backups if enabled (only after validation passes)
-            if options.backup:
-                self._create_backup_files(excel_file, pdf_file)
+            # Backups are handled in the service after validation passes.
 
             # If merging, resolve sheet names for each pair using the same selection flow
             if getattr(options, "merge_pairs", None):
@@ -154,24 +139,4 @@ class AppController:
             self.ui.show_error("Sheet Selection Error", str(e))
             return None
 
-    def _generate_backup_filename(self, original_path: str) -> str:
-        """Generate backup filename with timestamp."""
-        original_file = Path(original_path)
-        file_stem = original_file.stem
-        file_suffix = original_file.suffix
-        file_dir = original_file.parent
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_filename = f"{file_stem}_backup_{timestamp}{file_suffix}"
-
-        return str(file_dir / backup_filename)
-
-    def _create_backup_files(self, excel_path: str, pdf_path: str) -> Tuple[str, str]:
-        """Create backup copies with timestamp suffix."""
-        excel_backup_path = self._generate_backup_filename(excel_path)
-        pdf_backup_path = self._generate_backup_filename(pdf_path)
-
-        shutil.copy2(excel_path, excel_backup_path)
-        shutil.copy2(pdf_path, pdf_backup_path)
-
-        return excel_backup_path, pdf_backup_path
+    # Backup helpers are provided by fileops.files; no local duplicates.
