@@ -7,9 +7,10 @@ Functions here are side‑effect free and return new DataFrames.
 
 import hashlib
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Any, Iterable, List, Mapping, Optional, Sequence
 
 import pandas as pd
+from core.config import DEFAULT_SORT_COLUMNS
 from core.models import DocumentLink
 from core.transform.pdf import extract_original_index
 from utils.dates import parse_robust
@@ -95,13 +96,15 @@ def create_document_links(
 
         bookmark = bookmark_map[original_index]
 
-        # Generate unique Document_ID
-        try:
-            document_id = generate_document_id(original_index, source_path, row_idx)
-        except Exception as e:
-            raise ValueError(
-                f"Failed to generate Document_ID for row {row_idx}: {e}"
-            ) from e
+        # Use existing Document_ID if present; otherwise generate
+        document_id = str(row.get("Document_ID", "")).strip()
+        if not document_id:
+            try:
+                document_id = generate_document_id(original_index, source_path, row_idx)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to generate Document_ID for row {row_idx}: {e}"
+                ) from e
 
         # Create DocumentLink object
         document_links.append(
@@ -200,14 +203,7 @@ def sort_and_renumber(
     """Sort by available columns ascending and renumber index_col from 1..N."""
 
     if sort_columns is None:
-        sort_columns = [
-            "Received Date",
-            "Document Date",
-            "Document Type",
-            "Grantor",
-            "Grantee",
-            "Legal Description",
-        ]
+        sort_columns = list(DEFAULT_SORT_COLUMNS)
 
     new_df = df.copy()
     cols = [c for c in sort_columns if c in new_df.columns]

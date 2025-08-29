@@ -5,6 +5,7 @@ RenumberService: orchestrates Excel/PDF load, validate, transform, and save.
 
 from typing import Any, Mapping, Sequence, List, Tuple
 from pathlib import Path
+from fileops.files import create_backups
 import pandas as pd
 
 from core.interfaces import ExcelRepo, Logger, PdfRepo
@@ -131,14 +132,6 @@ class RenumberService:
             titles_map = make_titles(df)
 
             # Determine output paths
-            def with_suffix(path_str: str, suffix: str) -> str:
-                p = Path(path_str)
-                return str(p.with_name(f"{p.stem}{suffix}{p.suffix}"))
-
-            is_filter_active = bool(
-                getattr(opts, "filter_column", None)
-                and getattr(opts, "filter_values", None)
-            )
 
             if merged:
                 excel_out_path = str(Path(excel_path).with_name("merged.xlsx"))
@@ -146,6 +139,10 @@ class RenumberService:
             else:
                 excel_out_path = excel_path
                 pdf_out_path = pdf_path
+
+            # Create backups if enabled (skip when merging), only after validation passes
+            if opts.backup and not merged:
+                create_backups(excel_path, pdf_path)
 
             # Save Excel back into template (in-place responsibility left to caller via backups)
             self._log.info("Saving Excel output...")
@@ -160,34 +157,10 @@ class RenumberService:
             # Recreate PDF output with updated bookmarks
             self._log.info("Saving PDF output...")
             if merged:
-                # Build mapping from (title, offset_page) → doc_id using links + offsets
-                title_page_to_doc: dict[Tuple[str, int], str] = {}
-                doc_id_to_level: dict[str, int] = {}
-                for link, offset in combined_links:  # type: ignore[name-defined]
-                    key = (
-                        link.original_bookmark_title,
-                        int(link.original_bookmark_page) + int(offset),
-                    )
-                    title_page_to_doc[key] = link.document_id
-                    doc_id_to_level[link.document_id] = int(
-                        link.original_bookmark_level
-                    )
-
                 # Non-reorder path: update titles in-place on combined bookmarks
-                def update_bookmarks_with_titles(bms: Sequence[Mapping[str, Any]]):
-                    out: List[Mapping[str, Any]] = []
-                    for bm in bms:
-                        key = (str(bm.get("title", "")), int(bm.get("page", 1)))
-                        doc_id = title_page_to_doc.get(key)
-                        if doc_id and doc_id in titles_map:
-                            new_bm = dict(bm)
-                            new_bm["title"] = titles_map[doc_id]
-                            out.append(new_bm)
-                        else:
-                            out.append(dict(bm))
-                    return out
-
-                updated_bookmarks = update_bookmarks_with_titles(bookmarks)
+                updated_bookmarks = _update_bookmarks_with_titles_merged(
+                    bookmarks, titles_map, combined_links  # type: ignore[name-defined]
+                )
                 # Respect 'sort_bookmarks' option in merge mode
                 if opts.sort_bookmarks:
                     updated_bookmarks = natsorted(
@@ -205,136 +178,26 @@ class RenumberService:
                 )
 
             if opts.reorder_pages:
-
                 if merged:
-                    # Compute per-bookmark ranges in combined list (by order)
-                    ordered = sorted(bookmarks, key=lambda b: int(b.get("page", 1)))
-                    ranges_list: List[Tuple[int, int]] = []
-                    for i, bm in enumerate(ordered):
-                        start = int(bm.get("page", 1))
-                        if i + 1 < len(ordered):
-                            end = int(ordered[i + 1].get("page", start)) - 1
-                        else:
-                            end = len(pages)
-                        if end < start:
-                            end = start
-                        ranges_list.append((start, end))
-
-                    # Map (title,page) → index in ordered bookmarks
-                    key_to_index: dict[Tuple[str, int], int] = {}
-                    for idx, bm in enumerate(ordered):
-                        key_to_index[
-                            (str(bm.get("title", "")), int(bm.get("page", 1)))
-                        ] = idx
-
-                    # Map doc_id → (index, level)
-                    doc_id_to_index: dict[str, int] = {}
-                    doc_id_to_level: dict[str, int] = {}
-                    for link, offset in combined_links:  # type: ignore[name-defined]
-                        key = (
-                            link.original_bookmark_title,
-                            int(link.original_bookmark_page) + int(offset),
-                        )
-                        idx = key_to_index.get(key)
-                        if idx is not None:
-                            doc_id_to_index[link.document_id] = idx
-                            doc_id_to_level[link.document_id] = int(
-                                link.original_bookmark_level
-                            )
-
-                    # Reorder pages by the new sequential Index# order
-                    new_pages: List[Any] = []
-                    new_bookmarks: List[dict[str, Any]] = []
-                    current_start_page = 1
-
-                    for _, row in df.iterrows():
-                        doc_id = str(row.get("Document_ID", "")).strip()
-                        if not doc_id:
-                            continue
-                        idx = doc_id_to_index.get(doc_id)
-                        if idx is None:
-                            continue
-                        start, end = ranges_list[idx]
-                        for p in range(start, end + 1):
-                            if 1 <= p <= len(pages):
-                                new_pages.append(pages[p - 1])
-                        new_title = titles_map.get(doc_id)
-                        if new_title:
-                            new_bookmarks.append(
-                                {
-                                    "title": new_title,
-                                    "page": current_start_page,
-                                    "level": doc_id_to_level.get(doc_id, 0),
-                                }
-                            )
-                        current_start_page += max(0, end - start + 1)
-
-                    self._pdf.write(
-                        pages=new_pages or pages,
-                        bookmarks=new_bookmarks or updated_bookmarks,
-                        out_path=pdf_out_path,
+                    new_pages, new_bookmarks = _reorder_pages_merged(
+                        df, titles_map, pages, bookmarks, combined_links  # type: ignore[name-defined]
                     )
                 else:
-                    # Original single-file reorder
-                    original_ranges_by_title = detect_page_ranges(
-                        bookmarks, total_pages
+                    new_pages, new_bookmarks = _reorder_pages_single(
+                        df,
+                        titles_map,
+                        pages,
+                        bookmarks,
+                        total_pages,
+                        pre_id_df,
+                        excel_path,
                     )
 
-                    # Create mapping from Document_ID to original bookmark info using DocumentLinks
-                    doc_id_to_original_title: dict[str, str] = {}
-                    doc_id_to_level: dict[str, int] = {}
-
-                    document_links = create_document_links(
-                        pre_id_df, bookmarks, excel_path
-                    )
-                    for link in document_links:
-                        doc_id_to_original_title[link.document_id] = (
-                            link.original_bookmark_title
-                        )
-                        doc_id_to_level[link.document_id] = int(
-                            link.original_bookmark_level
-                        )
-
-                    # Reorder pages by the new sequential Index# order (1, 2, 3...)
-                    new_pages: List[Any] = []
-                    new_bookmarks: List[dict[str, Any]] = []
-                    current_start_page = 1
-
-                    for _, row in df.iterrows():
-                        doc_id = str(row.get("Document_ID", "")).strip()
-                        if not doc_id:
-                            continue
-
-                        original_title = doc_id_to_original_title.get(doc_id)
-                        if not original_title:
-                            continue
-
-                        rng = original_ranges_by_title.get(original_title)
-                        if not rng:
-                            continue
-
-                        start, end = int(rng["start"]), int(rng["end"])
-
-                        for p in range(start, end + 1):
-                            if 1 <= p <= len(pages):
-                                new_pages.append(pages[p - 1])
-
-                        new_title = titles_map.get(doc_id)
-                        if new_title:
-                            new_bookmarks.append(
-                                {
-                                    "title": new_title,
-                                    "page": current_start_page,
-                                    "level": doc_id_to_level.get(doc_id, 0),
-                                }
-                            )
-                        current_start_page += max(0, end - start + 1)
-
-                    self._pdf.write(
-                        pages=new_pages or pages,
-                        bookmarks=new_bookmarks or updated_bookmarks,
-                        out_path=pdf_out_path,
-                    )
+                self._pdf.write(
+                    pages=new_pages or pages,
+                    bookmarks=new_bookmarks or updated_bookmarks,
+                    out_path=pdf_out_path,
+                )
             else:
                 self._pdf.write(
                     pages=pages, bookmarks=updated_bookmarks, out_path=pdf_out_path
@@ -343,7 +206,7 @@ class RenumberService:
             self._log.info("Complete.")
             return Result(success=True, message="OK")
 
-        except Exception as exc:  # noqa: BLE001
+        except (ValueError, OSError, RuntimeError) as exc:
             self._log.error(str(exc))
             return Result(success=False, message=str(exc))
 
@@ -386,3 +249,154 @@ def _merge_bookmarks_with_titles(
         )
 
     return updated
+
+
+def _update_bookmarks_with_titles_merged(
+    bookmarks: Sequence[Mapping[str, Any]],
+    titles_map: Mapping[str, str],
+    links_with_offsets: Sequence[Tuple[Any, int]],  # (DocumentLink, offset)
+):
+    """Update bookmark titles for merged flows using (title,page) mapping.
+
+    Uses original bookmark title and page (with offset) to resolve Document_ID
+    and then titles_map for the final label.
+    """
+    title_page_to_doc: dict[Tuple[str, int], str] = {}
+    for link, offset in links_with_offsets:
+        key = (
+            link.original_bookmark_title,
+            int(link.original_bookmark_page) + int(offset),
+        )
+        title_page_to_doc[key] = link.document_id
+
+    out: List[Mapping[str, Any]] = []
+    for bm in bookmarks:
+        key = (str(bm.get("title", "")), int(bm.get("page", 1)))
+        doc_id = title_page_to_doc.get(key)
+        if doc_id and doc_id in titles_map:
+            new_bm = dict(bm)
+            new_bm["title"] = titles_map[doc_id]
+            out.append(new_bm)
+        else:
+            out.append(dict(bm))
+    return out
+
+
+def _reorder_pages_merged(
+    df: pd.DataFrame,
+    titles_map: Mapping[str, str],
+    pages: Sequence[Any],
+    bookmarks: Sequence[Mapping[str, Any]],
+    links_with_offsets: Sequence[Tuple[Any, int]],
+):
+    ordered = sorted(bookmarks, key=lambda b: int(b.get("page", 1)))
+    ranges_list: List[Tuple[int, int]] = []
+    for i, bm in enumerate(ordered):
+        start = int(bm.get("page", 1))
+        if i + 1 < len(ordered):
+            end = int(ordered[i + 1].get("page", start)) - 1
+        else:
+            end = len(pages)
+        if end < start:
+            end = start
+        ranges_list.append((start, end))
+
+    key_to_index: dict[Tuple[str, int], int] = {}
+    for idx, bm in enumerate(ordered):
+        key_to_index[(str(bm.get("title", "")), int(bm.get("page", 1)))] = idx
+
+    doc_id_to_index: dict[str, int] = {}
+    doc_id_to_level: dict[str, int] = {}
+    for link, offset in links_with_offsets:
+        key = (
+            link.original_bookmark_title,
+            int(link.original_bookmark_page) + int(offset),
+        )
+        idx = key_to_index.get(key)
+        if idx is not None:
+            doc_id_to_index[link.document_id] = idx
+            doc_id_to_level[link.document_id] = int(link.original_bookmark_level)
+
+    new_pages: List[Any] = []
+    new_bookmarks: List[dict[str, Any]] = []
+    current_start_page = 1
+
+    for _, row in df.iterrows():
+        doc_id = str(row.get("Document_ID", "")).strip()
+        if not doc_id:
+            continue
+        idx = doc_id_to_index.get(doc_id)
+        if idx is None:
+            continue
+        start, end = ranges_list[idx]
+        for p in range(start, end + 1):
+            if 1 <= p <= len(pages):
+                new_pages.append(pages[p - 1])
+        new_title = titles_map.get(doc_id)
+        if new_title:
+            new_bookmarks.append(
+                {
+                    "title": new_title,
+                    "page": current_start_page,
+                    "level": doc_id_to_level.get(doc_id, 0),
+                }
+            )
+        current_start_page += max(0, end - start + 1)
+
+    return new_pages, new_bookmarks
+
+
+def _reorder_pages_single(
+    df: pd.DataFrame,
+    titles_map: Mapping[str, str],
+    pages: Sequence[Any],
+    bookmarks: Sequence[Mapping[str, Any]],
+    total_pages: int,
+    pre_id_df: pd.DataFrame,
+    excel_path: str,
+):
+    original_ranges_by_title = detect_page_ranges(bookmarks, total_pages)
+
+    doc_id_to_original_title: dict[str, str] = {}
+    doc_id_to_level: dict[str, int] = {}
+
+    document_links = create_document_links(pre_id_df, bookmarks, excel_path)
+    for link in document_links:
+        doc_id_to_original_title[link.document_id] = link.original_bookmark_title
+        doc_id_to_level[link.document_id] = int(link.original_bookmark_level)
+
+    new_pages: List[Any] = []
+    new_bookmarks: List[dict[str, Any]] = []
+    current_start_page = 1
+
+    for _, row in df.iterrows():
+        doc_id = str(row.get("Document_ID", "")).strip()
+        if not doc_id:
+            continue
+
+        original_title = doc_id_to_original_title.get(doc_id)
+        if not original_title:
+            continue
+
+        rng = original_ranges_by_title.get(original_title)
+        if not rng:
+            continue
+
+        start, end = int(rng["start"]), int(rng["end"])
+
+        for p in range(start, end + 1):
+            if 1 <= p <= len(pages):
+                new_pages.append(pages[p - 1])
+
+        new_title = titles_map.get(doc_id)
+        if new_title:
+            new_bookmarks.append(
+                {
+                    "title": new_title,
+                    "page": current_start_page,
+                    "level": doc_id_to_level.get(doc_id, 0),
+                }
+            )
+        current_start_page += max(0, end - start + 1)
+
+    return new_pages, new_bookmarks
