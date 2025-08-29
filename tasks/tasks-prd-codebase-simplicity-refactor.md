@@ -2,7 +2,7 @@
 
 - `core/app_controller.py` - Replace getattr-based `Options` access with direct fields; keep existing sheet resolution flow; ensure `merge_pairs_with_sheets` is set from controller.
 - `core/services/renumber.py` - Prefer `merge_pairs_with_sheets`, fallback to `merge_pairs`; replace getattr-based `Options` access; simplify branching in `run` without behavior changes.
-- `adapters/pdf_repo.py` - Tolerant outline retrieval (`outlines` vs `outline`) without changing PyPDF2 version.
+- `adapters/pdf_repo.py` - Tolerant outline retrieval (`outlines` vs `outline`) without changing PyPDF2 version; narrowed exception handling.
 - `core/interfaces.py` - Verify Protocol contracts remain unchanged.
 - `adapters/ui_tkinter.py` and `app/tk_app.py` - Sanity-check no changes needed; ensure `Options` construction unaffected.
 - `tests/core/services/test_renumber_service.py` - Service behavior validation.
@@ -41,7 +41,7 @@
   - [x] 4.2 Keep `_parse_outline` usage and flat bookmark contract unchanged.
   - [x] 4.3 Run PDF-related tests: `python3 -m pytest -q tests/adapters/pdf_repo_smoke_test.py` and full suite.
 
-- [ ] 5.0 Validate unchanged behavior and interfaces
+- [x] 5.0 Validate unchanged behavior and interfaces
   - [x] 5.1 Run `python3 -m pytest -q` and ensure all tests pass without modification.
-  - [ ] 5.2 Fix any linter issues introduced; do not change external behavior or public APIs.
-  - [ ] 5.3 Sanity-check sample flow manually if desired (no code changes required).
+  - [x] 5.2 Fix any linter issues introduced; do not change external behavior or public APIs.
+  - [x] 5.3 Sanity-check sample flow manually if desired (no code changes required).
