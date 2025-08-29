@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Mapping, Sequence, Tuple
 
 from PyPDF2 import PdfReader, PdfWriter
 from PyPDF2.generic import Fit
+from PyPDF2.errors import DeprecationError
 
 
 class PdfPyPDF2Repo:
@@ -19,7 +20,15 @@ class PdfPyPDF2Repo:
         """Return extracted bookmarks and total page count from a PDF path."""
         reader = PdfReader(path)
         pages_count = len(reader.pages)
+        # Tolerate PyPDF2 attribute differences across versions
+        # Prefer 'outline' (PyPDF2 >=3) and fall back to 'outlines' (older),
+        # guarding against DeprecationError on access.
         outline = getattr(reader, "outline", None)
+        if not outline:
+            try:
+                outline = getattr(reader, "outlines", None)
+            except DeprecationError:
+                outline = None
         if not outline:
             return [], pages_count
 
@@ -44,14 +53,14 @@ class PdfPyPDF2Repo:
         for p in pages:
             try:
                 writer.add_page(p)
-            except Exception:
+            except (TypeError, ValueError, AttributeError):
                 # Skip invalid page types
                 continue
 
         # Set default to show outlines if possible
         try:
             writer.page_mode = "/UseOutlines"
-        except Exception:
+        except AttributeError:
             pass
 
         # Add bookmarks
@@ -63,7 +72,7 @@ class PdfPyPDF2Repo:
                     page_obj = writer.pages[page_num]
                     fit = Fit.xyz(left=None, top=None, zoom=None)
                     writer.add_outline_item(title, page_obj, fit=fit)
-                except Exception:
+                except (ValueError, TypeError, AttributeError, IndexError):
                     continue
 
         with open(out_path, "wb") as fh:
@@ -87,13 +96,21 @@ class PdfPyPDF2Repo:
 
     def _resolve_bookmark_page(self, reader: PdfReader, item: Any) -> int:
         """Resolve a bookmark's 1-based page number with fallbacks."""
+        # Primary: use reader API when available
+        if hasattr(reader, "get_destination_page_number"):
+            try:
+                idx = reader.get_destination_page_number(item)
+                return int(idx) + 1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+
         try:
             if hasattr(item, "page") and item.page is not None:
                 page_ref = item.page
                 # Direct index if the page object is the same reference
                 try:
                     return reader.pages.index(page_ref) + 1
-                except Exception:
+                except (ValueError, TypeError):
                     pass
                 # Match by indirect reference id if available
                 try:
@@ -106,8 +123,8 @@ class PdfPyPDF2Repo:
                                 and getattr(ind, "idnum", None) == target_id
                             ):
                                 return i + 1
-                except Exception:
+                except AttributeError:
                     pass
-        except Exception:
+        except AttributeError:
             pass
         return 1
