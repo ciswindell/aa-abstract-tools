@@ -48,7 +48,7 @@ class AppController:
             options.sheet_name = target_sheet
 
             # If merging, disable backups regardless of checkbox (originals untouched)
-            if getattr(options, "merge_pairs", None):
+            if options.merge_pairs:
                 options.backup = False
 
             # Build services for early validation
@@ -58,7 +58,7 @@ class AppController:
             validator = ValidationService(self.required_columns)
 
             # If filtering is enabled but values are not chosen yet, prompt now
-            if getattr(options, "filter_enabled", False) and not options.filter_values:
+            if options.filter_enabled and not options.filter_values:
                 try:
                     df_preview = excel_repo.load(excel_file, target_sheet)
                     col, vals = self.ui.prompt_filter_selection(df_preview)
@@ -71,7 +71,7 @@ class AppController:
             # Backups are handled in the service after validation passes.
 
             # If merging, resolve sheet names for each pair using the same selection flow
-            if getattr(options, "merge_pairs", None):
+            if options.merge_pairs:
                 # Always include the primary selection as the first pair
                 pairs_with_sheets = [(excel_file, pdf_file, target_sheet)]
                 seen = {(excel_file, pdf_file)}

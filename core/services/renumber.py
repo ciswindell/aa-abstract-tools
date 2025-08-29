@@ -44,7 +44,7 @@ class RenumberService:
 
         try:
             # Handle merge or single-file flow
-            merged = bool(getattr(opts, "merge_pairs", None))
+            merged = bool(opts.merge_pairs)
 
             if merged:
                 self._log.info("Loading and validating multiple pairs for merge...")
@@ -57,12 +57,20 @@ class RenumberService:
                 # Each pair: load → validate → clean → link → add IDs → accumulate
                 # Prefer per-pair sheet if provided
                 pairs_iter = []
-                if getattr(opts, "merge_pairs_with_sheets", None):
-                    for x, p, s in getattr(opts, "merge_pairs_with_sheets", []):
-                        pairs_iter.append((x, p, s))
+                if opts.merge_pairs_with_sheets:
+                    for (
+                        excel_path_item,
+                        pdf_path_item,
+                        sheet_name_item,
+                    ) in opts.merge_pairs_with_sheets:
+                        pairs_iter.append(
+                            (excel_path_item, pdf_path_item, sheet_name_item)
+                        )
                 else:
-                    for x, p in getattr(opts, "merge_pairs", []):
-                        pairs_iter.append((x, p, opts.sheet_name))
+                    for excel_path_item, pdf_path_item in opts.merge_pairs or []:
+                        pairs_iter.append(
+                            (excel_path_item, pdf_path_item, opts.sheet_name)
+                        )
 
                 for pair_excel, pair_pdf, pair_sheet in pairs_iter:
                     df_i = self._excel.load(pair_excel, pair_sheet)
@@ -106,6 +114,7 @@ class RenumberService:
                 self._log.info("Loading Excel and PDF...")
                 df = self._excel.load(excel_path, opts.sheet_name)
                 bookmarks, total_pages = self._pdf.read(pdf_path)
+                pages = list(self._pdf.pages(pdf_path))
 
                 self._log.info("Validating inputs...")
                 self._validator.run(df=df, bookmarks=bookmarks)
@@ -114,9 +123,7 @@ class RenumberService:
             # Clean
             df = clean_types(df)
             # Option-gated filter (keeps behavior identical when not set)
-            if getattr(opts, "filter_column", None) and getattr(
-                opts, "filter_values", None
-            ):
+            if opts.filter_column and opts.filter_values:
                 df = filter_df(df, opts.filter_column, opts.filter_values)
             # Preserve pre-ID/renumber snapshot for document link creation
             pre_id_df = df
@@ -169,7 +176,6 @@ class RenumberService:
                         alg=ns.IGNORECASE,
                     )
             else:
-                pages = self._pdf.pages(pdf_path)
                 # Create DocumentLink objects for bookmark title mapping
                 document_links = create_document_links(pre_id_df, bookmarks, excel_path)
 

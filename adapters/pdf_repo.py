@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Mapping, Sequence, Tuple
 
 from PyPDF2 import PdfReader, PdfWriter
 from PyPDF2.generic import Fit
+from PyPDF2.errors import DeprecationError
 
 
 class PdfPyPDF2Repo:
@@ -19,7 +20,15 @@ class PdfPyPDF2Repo:
         """Return extracted bookmarks and total page count from a PDF path."""
         reader = PdfReader(path)
         pages_count = len(reader.pages)
+        # Tolerate PyPDF2 attribute differences across versions
+        # Prefer 'outline' (PyPDF2 >=3) and fall back to 'outlines' (older),
+        # guarding against DeprecationError on access.
         outline = getattr(reader, "outline", None)
+        if not outline:
+            try:
+                outline = getattr(reader, "outlines", None)
+            except DeprecationError:
+                outline = None
         if not outline:
             return [], pages_count
 
