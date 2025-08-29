@@ -138,8 +138,8 @@ def test_validation_service_raises_on_duplicate_pdf_indices():
     assert "A1-Assignment-1/3/2024" in error_message, "Should show full bookmark title"
 
 
-def test_create_document_links_raises_on_missing_bookmark():
-    """Test that create_document_links raises ValueError when Excel row has no matching bookmark."""
+def test_create_document_links_skips_rows_without_bookmarks():
+    """Rows without corresponding bookmarks should be skipped (no error)."""
 
     df = pd.DataFrame(
         {"Index#": ["A1", "B2", "C3"], "Document Type": ["Deed", "Lien", "Assignment"]}
@@ -149,15 +149,10 @@ def test_create_document_links_raises_on_missing_bookmark():
     bookmarks = [
         {"title": "A1-Deed-1/1/2024", "page": 1, "level": 0},
         {"title": "B2-Lien-1/2/2024", "page": 3, "level": 0},
-        # C3 missing
     ]
 
-    with pytest.raises(ValueError) as exc_info:
-        create_document_links(df, bookmarks, "/test/file.xlsx")
-
-    error_message = str(exc_info.value)
-    assert "No PDF bookmark found" in error_message, "Should mention missing bookmark"
-    assert "C3" in error_message, "Should mention the specific missing index"
+    links = create_document_links(df, bookmarks, "/test/file.xlsx")
+    assert len(links) == 2
 
 
 def test_create_document_links_raises_on_duplicate_bookmarks():

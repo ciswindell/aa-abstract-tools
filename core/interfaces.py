@@ -76,3 +76,17 @@ class UIController(Protocol):
         default_sheet: Optional[str] = None,
     ) -> Optional[str]:
         """Prompt user to select a sheet from available options."""
+
+    def prompt_filter_selection(
+        self, df: pd.DataFrame
+    ) -> Tuple[Optional[str], List[str]]:
+        """Prompt user to pick a filter column and values; returns (column, values).
+
+        Returns (None, []) if the user cancels.
+        """
+
+    def prompt_merge_pairs(self) -> Optional[List[Tuple[str, str]]]:
+        """Prompt user to select one or more (Excel, PDF) pairs for merge.
+
+        Returns None if the user cancels.
+        """

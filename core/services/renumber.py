@@ -3,7 +3,9 @@
 RenumberService: orchestrates Excel/PDF load, validate, transform, and save.
 """
 
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, List, Tuple
+from pathlib import Path
+import pandas as pd
 
 from core.interfaces import ExcelRepo, Logger, PdfRepo
 from core.models import Options, Result
@@ -13,8 +15,9 @@ from core.transform.excel import (
     clean_types,
     create_document_links,
     sort_and_renumber,
+    filter_df,
 )
-from core.transform.pdf import make_titles, extract_original_index, detect_page_ranges
+from core.transform.pdf import make_titles, detect_page_ranges
 from natsort import natsorted, ns
 
 
@@ -39,103 +42,302 @@ class RenumberService:
         """Execute the end-to-end renumber process."""
 
         try:
-            self._log.info("Loading Excel and PDF...")
-            df = self._excel.load(excel_path, opts.sheet_name)
-            bookmarks, total_pages = self._pdf.read(pdf_path)
+            # Handle merge or single-file flow
+            merged = bool(getattr(opts, "merge_pairs", None))
 
-            self._log.info("Validating inputs...")
-            self._validator.run(df=df, bookmarks=bookmarks)
+            if merged:
+                self._log.info("Loading and validating multiple pairs for merge...")
+                combined_pages: List[Any] = []
+                combined_bookmarks: List[Mapping[str, Any]] = []
+                combined_links: List[Any] = []  # DocumentLink objects
+                df_parts: List[Any] = []
+                page_offset = 0
+
+                # Each pair: load → validate → clean → link → add IDs → accumulate
+                # Prefer per-pair sheet if provided
+                pairs_iter = []
+                if getattr(opts, "merge_pairs_with_sheets", None):
+                    for x, p, s in getattr(opts, "merge_pairs_with_sheets", []):
+                        pairs_iter.append((x, p, s))
+                else:
+                    for x, p in getattr(opts, "merge_pairs", []):
+                        pairs_iter.append((x, p, opts.sheet_name))
+
+                for pair_excel, pair_pdf, pair_sheet in pairs_iter:
+                    df_i = self._excel.load(pair_excel, pair_sheet)
+                    bms_i, total_pages_i = self._pdf.read(pair_pdf)
+
+                    # Validate inputs for this pair
+                    self._validator.run(df=df_i, bookmarks=bms_i)
+
+                    # Clean and link before IDs for stable mapping
+                    clean_i = clean_types(df_i)
+                    links_i = create_document_links(clean_i, bms_i, pair_excel)
+
+                    # Add IDs per pair to keep IDs consistent with linking
+                    df_ids_i = add_document_ids(clean_i, pair_excel)
+                    df_parts.append(df_ids_i)
+
+                    # Accumulate pages and offset bookmarks
+                    pages_i = list(self._pdf.pages(pair_pdf))
+                    combined_pages.extend(pages_i)
+                    for bm in bms_i:
+                        new_bm = dict(bm)
+                        new_bm["page"] = int(bm.get("page", 1)) + page_offset
+                        combined_bookmarks.append(new_bm)
+
+                    # Store links and remember offset for later mapping via page
+                    for link in links_i:
+                        # Attach offset info by creating a light tuple mapping
+                        combined_links.append((link, page_offset))
+
+                    page_offset += int(total_pages_i)
+
+                # Combine DataFrames
+                if df_parts:
+                    df = pd.concat(df_parts, ignore_index=True)
+                else:
+                    df = pd.DataFrame()
+                bookmarks = combined_bookmarks
+                pages = combined_pages
+                total_pages = len(combined_pages)
+            else:
+                self._log.info("Loading Excel and PDF...")
+                df = self._excel.load(excel_path, opts.sheet_name)
+                bookmarks, total_pages = self._pdf.read(pdf_path)
+
+                self._log.info("Validating inputs...")
+                self._validator.run(df=df, bookmarks=bookmarks)
 
             self._log.info("Transforming Excel data...")
-            df1 = clean_types(df)
-            df2 = add_document_ids(df1, excel_path)
-            df3 = sort_and_renumber(df2)
+            # Clean
+            df = clean_types(df)
+            # Option-gated filter (keeps behavior identical when not set)
+            if getattr(opts, "filter_column", None) and getattr(
+                opts, "filter_values", None
+            ):
+                df = filter_df(df, opts.filter_column, opts.filter_values)
+            # Preserve pre-ID/renumber snapshot for document link creation
+            pre_id_df = df
+            # Add IDs and sort/renumber
+            if merged:
+                # IDs already added per pair to keep consistency with links
+                pass
+            else:
+                df = add_document_ids(df, excel_path)
+            df = sort_and_renumber(df)
 
             self._log.info("Generating PDF bookmark titles...")
-            titles_map = make_titles(df3)
+            titles_map = make_titles(df)
+
+            # Determine output paths
+            def with_suffix(path_str: str, suffix: str) -> str:
+                p = Path(path_str)
+                return str(p.with_name(f"{p.stem}{suffix}{p.suffix}"))
+
+            is_filter_active = bool(
+                getattr(opts, "filter_column", None)
+                and getattr(opts, "filter_values", None)
+            )
+
+            if merged:
+                excel_out_path = str(Path(excel_path).with_name("merged.xlsx"))
+                pdf_out_path = str(Path(pdf_path).with_name("merged.pdf"))
+            else:
+                excel_out_path = excel_path
+                pdf_out_path = pdf_path
 
             # Save Excel back into template (in-place responsibility left to caller via backups)
             self._log.info("Saving Excel output...")
             target_sheet = opts.sheet_name or "Index"
             self._excel.save(
-                df3,
+                df,
                 template_path=excel_path,
                 target_sheet=target_sheet,
-                out_path=excel_path,
+                out_path=excel_out_path,
             )
 
-            # Recreate PDF output with updated bookmarks (no reordering here)
+            # Recreate PDF output with updated bookmarks
             self._log.info("Saving PDF output...")
-            pages = self._pdf.pages(pdf_path)
-            # Create DocumentLink objects for bookmark title mapping
-            document_links = create_document_links(df1, bookmarks, excel_path)
+            if merged:
+                # Build mapping from (title, offset_page) → doc_id using links + offsets
+                title_page_to_doc: dict[Tuple[str, int], str] = {}
+                doc_id_to_level: dict[str, int] = {}
+                for link, offset in combined_links:  # type: ignore[name-defined]
+                    key = (
+                        link.original_bookmark_title,
+                        int(link.original_bookmark_page) + int(offset),
+                    )
+                    title_page_to_doc[key] = link.document_id
+                    doc_id_to_level[link.document_id] = int(
+                        link.original_bookmark_level
+                    )
 
-            updated_bookmarks = _merge_bookmarks_with_titles(
-                bookmarks, titles_map, opts.sort_bookmarks, document_links
-            )
+                # Non-reorder path: update titles in-place on combined bookmarks
+                def update_bookmarks_with_titles(bms: Sequence[Mapping[str, Any]]):
+                    out: List[Mapping[str, Any]] = []
+                    for bm in bms:
+                        key = (str(bm.get("title", "")), int(bm.get("page", 1)))
+                        doc_id = title_page_to_doc.get(key)
+                        if doc_id and doc_id in titles_map:
+                            new_bm = dict(bm)
+                            new_bm["title"] = titles_map[doc_id]
+                            out.append(new_bm)
+                        else:
+                            out.append(dict(bm))
+                    return out
+
+                updated_bookmarks = update_bookmarks_with_titles(bookmarks)
+                # Respect 'sort_bookmarks' option in merge mode
+                if opts.sort_bookmarks:
+                    updated_bookmarks = natsorted(
+                        updated_bookmarks,
+                        key=lambda b: b.get("title", ""),
+                        alg=ns.IGNORECASE,
+                    )
+            else:
+                pages = self._pdf.pages(pdf_path)
+                # Create DocumentLink objects for bookmark title mapping
+                document_links = create_document_links(pre_id_df, bookmarks, excel_path)
+
+                updated_bookmarks = _merge_bookmarks_with_titles(
+                    bookmarks, titles_map, opts.sort_bookmarks, document_links
+                )
 
             if opts.reorder_pages:
 
-                # Build ranges from original bookmarks (keyed by original title)
-                original_ranges_by_title = detect_page_ranges(bookmarks, total_pages)
+                if merged:
+                    # Compute per-bookmark ranges in combined list (by order)
+                    ordered = sorted(bookmarks, key=lambda b: int(b.get("page", 1)))
+                    ranges_list: List[Tuple[int, int]] = []
+                    for i, bm in enumerate(ordered):
+                        start = int(bm.get("page", 1))
+                        if i + 1 < len(ordered):
+                            end = int(ordered[i + 1].get("page", start)) - 1
+                        else:
+                            end = len(pages)
+                        if end < start:
+                            end = start
+                        ranges_list.append((start, end))
 
-                # Create mapping from Document_ID to original bookmark info using DocumentLinks
-                doc_id_to_original_title: dict[str, str] = {}
-                doc_id_to_level: dict[str, int] = {}
+                    # Map (title,page) → index in ordered bookmarks
+                    key_to_index: dict[Tuple[str, int], int] = {}
+                    for idx, bm in enumerate(ordered):
+                        key_to_index[
+                            (str(bm.get("title", "")), int(bm.get("page", 1)))
+                        ] = idx
 
-                for link in document_links:
-                    doc_id_to_original_title[link.document_id] = (
-                        link.original_bookmark_title
-                    )
-                    doc_id_to_level[link.document_id] = link.original_bookmark_level
-
-                # Reorder pages by the new sequential Index# order (1, 2, 3...)
-                new_pages: list[Any] = []
-                new_bookmarks: list[dict[str, Any]] = []
-                current_start_page = 1
-
-                # Iterate through df3 in order (which is already sorted 1, 2, 3...)
-                for _, row in df3.iterrows():
-                    doc_id = str(row.get("Document_ID", "")).strip()
-                    if not doc_id:
-                        continue
-
-                    original_title = doc_id_to_original_title.get(doc_id)
-                    if not original_title:
-                        continue
-
-                    rng = original_ranges_by_title.get(original_title)
-                    if not rng:
-                        continue
-
-                    start, end = int(rng["start"]), int(rng["end"])
-
-                    # Append page objects for this range (1-based to 0-based)
-                    for p in range(start, end + 1):
-                        if 1 <= p <= len(pages):
-                            new_pages.append(pages[p - 1])
-
-                    # Get new title from titles_map using Document_ID
-                    new_title = titles_map.get(doc_id)
-                    if new_title:
-                        new_bookmarks.append(
-                            {
-                                "title": new_title,
-                                "page": current_start_page,
-                                "level": doc_id_to_level.get(doc_id, 0),
-                            }
+                    # Map doc_id → (index, level)
+                    doc_id_to_index: dict[str, int] = {}
+                    doc_id_to_level: dict[str, int] = {}
+                    for link, offset in combined_links:  # type: ignore[name-defined]
+                        key = (
+                            link.original_bookmark_title,
+                            int(link.original_bookmark_page) + int(offset),
                         )
-                    # Advance current_start_page by the length of this segment
-                    current_start_page += max(0, end - start + 1)
+                        idx = key_to_index.get(key)
+                        if idx is not None:
+                            doc_id_to_index[link.document_id] = idx
+                            doc_id_to_level[link.document_id] = int(
+                                link.original_bookmark_level
+                            )
 
-                self._pdf.write(
-                    pages=new_pages or pages,
-                    bookmarks=new_bookmarks or updated_bookmarks,
-                    out_path=pdf_path,
-                )
+                    # Reorder pages by the new sequential Index# order
+                    new_pages: List[Any] = []
+                    new_bookmarks: List[dict[str, Any]] = []
+                    current_start_page = 1
+
+                    for _, row in df.iterrows():
+                        doc_id = str(row.get("Document_ID", "")).strip()
+                        if not doc_id:
+                            continue
+                        idx = doc_id_to_index.get(doc_id)
+                        if idx is None:
+                            continue
+                        start, end = ranges_list[idx]
+                        for p in range(start, end + 1):
+                            if 1 <= p <= len(pages):
+                                new_pages.append(pages[p - 1])
+                        new_title = titles_map.get(doc_id)
+                        if new_title:
+                            new_bookmarks.append(
+                                {
+                                    "title": new_title,
+                                    "page": current_start_page,
+                                    "level": doc_id_to_level.get(doc_id, 0),
+                                }
+                            )
+                        current_start_page += max(0, end - start + 1)
+
+                    self._pdf.write(
+                        pages=new_pages or pages,
+                        bookmarks=new_bookmarks or updated_bookmarks,
+                        out_path=pdf_out_path,
+                    )
+                else:
+                    # Original single-file reorder
+                    original_ranges_by_title = detect_page_ranges(
+                        bookmarks, total_pages
+                    )
+
+                    # Create mapping from Document_ID to original bookmark info using DocumentLinks
+                    doc_id_to_original_title: dict[str, str] = {}
+                    doc_id_to_level: dict[str, int] = {}
+
+                    document_links = create_document_links(
+                        pre_id_df, bookmarks, excel_path
+                    )
+                    for link in document_links:
+                        doc_id_to_original_title[link.document_id] = (
+                            link.original_bookmark_title
+                        )
+                        doc_id_to_level[link.document_id] = int(
+                            link.original_bookmark_level
+                        )
+
+                    # Reorder pages by the new sequential Index# order (1, 2, 3...)
+                    new_pages: List[Any] = []
+                    new_bookmarks: List[dict[str, Any]] = []
+                    current_start_page = 1
+
+                    for _, row in df.iterrows():
+                        doc_id = str(row.get("Document_ID", "")).strip()
+                        if not doc_id:
+                            continue
+
+                        original_title = doc_id_to_original_title.get(doc_id)
+                        if not original_title:
+                            continue
+
+                        rng = original_ranges_by_title.get(original_title)
+                        if not rng:
+                            continue
+
+                        start, end = int(rng["start"]), int(rng["end"])
+
+                        for p in range(start, end + 1):
+                            if 1 <= p <= len(pages):
+                                new_pages.append(pages[p - 1])
+
+                        new_title = titles_map.get(doc_id)
+                        if new_title:
+                            new_bookmarks.append(
+                                {
+                                    "title": new_title,
+                                    "page": current_start_page,
+                                    "level": doc_id_to_level.get(doc_id, 0),
+                                }
+                            )
+                        current_start_page += max(0, end - start + 1)
+
+                    self._pdf.write(
+                        pages=new_pages or pages,
+                        bookmarks=new_bookmarks or updated_bookmarks,
+                        out_path=pdf_out_path,
+                    )
             else:
                 self._pdf.write(
-                    pages=pages, bookmarks=updated_bookmarks, out_path=pdf_path
+                    pages=pages, bookmarks=updated_bookmarks, out_path=pdf_out_path
                 )
 
             self._log.info("Complete.")

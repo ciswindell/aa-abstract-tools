@@ -82,17 +82,16 @@ def create_document_links(
                 )
             bookmark_map[original_idx] = bm
 
-    # Create DocumentLink objects
+    # Create DocumentLink objects (skip Excel rows without matching bookmark)
     document_links = []
     for row_idx, row in df.iterrows():
         original_index = str(row[index_col]).strip()
 
         # Find matching bookmark
         if original_index not in bookmark_map:
-            raise ValueError(
-                f"No PDF bookmark found for Excel row with Index# '{original_index}'. "
-                f"All Excel rows must have corresponding bookmarks."
-            )
+            # Acceptable: Excel row may be missing a corresponding bookmark
+            # Skip linking for this row
+            continue
 
         bookmark = bookmark_map[original_index]
 
@@ -220,3 +219,19 @@ def sort_and_renumber(
         new_df[index_col] = range(1, len(new_df) + 1)
 
     return new_df
+
+
+def filter_df(
+    df: pd.DataFrame, column: Optional[str], values: Optional[Sequence[Any]]
+) -> pd.DataFrame:
+    """Return a filtered copy of df where df[column] is in values.
+
+    If column or values are not provided, or column is missing, returns df copy.
+    Always resets index.
+    """
+
+    if not column or not values or column not in df.columns:
+        return df.copy()
+
+    filtered = df[df[column].isin(values)].copy()
+    return filtered.reset_index(drop=True)
