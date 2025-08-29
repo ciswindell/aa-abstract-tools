@@ -9,7 +9,7 @@ from fileops.files import create_backups
 import pandas as pd
 
 from core.interfaces import ExcelRepo, Logger, PdfRepo
-from core.models import Options, Result
+from core.models import Options, Result, DocumentLink
 from core.services.validate import ValidationService
 from core.transform.excel import (
     add_document_ids,
@@ -50,7 +50,7 @@ class RenumberService:
                 self._log.info("Loading and validating multiple pairs for merge...")
                 combined_pages: List[Any] = []
                 combined_bookmarks: List[Mapping[str, Any]] = []
-                combined_links: List[Any] = []  # DocumentLink objects
+                combined_links: List[Tuple[DocumentLink, int]] = []
                 df_parts: List[Any] = []
                 page_offset = 0
 
@@ -164,23 +164,35 @@ class RenumberService:
             # Recreate PDF output with updated bookmarks
             self._log.info("Saving PDF output...")
             if merged:
-                # Non-reorder path: update titles in-place on combined bookmarks
-                updated_bookmarks = _update_bookmarks_with_titles_merged(
-                    bookmarks, titles_map, combined_links  # type: ignore[name-defined]
-                )
-                # Respect 'sort_bookmarks' option in merge mode
-                if opts.sort_bookmarks:
-                    updated_bookmarks = natsorted(
-                        updated_bookmarks,
-                        key=lambda b: b.get("title", ""),
-                        alg=ns.IGNORECASE,
+                # Build resolver mapping for merged: (title, page) -> Document_ID
+                title_page_to_doc: dict[Tuple[str, int], str] = {}
+                for link, offset in combined_links:  # type: ignore[name-defined]
+                    key = (
+                        link.original_bookmark_title,
+                        int(link.original_bookmark_page) + int(offset),
                     )
-            else:
-                # Create DocumentLink objects for bookmark title mapping
-                document_links = create_document_links(pre_id_df, bookmarks, excel_path)
+                    title_page_to_doc[key] = link.document_id
 
-                updated_bookmarks = _merge_bookmarks_with_titles(
-                    bookmarks, titles_map, opts.sort_bookmarks, document_links
+                def merged_resolver(bm: Mapping[str, Any]) -> str | None:
+                    key = (str(bm.get("title", "")), int(bm.get("page", 1)))
+                    return title_page_to_doc.get(key)
+
+                updated_bookmarks = _update_bookmarks_with_titles_generic(
+                    bookmarks, titles_map, merged_resolver, opts.sort_bookmarks
+                )
+            else:
+                # Create DocumentLink objects and resolver for single-file
+                document_links = create_document_links(pre_id_df, bookmarks, excel_path)
+                title_to_doc_id = {
+                    link.original_bookmark_title: link.document_id
+                    for link in document_links
+                }
+
+                def single_resolver(bm: Mapping[str, Any]) -> str | None:
+                    return title_to_doc_id.get(str(bm.get("title", "")))
+
+                updated_bookmarks = _update_bookmarks_with_titles_generic(
+                    bookmarks, titles_map, single_resolver, opts.sort_bookmarks
                 )
 
             if opts.reorder_pages:
@@ -221,7 +233,7 @@ def _merge_bookmarks_with_titles(
     bookmarks: Sequence[Mapping[str, Any]],
     titles_map: Mapping[str, str],
     sort_naturally: bool,
-    document_links: Sequence[Any],  # DocumentLink objects
+    document_links: Sequence[DocumentLink],
 ):
     """Return updated bookmarks with new titles using DocumentLink mapping.
 
@@ -260,7 +272,7 @@ def _merge_bookmarks_with_titles(
 def _update_bookmarks_with_titles_merged(
     bookmarks: Sequence[Mapping[str, Any]],
     titles_map: Mapping[str, str],
-    links_with_offsets: Sequence[Tuple[Any, int]],  # (DocumentLink, offset)
+    links_with_offsets: Sequence[Tuple[DocumentLink, int]],
 ):
     """Update bookmark titles for merged flows using (title,page) mapping.
 
@@ -288,40 +300,63 @@ def _update_bookmarks_with_titles_merged(
     return out
 
 
+def _update_bookmarks_with_titles_generic(
+    bookmarks: Sequence[Mapping[str, Any]],
+    titles_map: Mapping[str, str],
+    resolver: "callable",
+    sort_naturally: bool,
+):
+    """Generic bookmark title update using a resolver to get Document_ID.
+
+    resolver(bookmark_dict) -> str | None
+    """
+    updated = []
+    for bm in bookmarks:
+        doc_id = resolver(bm)
+        if doc_id and doc_id in titles_map:
+            new_bm = dict(bm)
+            new_bm["title"] = titles_map[doc_id]
+            updated.append(new_bm)
+        else:
+            updated.append(dict(bm))
+    if sort_naturally:
+        updated = natsorted(
+            updated, key=lambda b: b.get("title", ""), alg=ns.IGNORECASE
+        )
+    return updated
+
+
 def _reorder_pages_merged(
     df: pd.DataFrame,
     titles_map: Mapping[str, str],
     pages: Sequence[Any],
     bookmarks: Sequence[Mapping[str, Any]],
-    links_with_offsets: Sequence[Tuple[Any, int]],
+    links_with_offsets: Sequence[Tuple[DocumentLink, int]],
 ):
-    ordered = sorted(bookmarks, key=lambda b: int(b.get("page", 1)))
-    ranges_list: List[Tuple[int, int]] = []
-    for i, bm in enumerate(ordered):
-        start = int(bm.get("page", 1))
-        if i + 1 < len(ordered):
-            end = int(ordered[i + 1].get("page", start)) - 1
-        else:
-            end = len(pages)
-        if end < start:
-            end = start
-        ranges_list.append((start, end))
+    """Return reordered pages and new bookmarks for merged flow.
 
-    key_to_index: dict[Tuple[str, int], int] = {}
-    for idx, bm in enumerate(ordered):
-        key_to_index[(str(bm.get("title", "")), int(bm.get("page", 1)))] = idx
+    Uses synthetic unique bookmark keys ("title@@page") to compute ranges via
+    detect_page_ranges, then maps DataFrame order to page ranges and titles.
+    """
+    if not bookmarks or not pages:
+        return [], []
+    # Build synthetic unique titles to safely use detect_page_ranges even when
+    # bookmark titles repeat across merged inputs. Key format: "{title}@@{page}".
+    synthetic_bookmarks: List[Mapping[str, Any]] = []
+    for bm in bookmarks:
+        t = str(bm.get("title", ""))
+        p = int(bm.get("page", 1))
+        synthetic_bookmarks.append({"title": f"{t}@@{p}", "page": p})
 
-    doc_id_to_index: dict[str, int] = {}
+    ranges_by_synth_title = detect_page_ranges(synthetic_bookmarks, len(pages))
+
+    # Map Document_ID to its synthetic key and level using original link + offset
+    doc_id_to_synth_key: dict[str, str] = {}
     doc_id_to_level: dict[str, int] = {}
     for link, offset in links_with_offsets:
-        key = (
-            link.original_bookmark_title,
-            int(link.original_bookmark_page) + int(offset),
-        )
-        idx = key_to_index.get(key)
-        if idx is not None:
-            doc_id_to_index[link.document_id] = idx
-            doc_id_to_level[link.document_id] = int(link.original_bookmark_level)
+        synth_key = f"{link.original_bookmark_title}@@{int(link.original_bookmark_page) + int(offset)}"
+        doc_id_to_synth_key[link.document_id] = synth_key
+        doc_id_to_level[link.document_id] = int(link.original_bookmark_level)
 
     new_pages: List[Any] = []
     new_bookmarks: List[dict[str, Any]] = []
@@ -331,10 +366,13 @@ def _reorder_pages_merged(
         doc_id = str(row.get("Document_ID", "")).strip()
         if not doc_id:
             continue
-        idx = doc_id_to_index.get(doc_id)
-        if idx is None:
+        synth_key = doc_id_to_synth_key.get(doc_id)
+        if not synth_key:
             continue
-        start, end = ranges_list[idx]
+        rng = ranges_by_synth_title.get(synth_key)
+        if not rng:
+            continue
+        start, end = int(rng["start"]), int(rng["end"])
         for p in range(start, end + 1):
             if 1 <= p <= len(pages):
                 new_pages.append(pages[p - 1])
@@ -361,6 +399,13 @@ def _reorder_pages_single(
     pre_id_df: pd.DataFrame,
     excel_path: str,
 ):
+    """Return reordered pages and new bookmarks for single-file flow.
+
+    Relies on detect_page_ranges and DocumentLink mapping to preserve
+    associations from original bookmarks to new titles.
+    """
+    if not bookmarks or not pages or int(total_pages) <= 0:
+        return [], []
     original_ranges_by_title = detect_page_ranges(bookmarks, total_pages)
 
     doc_id_to_original_title: dict[str, str] = {}

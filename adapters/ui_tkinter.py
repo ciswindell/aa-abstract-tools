@@ -5,6 +5,9 @@ Tkinter UI adapter that implements the UIController interface.
 
 from typing import Any, List, Optional, Tuple
 
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+
 # Note: UIController Protocol imported where needed; not required here.
 from core.models import Options
 
@@ -59,15 +62,11 @@ class TkinterUIAdapter:
 
     def show_error(self, title: str, message: str) -> None:
         """Show an error message to the user."""
-        from tkinter import messagebox
-
         self.gui.log_status(f"Error: {message}")
         messagebox.showerror(title, message)
 
     def show_success(self, message: str) -> None:
         """Show a success message to the user."""
-        from tkinter import messagebox
-
         self.gui.log_status("Complete!")
         messagebox.showinfo("Processing Complete", message)
 
@@ -78,8 +77,6 @@ class TkinterUIAdapter:
         default_sheet: Optional[str] = None,
     ) -> Optional[str]:
         """Prompt user to select a sheet from available options."""
-        import tkinter as tk
-        from tkinter import ttk
 
         if not sheet_names:
             return None
@@ -158,8 +155,6 @@ class TkinterUIAdapter:
 
         Returns (column_name, values) or (None, []).
         """
-        import tkinter as tk
-        from tkinter import ttk
 
         if df is None or df.empty:
             return None, []
@@ -236,8 +231,6 @@ class TkinterUIAdapter:
 
         Returns list of (excel_path, pdf_path) or None if canceled.
         """
-        import tkinter as tk
-        from tkinter import ttk, filedialog
 
         self.log_status("Select pairs to merge…")
         self.gui.root.update()

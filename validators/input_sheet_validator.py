@@ -56,6 +56,25 @@ def find_duplicate_columns(df) -> List[str]:
     return duplicates
 
 
+def _compute_duplicate_base_names(duplicate_columns: List[str]) -> List[str]:
+    """Return base names for duplicates including pandas auto-renamed columns.
+
+    Example: ["Index#", "Index#.1", "Index#.2"] -> ["Index#"].
+    """
+    if not duplicate_columns:
+        return []
+    base_names = set()
+    for col in duplicate_columns:
+        col_str = str(col)
+        if "." in col_str:
+            parts = col_str.split(".")
+            if len(parts) == 2 and parts[1].isdigit():
+                base_names.add(parts[0])
+                continue
+        base_names.add(col_str)
+    return sorted(base_names)
+
+
 def find_duplicate_index_values(df, index_col: str = "Index#") -> List[str]:
     """Find duplicate values in the Index# column (PRD requirement #3)."""
     if df is None or index_col not in df.columns:
@@ -71,8 +90,15 @@ def find_duplicate_index_values(df, index_col: str = "Index#") -> List[str]:
 
 
 def validate(df, required_columns: List[str]) -> Dict[str, List[str]]:
+    duplicates = find_duplicate_columns(df)
+    base_names = _compute_duplicate_base_names(duplicates)
+    has_auto_renamed = any(
+        "." in str(c) and str(c).split(".")[-1].isdigit() for c in duplicates
+    )
     return {
         "missing": find_missing_required_columns(df, required_columns),
-        "duplicate_columns": find_duplicate_columns(df),
+        "duplicate_columns": duplicates,
+        "duplicate_base_names": base_names,
         "duplicate_indices": find_duplicate_index_values(df),
+        "has_auto_renamed": has_auto_renamed,  # hint for messaging
     }

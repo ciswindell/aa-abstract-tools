@@ -37,28 +37,16 @@ class ValidationService:
             sheet_results = validate_sheet(df, self.required_columns)
             missing = sheet_results.get("missing", [])
             duplicate_columns = sheet_results.get("duplicate_columns", [])
+            duplicate_base_names = sheet_results.get("duplicate_base_names", [])
             duplicate_indices = sheet_results.get("duplicate_indices", [])
+            has_auto_renamed = bool(sheet_results.get("has_auto_renamed", False))
 
             if missing or duplicate_columns or duplicate_indices:
                 details: List[str] = []
                 if duplicate_columns:
-                    # Check if any columns have pandas auto-rename pattern (.1, .2, etc.)
-                    has_auto_renamed = any(
-                        "." in col and col.split(".")[-1].isdigit()
-                        for col in duplicate_columns
-                    )
-
-                    if has_auto_renamed:
-                        # Find the base column names that are duplicated
-                        base_names = set()
-                        for col in duplicate_columns:
-                            if "." in col and col.split(".")[-1].isdigit():
-                                base_names.add(col.split(".")[0])
-                            else:
-                                base_names.add(col)
-
+                    if has_auto_renamed and duplicate_base_names:
                         base_list = "\n".join(
-                            f"  • '{name}'" for name in sorted(base_names)
+                            f"  • '{name}'" for name in duplicate_base_names
                         )
                         details.append(
                             f"Your Excel file has duplicate column names:\n{base_list}\n\n"

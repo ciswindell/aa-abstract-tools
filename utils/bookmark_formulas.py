@@ -10,6 +10,15 @@ from openpyxl import load_workbook
 from utils.excel_utils import index_to_col_letter
 
 
+def _header_positions(ws) -> dict[str, int]:
+    """Return lowercase header -> 1-based column index mapping for first row."""
+    return {
+        str(cell.value).strip().lower(): idx + 1
+        for idx, cell in enumerate(ws[1])
+        if cell.value
+    }
+
+
 def apply_bookmark_formulas(
     workbook_path: str, df: pd.DataFrame, bookmark_column: str
 ) -> None:
@@ -23,11 +32,7 @@ def apply_bookmark_formulas(
         ws = wb.active
 
         # Find column positions by header names (case-insensitive)
-        headers = {
-            str(cell.value).strip().lower(): idx + 1
-            for idx, cell in enumerate(ws[1])
-            if cell.value
-        }
+        headers = _header_positions(ws)
 
         bookmark_col = headers.get(bookmark_column.strip().lower())
         index_col = headers.get("index#")
@@ -60,11 +65,7 @@ def has_bookmark_formulas(workbook_path: str, bookmark_column: str) -> bool:
         ws = wb.active
 
         # Find bookmark column
-        headers = {
-            str(cell.value).strip().lower(): idx + 1
-            for idx, cell in enumerate(ws[1])
-            if cell.value
-        }
+        headers = _header_positions(ws)
         bookmark_col = headers.get(bookmark_column.strip().lower())
 
         if bookmark_col:

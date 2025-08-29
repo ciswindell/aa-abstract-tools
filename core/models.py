@@ -4,7 +4,7 @@ Core models (dataclasses) used by application services and adapters.
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, List, Tuple
+from typing import Optional, List, Tuple
 
 
 @dataclass
@@ -44,23 +44,6 @@ class Result:
 
 
 @dataclass
-class Bookmark:
-    """A single PDF bookmark entry."""
-
-    title: str
-    page: int
-    level: int = 0
-
-
-@dataclass
-class PageRange:
-    """Inclusive page range (1-based)."""
-
-    start: int
-    end: int
-
-
-@dataclass
 class DocumentLink:
     """Links an Excel row to its corresponding PDF bookmark.
 
@@ -77,13 +60,3 @@ class DocumentLink:
     original_bookmark_title: str
     original_bookmark_page: int
     original_bookmark_level: int
-
-
-@dataclass
-class Record:
-    """Excel row wrapper; stores raw column values.
-
-    Note: Keep generic to avoid coupling to specific column names.
-    """
-
-    values: Dict[str, Any]
