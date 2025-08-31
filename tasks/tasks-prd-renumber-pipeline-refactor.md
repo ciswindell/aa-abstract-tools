@@ -62,9 +62,9 @@
   - [x] 2.12 Implement `SaveStep` - save Excel and PDF outputs using existing repo methods
 
 - [ ] 3.0 Refactor RenumberService to Use Pipeline
-  - [ ] 3.1 Replace monolithic `run()` method with pipeline instantiation and execution
-  - [ ] 3.2 Maintain exact same method signature and return type for backward compatibility
-  - [ ] 3.3 Preserve all existing error handling and logging behavior
+  - [x] 3.1 Replace monolithic `run()` method with pipeline instantiation and execution
+  - [x] 3.2 Maintain exact same method signature and return type for backward compatibility
+  - [x] 3.3 Preserve all existing error handling and logging behavior
   - [ ] 3.4 Remove complex conditional branching logic (now handled by early merge)
 
 - [ ] 4.0 Update Early Merge Logic
