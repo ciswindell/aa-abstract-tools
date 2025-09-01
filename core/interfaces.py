@@ -5,9 +5,10 @@ Interfaces (Protocols) for core services and adapters.
 Defines minimal contracts to decouple UI and IO from core logic.
 """
 
-from typing import Any, Mapping, Optional, Protocol, Sequence, Tuple, List
+from typing import Any, List, Mapping, Optional, Protocol, Sequence, Tuple
 
 import pandas as pd
+
 from core.models import Options
 
 
@@ -26,6 +27,9 @@ class ExcelRepo(Protocol):
 
     def load(self, path: str, sheet: Optional[str]) -> pd.DataFrame:
         """Load a worksheet into a DataFrame."""
+
+    def get_sheet_names(self, path: str) -> List[str]:
+        """Get list of sheet names in the Excel file."""
 
     def save(
         self, df: pd.DataFrame, template_path: str, target_sheet: str, out_path: str

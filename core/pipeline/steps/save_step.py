@@ -12,12 +12,12 @@ class SaveStep(BaseStep):
     """Pipeline step for saving final Excel and PDF outputs."""
 
     def execute(self, context: PipelineContext) -> None:
-        """Save Excel and PDF outputs using existing repository methods.
+        """Save Excel and PDF outputs using DocumentUnit-based architecture.
 
         This step handles the final output phase:
         - Creates backups if enabled (for single-file workflows only)
-        - Saves Excel DataFrame back to template preserving formatting
-        - Writes PDF with updated bookmarks and optionally reordered pages
+        - Saves flagged DataFrame rows back to Excel template preserving formatting
+        - Writes PDF using PdfWriter from RebuildPdfStep (filtered/sorted pages with fresh bookmarks)
         - Uses appropriate output paths for merge vs single-file workflows
 
         Args:
@@ -32,14 +32,16 @@ class SaveStep(BaseStep):
         if context.df is None:
             raise ValueError("No Excel data available for saving")
 
-        if context.pages is None or context.bookmarks is None:
-            raise ValueError("No PDF data available for saving")
+        if not hasattr(context, "final_pdf") or context.final_pdf is None:
+            raise ValueError(
+                "No PDF writer available for saving - RebuildPdfStep may not have executed"
+            )
 
         # Get output paths
         excel_out_path, pdf_out_path = context.get_output_paths()
 
         # Create backups if enabled (skip for merge workflows)
-        if context.options.backup and not context.is_merge_workflow():
+        if context.options.get("backup", False) and not context.is_merge_workflow():
             self.logger.info("Creating backup files before saving")
             create_backups(context.excel_path, context.pdf_path)
 
@@ -58,34 +60,50 @@ class SaveStep(BaseStep):
         self.logger.info(f"Saving Excel output to: {excel_out_path}")
 
         # Determine target sheet name
-        target_sheet = context.options.sheet_name or "Index"
+        target_sheet = context.options.get("sheet_name") or "Index"
+
+        # Save flagged rows (or all rows if no _include column exists)
+        if "_include" in context.df.columns:
+            df_to_save = context.df[context.df["_include"]].copy()
+        else:
+            df_to_save = context.df.copy()
+
+        saved_rows = len(df_to_save)
+        total_rows = len(context.df)
+        self.logger.info(f"Saving {saved_rows}/{total_rows} rows to Excel")
 
         # Use existing ExcelRepo to save DataFrame back into template
         # This preserves all formatting, styles, other sheets, etc.
         self.excel_repo.save(
-            df=context.df,
+            df=df_to_save,
             template_path=context.excel_path,
             target_sheet=target_sheet,
             out_path=excel_out_path,
         )
 
-        self.logger.info(
-            f"Excel saved: {len(context.df)} rows to sheet '{target_sheet}'"
-        )
+        self.logger.info(f"Excel saved: {saved_rows} rows to sheet '{target_sheet}'")
 
     def _save_pdf_output(self, context: PipelineContext, pdf_out_path: str) -> None:
-        """Save PDF with updated bookmarks and optionally reordered pages."""
+        """Save PDF using PdfWriter from RebuildPdfStep."""
         self.logger.info(f"Saving PDF output to: {pdf_out_path}")
 
-        # Use existing PdfRepo to write pages and bookmarks
-        # Pages may be reordered (if ReorderStep executed) or original order
-        # Bookmarks have updated titles from BookmarkStep
-        self.pdf_repo.write(
-            pages=context.pages,
-            bookmarks=context.bookmarks,
-            out_path=pdf_out_path,
-        )
+        try:
+            # Write the final PDF using the PdfWriter from RebuildPdfStep
+            # This contains the filtered/sorted pages with fresh bookmarks
+            with open(pdf_out_path, "wb") as output_file:
+                context.final_pdf.write(output_file)
 
-        self.logger.info(
-            f"PDF saved: {len(context.pages)} pages, {len(context.bookmarks)} bookmarks"
-        )
+            # Log statistics about the saved PDF
+            page_count = len(context.final_pdf.pages)
+
+            # Count bookmarks by checking outline
+            bookmark_count = 0
+            if hasattr(context.final_pdf, "outline") and context.final_pdf.outline:
+                bookmark_count = len(context.final_pdf.outline)
+
+            self.logger.info(
+                f"PDF saved: {page_count} pages, {bookmark_count} bookmarks"
+            )
+
+        except Exception as e:
+            raise Exception(f"Failed to save PDF to {pdf_out_path}: {e}") from e

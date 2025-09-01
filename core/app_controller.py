@@ -9,10 +9,11 @@ from typing import Optional
 from openpyxl import load_workbook
 
 from adapters.excel_repo import ExcelOpenpyxlRepo
-from adapters.logger_tk import TkLogger
+from adapters.logger_tk import TkLogger, TkinterLogger
 from adapters.pdf_repo import PdfRepo
 from core.config import DEFAULT_REQUIRED_COLUMNS, DEFAULT_SHEET_NAME
-from core.interfaces import UIController, ExcelRepo, PdfRepo as PdfRepoInterface, Logger
+from core.interfaces import ExcelRepo, Logger, UIController
+from core.interfaces import PdfRepo as PdfRepoInterface
 from core.services.renumber import RenumberService
 from core.services.validate import ValidationService
 
@@ -63,7 +64,7 @@ class AppController:
                 options.backup = False
 
             # Build services for early validation (use injected or defaults)
-            logger = self._logger or TkLogger(self.ui.log_status)
+            logger = self._logger or TkinterLogger(self.ui)
             excel_repo = self._excel_repo or ExcelOpenpyxlRepo()
             pdf_repo = self._pdf_repo or PdfRepo()
             validator = self._validator or ValidationService(self.required_columns)
@@ -102,7 +103,7 @@ class AppController:
                 options.merge_pairs_with_sheets = pairs_with_sheets
 
             # Run processing
-            service = RenumberService(excel_repo, pdf_repo, validator, logger)
+            service = RenumberService(excel_repo, pdf_repo, validator, logger, self.ui)
             result = service.run(excel_file, pdf_file, options)
             if not result.success:
                 raise RuntimeError(result.message or "Unknown error")

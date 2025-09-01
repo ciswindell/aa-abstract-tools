@@ -3,7 +3,7 @@
 RenumberService: orchestrates Excel/PDF load, validate, transform, and save using pipeline architecture.
 """
 
-from core.interfaces import ExcelRepo, Logger, PdfRepo
+from core.interfaces import ExcelRepo, Logger, PdfRepo, UIController
 from core.models import Options, Result
 from core.pipeline.pipeline import Pipeline
 from core.services.validate import ValidationService
@@ -18,12 +18,14 @@ class RenumberService:
         pdf_repo: PdfRepo,
         validator: ValidationService,
         logger: Logger,
+        ui: UIController,
     ) -> None:
-        """Initialize with repositories, validator, and logger."""
+        """Initialize with repositories, validator, logger, and UI."""
         self._excel = excel_repo
         self._pdf = pdf_repo
         self._validator = validator
         self._log = logger
+        self._ui = ui
 
     def run(self, excel_path: str, pdf_path: str, opts: Options) -> Result:
         """Execute the end-to-end renumber process using pipeline architecture.
@@ -45,6 +47,7 @@ class RenumberService:
             pdf_repo=self._pdf,
             validator=self._validator,
             logger=self._log,
+            ui=self._ui,
         )
 
         return pipeline.execute(excel_path, pdf_path, opts)

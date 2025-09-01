@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""
+SortDfStep: Sort DataFrame rows and renumber Index# column.
+"""
+
+from core.pipeline.context import PipelineContext
+from core.pipeline.steps import BaseStep
+from core.transform.excel import sort_and_renumber
+
+
+class SortDfStep(BaseStep):
+    """Pipeline step for sorting DataFrame rows and renumbering Index# column."""
+
+    def execute(self, context: PipelineContext) -> None:
+        """Sort flagged DataFrame rows and renumber Index# column.
+
+        This step performs order-agnostic sorting that works regardless of FilterDfStep execution:
+        - Initializes _include column if not present (all rows included by default)
+        - Sorts only rows where _include=True by available columns (Legal Description, Grantee, etc.)
+        - Renumbers Index# column from 1 to N for flagged rows only
+        - Preserves unflagged rows in their original positions and states
+        - Works correctly whether FilterDfStep has run before or after this step
+
+        Args:
+            context: Pipeline context containing df to sort
+
+        Raises:
+            Exception: If sorting fails
+        """
+        self.logger.info("Sorting flagged Excel data and renumbering Index# column")
+
+        try:
+            # Validate required data
+            if context.df is None:
+                raise ValueError("No Excel data loaded for sorting")
+
+            if context.df.empty:
+                raise ValueError("DataFrame is empty - no data to sort")
+
+            # Validate required columns exist
+            required_columns = ["Index#", "Document_ID"]
+            missing_columns = [
+                col for col in required_columns if col not in context.df.columns
+            ]
+            if missing_columns:
+                available_columns = list(context.df.columns)
+                raise ValueError(
+                    f"Required columns missing for sorting: {missing_columns}. "
+                    f"Available columns: {available_columns}"
+                )
+
+            # Initialize _include column if it doesn't exist (order-agnostic design)
+            if "_include" not in context.df.columns:
+                context.df["_include"] = True  # Default: include all rows
+                self.logger.info(
+                    "No _include column found, including all rows for sorting"
+                )
+
+            # Get counts for logging
+            total_rows = len(context.df)
+            included_rows = context.df["_include"].sum()
+            excluded_rows = total_rows - included_rows
+
+            self.logger.info(
+                f"Sorting {included_rows}/{total_rows} flagged rows ({excluded_rows} excluded)"
+            )
+
+            if included_rows == 0:
+                self.logger.warning(
+                    "No rows flagged for sorting - skipping sort operation"
+                )
+                return
+
+        except Exception as e:
+            self.logger.error(f"SortDfStep validation failed: {e}")
+            raise
+
+        try:
+            # Extract flagged rows for sorting
+            included_mask = context.df["_include"]
+            included_df = context.df[included_mask].copy()
+
+            if included_df.empty:
+                raise ValueError("No flagged rows to sort after filtering")
+
+            # Store original first index for logging
+            original_first_index = None
+            if "Index#" in included_df.columns and len(included_df) > 0:
+                original_first_index = included_df.iloc[0]["Index#"]
+
+            # Sort and renumber only the flagged rows
+            try:
+                sorted_included_df = sort_and_renumber(included_df)
+            except Exception as e:
+                raise ValueError(f"Failed to sort and renumber DataFrame: {e}") from e
+
+            # Validate sorting results
+            if len(sorted_included_df) != len(included_df):
+                raise ValueError(
+                    f"Row count changed during sorting: {len(included_df)} -> {len(sorted_included_df)}"
+                )
+
+            # Update the original DataFrame with sorted flagged rows
+            # This preserves unflagged rows in their original positions
+            try:
+                context.df.loc[included_mask, :] = sorted_included_df
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to update DataFrame with sorted results: {e}"
+                ) from e
+
+        except Exception as e:
+            self.logger.error(f"SortDfStep sorting operation failed: {e}")
+            raise
+
+        # Log sorting results
+        new_first_index = None
+        if "Index#" in sorted_included_df.columns and len(sorted_included_df) > 0:
+            new_first_index = sorted_included_df.iloc[0]["Index#"]
+
+        self.logger.info(f"Sorting complete: {included_rows} flagged rows processed")
+
+        if original_first_index is not None and new_first_index is not None:
+            if original_first_index != new_first_index:
+                self.logger.info(
+                    f"Sort order changed: first flagged Index# {original_first_index} -> {new_first_index}"
+                )
+            else:
+                self.logger.info("Flagged data was already in correct sort order")
+
+        # Verify Index# column was properly renumbered for flagged rows
+        if "Index#" in sorted_included_df.columns:
+            flagged_index_values = sorted_included_df["Index#"].tolist()
+            expected_values = list(range(1, len(sorted_included_df) + 1))
+            if flagged_index_values != expected_values:
+                raise ValueError(
+                    "Index# column was not properly renumbered to sequential 1..N values for flagged rows"
+                )

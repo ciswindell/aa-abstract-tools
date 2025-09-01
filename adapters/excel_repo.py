@@ -12,8 +12,8 @@ from typing import Optional
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
-from fileops.files import atomic_write_with_template
 
+from fileops.files import atomic_write_with_template
 from utils.bookmark_formulas import (
     apply_bookmark_formulas,
     detect_bookmark_column,
@@ -27,6 +27,14 @@ class ExcelOpenpyxlRepo:
     def load(self, path: str, sheet: Optional[str]) -> pd.DataFrame:
         """Load a worksheet into a DataFrame (values as strings)."""
         return pd.read_excel(path, dtype=str, sheet_name=sheet)
+
+    def get_sheet_names(self, path: str) -> list[str]:
+        """Get list of sheet names in the Excel file."""
+        wb = load_workbook(path, read_only=True)
+        try:
+            return wb.sheetnames
+        finally:
+            wb.close()
 
     def _write_dataframe_to_workbook(
         self,

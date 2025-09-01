@@ -5,7 +5,7 @@ Main pipeline orchestrator that executes steps in sequence.
 
 from typing import List
 
-from core.interfaces import ExcelRepo, Logger, PdfRepo
+from core.interfaces import ExcelRepo, Logger, PdfRepo, UIController
 from core.models import Options, Result
 from core.pipeline.context import PipelineContext
 from core.pipeline.steps import PipelineStep
@@ -21,12 +21,14 @@ class Pipeline:
         pdf_repo: PdfRepo,
         validator: ValidationService,
         logger: Logger,
+        ui: UIController,
     ) -> None:
         """Initialize pipeline with dependencies."""
         self.excel_repo = excel_repo
         self.pdf_repo = pdf_repo
         self.validator = validator
         self.logger = logger
+        self.ui = ui
         self.steps: List[PipelineStep] = []
 
     def add_step(self, step: PipelineStep) -> None:
@@ -39,55 +41,44 @@ class Pipeline:
         This method defines the hardcoded pipeline step order as specified in the PRD.
         Steps are conditionally executed based on options within each step's should_execute() method.
         """
-        from core.pipeline.steps.add_ids_step import AddIdsStep
-        from core.pipeline.steps.bookmark_step import BookmarkStep
-        from core.pipeline.steps.clean_step import CleanStep
-        from core.pipeline.steps.filter_step import FilterStep
-        from core.pipeline.steps.link_step import LinkStep
+
+        from core.pipeline.steps.filter_df_step import FilterDfStep
         from core.pipeline.steps.load_step import LoadStep
-        from core.pipeline.steps.merge_step import MergeStep
-        from core.pipeline.steps.reorder_step import ReorderStep
+        from core.pipeline.steps.rebuild_pdf_step import RebuildPdfStep
         from core.pipeline.steps.save_step import SaveStep
-        from core.pipeline.steps.sort_step import SortStep
-        from core.pipeline.steps.title_step import TitleStep
+        from core.pipeline.steps.sort_df_step import SortDfStep
         from core.pipeline.steps.validate_step import ValidateStep
 
-        # Register steps in hardcoded order (as per PRD requirements)
+        # Register steps in simplified DocumentUnit architecture order
         self.add_step(
-            LoadStep(self.excel_repo, self.pdf_repo, self.validator, self.logger)
+            ValidateStep(
+                self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
+            )
         )
         self.add_step(
-            MergeStep(self.excel_repo, self.pdf_repo, self.validator, self.logger)
+            LoadStep(
+                self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
+            )
         )
         self.add_step(
-            ValidateStep(self.excel_repo, self.pdf_repo, self.validator, self.logger)
+            FilterDfStep(
+                self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
+            )
         )
         self.add_step(
-            CleanStep(self.excel_repo, self.pdf_repo, self.validator, self.logger)
+            SortDfStep(
+                self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
+            )
         )
         self.add_step(
-            FilterStep(self.excel_repo, self.pdf_repo, self.validator, self.logger)
+            RebuildPdfStep(
+                self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
+            )
         )
         self.add_step(
-            AddIdsStep(self.excel_repo, self.pdf_repo, self.validator, self.logger)
-        )
-        self.add_step(
-            LinkStep(self.excel_repo, self.pdf_repo, self.validator, self.logger)
-        )
-        self.add_step(
-            SortStep(self.excel_repo, self.pdf_repo, self.validator, self.logger)
-        )
-        self.add_step(
-            TitleStep(self.excel_repo, self.pdf_repo, self.validator, self.logger)
-        )
-        self.add_step(
-            BookmarkStep(self.excel_repo, self.pdf_repo, self.validator, self.logger)
-        )
-        self.add_step(
-            ReorderStep(self.excel_repo, self.pdf_repo, self.validator, self.logger)
-        )
-        self.add_step(
-            SaveStep(self.excel_repo, self.pdf_repo, self.validator, self.logger)
+            SaveStep(
+                self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
+            )
         )
 
     def execute(self, excel_path: str, pdf_path: str, options: Options) -> Result:
@@ -106,10 +97,29 @@ class Pipeline:
             if not self.steps:
                 self.register_steps()
 
-            # Create pipeline context
-            context = PipelineContext(
-                excel_path=excel_path, pdf_path=pdf_path, options=options
-            )
+            # Convert Options to dictionary and create file pairs
+            options_dict = {
+                "backup": options.backup,
+                "sort_bookmarks": options.sort_bookmarks,
+                "reorder_pages": options.reorder_pages,
+                "sheet_name": options.sheet_name,
+                "filter_enabled": options.filter_enabled,
+                "filter_column": options.filter_column,
+                "filter_values": options.filter_values,
+            }
+
+            # Create file pairs list
+            file_pairs = [(excel_path, pdf_path, options.sheet_name or "Sheet1")]
+
+            # Add merge pairs if this is a merge workflow
+            if options.merge_pairs_with_sheets:
+                file_pairs.extend(options.merge_pairs_with_sheets)
+            elif options.merge_pairs:
+                for excel, pdf in options.merge_pairs:
+                    file_pairs.append((excel, pdf, options.sheet_name or "Sheet1"))
+
+            # Create simplified pipeline context
+            context = PipelineContext(file_pairs=file_pairs, options=options_dict)
 
             self.logger.info(f"Starting pipeline with {len(self.steps)} steps")
 

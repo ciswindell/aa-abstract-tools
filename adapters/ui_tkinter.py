@@ -3,10 +3,9 @@
 Tkinter UI adapter that implements the UIController interface.
 """
 
-from typing import Any, List, Optional, Tuple
-
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import filedialog, messagebox, ttk
+from typing import Any, List, Optional, Tuple
 
 # Note: UIController Protocol imported where needed; not required here.
 from core.models import Options
@@ -94,14 +93,18 @@ class TkinterUIAdapter:
         self.log_status("Select processing sheet...")
         self.gui.root.update()
 
+        from pathlib import Path
+
+        filename = Path(file_path).name
+
         dialog = tk.Toplevel(self.gui.root)
-        dialog.title("Select Sheet")
+        dialog.title(f"Select Sheet - {filename}")
         dialog.transient(self.gui.root)
         dialog.grab_set()
 
         expected = default_sheet or "Index"
         msg = (
-            f"Warning: The Excel file does not contain a worksheet named '{expected}'.\n\n"
+            f"Warning: The Excel file '{filename}' does not contain a worksheet named '{expected}'.\n\n"
             "Please select the worksheet that needs to be processed."
         )
         ttk.Label(dialog, text=msg, wraplength=420, justify=tk.LEFT).grid(
@@ -127,9 +130,6 @@ class TkinterUIAdapter:
         combo.current(default_index)
 
         chosen = {"value": None}
-
-        # Silence unused parameter warning for file_path; path displayed by parent UI
-        _ = file_path
 
         def on_ok():
             chosen["value"] = selected_var.get()

@@ -7,12 +7,11 @@ Functions here are side‑effect free and return new DataFrames.
 
 import hashlib
 from pathlib import Path
-from typing import Any, Iterable, List, Mapping, Optional, Sequence
+from typing import Any, Iterable, List, Optional, Sequence
 
 import pandas as pd
+
 from core.config import DEFAULT_SORT_COLUMNS
-from core.models import DocumentLink
-from core.transform.pdf import extract_original_index
 from utils.dates import parse_robust
 
 
@@ -44,71 +43,6 @@ def generate_document_id(
         raise ValueError(
             f"Failed to generate document ID for {original_index}: {e}"
         ) from e
-
-
-def create_document_links(
-    df: pd.DataFrame,
-    bookmarks: Sequence[Mapping[str, Any]],
-    index_col: str = "Index#",
-) -> List[DocumentLink]:
-    """Create DocumentLink objects mapping Excel rows to PDF bookmarks.
-
-    Assumes `Document_ID` already exists for each row. Rows without a matching
-    bookmark or without a `Document_ID` are skipped. Raises if duplicate
-    bookmark indices are detected.
-
-    Args:
-        df: Excel DataFrame with original data (before renumbering)
-        bookmarks: PDF bookmark data
-        index_col: Name of the index column
-
-    Returns:
-        List of DocumentLink objects
-
-    Raises:
-        ValueError: If duplicate bookmarks share the same extracted original index
-    """
-    # Create mapping from original index to bookmark
-    bookmark_map = {}
-    for bm in bookmarks:
-        title = str(bm.get("title", ""))
-        original_idx = extract_original_index(title)
-        if original_idx:
-            if original_idx in bookmark_map:
-                raise ValueError(
-                    f"Multiple bookmarks found with same index '{original_idx}'. "
-                    f"This violates data integrity requirements."
-                )
-            bookmark_map[original_idx] = bm
-
-    # Create DocumentLink objects (skip Excel rows without matching bookmark or ID)
-    document_links = []
-    for row_idx, row in df.iterrows():
-        original_index = str(row[index_col]).strip()
-
-        # Find matching bookmark
-        if original_index not in bookmark_map:
-            continue
-
-        bookmark = bookmark_map[original_index]
-
-        # Require pre-existing Document_ID; skip row if missing
-        document_id = str(row.get("Document_ID", "")).strip()
-        if not document_id:
-            continue
-
-        # Create DocumentLink object
-        document_links.append(
-            DocumentLink(
-                document_id=document_id,
-                excel_row_index=row_idx,
-                original_bookmark_title=str(bookmark.get("title", "")),
-                original_bookmark_page=int(bookmark.get("page", 1)),
-                original_bookmark_level=int(bookmark.get("level", 0)),
-            )
-        )
-
-    return document_links
 
 
 def add_document_ids(

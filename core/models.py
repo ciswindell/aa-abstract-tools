@@ -4,7 +4,9 @@ Core models (dataclasses) used by application services and adapters.
 """
 
 from dataclasses import dataclass
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
+
+import pandas as pd
 
 
 @dataclass
@@ -44,19 +46,21 @@ class Result:
 
 
 @dataclass
-class DocumentLink:
-    """Links an Excel row to its corresponding PDF bookmark.
+class DocumentUnit:
+    """Atomic unit linking Excel row to PDF page range in merged PDF.
+
+    This dataclass represents the fundamental relationship between an Excel row
+    and its corresponding PDF page range. It prevents the fragile separation
+    of bookmarks and pages that caused data corruption in the original pipeline.
 
     Attributes:
-        document_id: Unique hash identifier for the document.
-        excel_row_index: Position in the DataFrame (0-based).
-        original_bookmark_title: Original PDF bookmark title.
-        original_bookmark_page: Original PDF bookmark page number (1-based).
-        original_bookmark_level: Original PDF bookmark level.
+        document_id: Immutable hash key linking to Excel row (never changes during processing).
+        merged_page_range: (start_page, end_page) position in intermediate merged PDF (1-based).
+        excel_row_data: The linked Excel row containing all document metadata.
+        source_info: "excel_path:pdf_path" for debugging and tracing origins.
     """
 
     document_id: str
-    excel_row_index: int
-    original_bookmark_title: str
-    original_bookmark_page: int
-    original_bookmark_level: int
+    merged_page_range: Tuple[int, int]
+    excel_row_data: pd.Series
+    source_info: str
