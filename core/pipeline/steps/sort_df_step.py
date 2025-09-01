@@ -3,6 +3,8 @@
 SortDfStep: Sort DataFrame rows and renumber Index# column.
 """
 
+import pandas as pd
+
 from core.pipeline.context import PipelineContext
 from core.pipeline.steps import BaseStep
 from core.transform.excel import sort_and_renumber
@@ -51,7 +53,11 @@ class SortDfStep(BaseStep):
 
             # Initialize _include column if it doesn't exist (order-agnostic design)
             if "_include" not in context.df.columns:
-                context.df["_include"] = True  # Default: include all rows
+                # Create proper boolean column with no NaN values using safe assignment
+                context.df = context.df.copy()
+                context.df["_include"] = pd.Series(
+                    [True] * len(context.df), index=context.df.index, dtype=bool
+                )
                 self.logger.info(
                     "No _include column found, including all rows for sorting"
                 )
@@ -80,6 +86,12 @@ class SortDfStep(BaseStep):
             included_mask = context.df["_include"]
             included_df = context.df[included_mask].copy()
 
+            # Show what we're about to sort for verification
+            if "Source" in included_df.columns:
+                source_counts_before = included_df.groupby("Source").size()
+                for source, count in source_counts_before.items():
+                    self.logger.info(f"  About to sort {count} rows from {source}")
+
             if included_df.empty:
                 raise ValueError("No flagged rows to sort after filtering")
 
@@ -100,13 +112,38 @@ class SortDfStep(BaseStep):
                     f"Row count changed during sorting: {len(included_df)} -> {len(sorted_included_df)}"
                 )
 
-            # Update the original DataFrame with sorted flagged rows
-            # This preserves unflagged rows in their original positions
+            # Rebuild DataFrame with sorted flagged rows and preserved unflagged rows
+            # This is more robust than trying to update in place
             try:
-                context.df.loc[included_mask, :] = sorted_included_df
+                # Get unflagged rows (preserve their original order and position)
+                unflagged_df = context.df[~included_mask].copy()
+
+                # Ensure sorted_included_df has _include=True
+                sorted_included_df["_include"] = True
+
+                # Combine: sorted flagged rows + unflagged rows
+                # The order will be: all flagged rows first (sorted), then unflagged rows
+                context.df = pd.concat(
+                    [sorted_included_df, unflagged_df], ignore_index=True
+                )
+
+                # Verify the rebuild worked correctly
+                final_included_count = context.df["_include"].sum()
+                if "Source" in context.df.columns:
+                    source_counts_after = (
+                        context.df[context.df["_include"]].groupby("Source").size()
+                    )
+                    for source, count in source_counts_after.items():
+                        self.logger.info(
+                            f"  After sort rebuild: {count} rows from {source}"
+                        )
+                self.logger.info(
+                    f"  Total flagged rows after sort: {final_included_count}"
+                )
+
             except Exception as e:
                 raise ValueError(
-                    f"Failed to update DataFrame with sorted results: {e}"
+                    f"Failed to rebuild DataFrame with sorted results: {e}"
                 ) from e
 
         except Exception as e:

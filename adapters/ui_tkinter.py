@@ -62,7 +62,44 @@ class TkinterUIAdapter:
     def show_error(self, title: str, message: str) -> None:
         """Show an error message to the user."""
         self.gui.log_status(f"Error: {message}")
-        messagebox.showerror(title, message)
+
+        # For validation errors (long messages with many lines), use custom dialog
+        if len(message) > 300 or message.count("\n") > 10:
+            self._show_scrollable_error(title, message)
+        else:
+            messagebox.showerror(title, message)
+
+    def _show_scrollable_error(self, title: str, message: str) -> None:
+        """Show error in a scrollable dialog for long messages."""
+        dialog = tk.Toplevel(self.gui.root)
+        dialog.title(title)
+        dialog.transient(self.gui.root)
+        dialog.grab_set()
+        dialog.geometry("500x400")
+        dialog.resizable(True, True)
+
+        # Text widget with scrollbar
+        frame = ttk.Frame(dialog)
+        frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        text = tk.Text(frame, wrap="word", font=("Arial", 9))
+        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=text.yview)
+        text.configure(yscrollcommand=scrollbar.set)
+
+        text.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        text.insert("1.0", message)
+        text.configure(state="disabled")
+
+        # OK button
+        ttk.Button(dialog, text="OK", command=dialog.destroy).pack(pady=10)
+
+        # Center dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() - dialog.winfo_width()) // 2
+        y = (dialog.winfo_screenheight() - dialog.winfo_height()) // 2
+        dialog.geometry(f"+{x}+{y}")
 
     def show_success(self, message: str) -> None:
         """Show a success message to the user."""

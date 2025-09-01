@@ -105,17 +105,29 @@ def clean_types(
     if date_columns is None:
         date_columns = ["Document Date", "Received Date"]
 
+    # Clean index column safely
     if index_col in new_df.columns:
-        new_df[index_col] = new_df[index_col].astype(str).str.strip()
-        new_df[index_col] = new_df[index_col].replace("nan", "")
+        try:
+            new_df[index_col] = new_df[index_col].astype(str).str.strip()
+            new_df[index_col] = new_df[index_col].replace("nan", "")
+        except Exception as e:
+            raise ValueError(f"Failed to clean index column '{index_col}': {e}") from e
 
+    # Clean text columns safely
     for col in text_columns:
         if col in new_df.columns:
-            new_df[col] = new_df[col].astype(str).str.strip().replace("nan", "")
+            try:
+                new_df[col] = new_df[col].astype(str).str.strip().replace("nan", "")
+            except Exception as e:
+                raise ValueError(f"Failed to clean text column '{col}': {e}") from e
 
+    # Parse date columns safely
     for col in date_columns:
         if col in new_df.columns:
-            new_df[col] = new_df[col].map(parse_robust)
+            try:
+                new_df[col] = new_df[col].map(parse_robust)
+            except Exception as e:
+                raise ValueError(f"Failed to parse date column '{col}': {e}") from e
 
     return new_df
 

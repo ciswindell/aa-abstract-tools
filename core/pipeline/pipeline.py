@@ -109,14 +109,17 @@ class Pipeline:
             }
 
             # Create file pairs list
-            file_pairs = [(excel_path, pdf_path, options.sheet_name or "Sheet1")]
-
-            # Add merge pairs if this is a merge workflow
             if options.merge_pairs_with_sheets:
-                file_pairs.extend(options.merge_pairs_with_sheets)
+                # Use the pre-built pairs with sheets (already includes primary pair)
+                file_pairs = list(options.merge_pairs_with_sheets)
             elif options.merge_pairs:
+                # Legacy merge pairs - add primary pair first, then merge pairs
+                file_pairs = [(excel_path, pdf_path, options.sheet_name or "Sheet1")]
                 for excel, pdf in options.merge_pairs:
                     file_pairs.append((excel, pdf, options.sheet_name or "Sheet1"))
+            else:
+                # Single file processing
+                file_pairs = [(excel_path, pdf_path, options.sheet_name or "Sheet1")]
 
             # Create simplified pipeline context
             context = PipelineContext(file_pairs=file_pairs, options=options_dict)
@@ -144,9 +147,12 @@ class Pipeline:
                     step.execute(context)
                     self.logger.info(f"Completed step {step_name}")
                 except Exception as e:
-                    error_msg = f"Pipeline failed at step {step_name}: {str(e)}"
-                    self.logger.error(error_msg)
-                    return Result(success=False, message=error_msg)
+                    # Log the full error with context for debugging
+                    full_error_msg = f"Pipeline failed at step {step_name}: {str(e)}"
+                    self.logger.error(full_error_msg)
+
+                    # Return clean error message for user display
+                    return Result(success=False, message=str(e))
 
             self.logger.info(
                 f"Pipeline completed successfully ({executed_steps} steps executed)"

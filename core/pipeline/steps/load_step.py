@@ -284,10 +284,13 @@ class LoadStep(BaseStep):
         if len(df_parts) == 1:
             return df_parts[0]
 
-        # Concatenate all DataFrames (each already has unique Document IDs)
-        merged_df = pd.concat(df_parts, ignore_index=True)
-        self.logger.info(
-            f"Merged {len(df_parts)} DataFrames into {len(merged_df)} total rows"
-        )
+        # Concatenate all DataFrames safely (each already has unique Document IDs)
+        try:
+            merged_df = pd.concat(df_parts, ignore_index=True, sort=False)
+            self.logger.info(
+                f"Merged {len(df_parts)} DataFrames into {len(merged_df)} total rows"
+            )
+        except Exception as e:
+            raise ValueError(f"Failed to concatenate DataFrames: {e}") from e
 
         return merged_df

@@ -94,9 +94,19 @@ class ValidateStep(BaseStep):
                         f"Each Index# value must be unique for proper document linking."
                     )
 
-                # Check for empty Index# values
-                empty_indices = index_col.isin(["", "nan", "None"]) | index_col.isna()
-                empty_count = empty_indices.sum()
+                # Check for empty Index# values (handle mixed types safely)
+                try:
+                    # Convert to string first to handle mixed types safely
+                    index_col_str = index_col.astype(str).str.strip()
+                    empty_indices = (
+                        index_col_str.isin(["", "nan", "None", "NaN"])
+                        | index_col.isna()
+                    )
+                    empty_count = empty_indices.sum()
+                except Exception as e:
+                    raise ValueError(
+                        f"Failed to check for empty Index# values in '{excel_filename}': {e}"
+                    ) from e
 
                 if empty_count > 0:
                     raise ValueError(
@@ -178,6 +188,40 @@ class ValidateStep(BaseStep):
                             f"Each bookmark index must be unique for proper document linking."
                         )
 
+                # Check for multiple bookmarks pointing to the same page (error)
+                bookmark_pages = [
+                    int(bookmark.get("page", 1)) for bookmark in bookmarks
+                ]
+                page_counts = Counter(bookmark_pages)
+                duplicate_pages = [
+                    page for page, count in page_counts.items() if count > 1
+                ]
+
+                if duplicate_pages:
+                    # Create clear, organized error message by page
+                    error_lines = [
+                        "Multiple bookmarks point to the same pages.",
+                        "Each bookmark must point to a unique page to avoid overlapping page ranges.",
+                        "",
+                        "Pages with multiple bookmarks:",
+                    ]
+
+                    # Sort pages for consistent output
+                    for page in sorted(duplicate_pages):
+                        bookmarks_on_page = [
+                            str(bookmark.get("title", "")).strip()
+                            for bookmark in bookmarks
+                            if int(bookmark.get("page", 1)) == page
+                        ]
+                        error_lines.append(f"  Page {page}:")
+                        for bookmark_title in bookmarks_on_page:
+                            error_lines.append(f"    • {bookmark_title}")
+                        error_lines.append("")  # Empty line between pages
+
+                    error_lines.append(f"Total affected pages: {len(duplicate_pages)}")
+
+                    raise ValueError("\n".join(error_lines))
+
                 # Success logging
                 valid_count = len(bookmark_indices)
                 total_count = len(bookmarks)
@@ -186,10 +230,9 @@ class ValidateStep(BaseStep):
                     f"{total_pages} pages"
                 )
 
-            except Exception as e:
-                raise Exception(
-                    f"PDF bookmark validation failed for '{pdf_filename}': {e}"
-                ) from e
+            except Exception:
+                # Re-raise the original exception without adding redundant context
+                raise
 
     def _validate_file_exists(self, file_path: str, file_type: str) -> None:
         """Validate that a file exists and is accessible."""

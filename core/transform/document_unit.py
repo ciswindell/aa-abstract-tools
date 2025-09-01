@@ -84,11 +84,39 @@ def link_bookmarks_to_excel_rows(
     # Detect page ranges for all bookmarks in this PDF
     page_ranges = detect_page_ranges(bookmarks, total_pages)
 
-    # Create mapping from original index to Excel row
+    # Create mapping from original index to Excel rows (fail on duplicates)
     excel_index_map = {}
+    duplicate_indices = []
+
     for idx, row in excel_df.iterrows():
         original_index = str(row["Index#"]).strip()
+        if original_index in excel_index_map:
+            duplicate_indices.append(
+                {
+                    "index": original_index,
+                    "first_row": excel_index_map[original_index].name,
+                    "duplicate_row": row.name,
+                    "first_document_id": excel_index_map[original_index]["Document_ID"],
+                    "duplicate_document_id": row["Document_ID"],
+                }
+            )
         excel_index_map[original_index] = row
+
+    # Fail if duplicates found with detailed information
+    if duplicate_indices:
+        error_details = []
+        for dup in duplicate_indices:
+            error_details.append(
+                f"  Index# '{dup['index']}': "
+                f"Row {dup['first_row']} (ID: {dup['first_document_id'][:8]}...) "
+                f"vs Row {dup['duplicate_row']} (ID: {dup['duplicate_document_id'][:8]}...)"
+            )
+
+        raise ValueError(
+            f"Duplicate Index# values found in {source_info}:\n"
+            + "\n".join(error_details)
+            + f"\n\nTotal duplicates: {len(duplicate_indices)}"
+        )
 
     document_units = []
 

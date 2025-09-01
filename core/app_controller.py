@@ -9,7 +9,7 @@ from typing import Optional
 from openpyxl import load_workbook
 
 from adapters.excel_repo import ExcelOpenpyxlRepo
-from adapters.logger_tk import TkLogger, TkinterLogger
+from adapters.logger_tk import TkinterLogger
 from adapters.pdf_repo import PdfRepo
 from core.config import DEFAULT_REQUIRED_COLUMNS, DEFAULT_SHEET_NAME
 from core.interfaces import ExcelRepo, Logger, UIController
@@ -69,16 +69,8 @@ class AppController:
             pdf_repo = self._pdf_repo or PdfRepo()
             validator = self._validator or ValidationService(self.required_columns)
 
-            # If filtering is enabled but values are not chosen yet, prompt now
-            if options.filter_enabled and not options.filter_values:
-                try:
-                    df_preview = excel_repo.load(excel_file, target_sheet)
-                    col, vals = self.ui.prompt_filter_selection(df_preview)
-                    if col and vals:
-                        options.filter_column = col
-                        options.filter_values = vals
-                except (ValueError, OSError, RuntimeError):
-                    pass
+            # Filter prompt will happen after loading/merging in the pipeline
+            # This ensures the user sees all merged data when selecting filter values
 
             # Backups are handled in the service after validation passes.
 

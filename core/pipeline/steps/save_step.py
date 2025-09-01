@@ -65,6 +65,11 @@ class SaveStep(BaseStep):
         # Save flagged rows (or all rows if no _include column exists)
         if "_include" in context.df.columns:
             df_to_save = context.df[context.df["_include"]].copy()
+            # Show breakdown by source for verification
+            if "Source" in context.df.columns:
+                source_breakdown = df_to_save.groupby("Source").size()
+                for source, count in source_breakdown.items():
+                    self.logger.info(f"  Saving {count} rows from {source}")
         else:
             df_to_save = context.df.copy()
 
