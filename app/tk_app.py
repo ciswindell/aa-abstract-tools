@@ -3,13 +3,12 @@
 Tkinter application wiring for the Abstract Renumber Tool.
 """
 
-import tkinter as tk
-from tkinter import filedialog, ttk
-from typing import Optional, Tuple
-
 import os
+import tkinter as tk
 from datetime import datetime
 from pathlib import Path
+from tkinter import filedialog, ttk
+from typing import Optional, Tuple
 
 from adapters.ui_tkinter import TkinterUIAdapter
 from core.app_controller import AppController
@@ -463,6 +462,57 @@ class AbstractRenumberGUI:
 
     def get_merge_pairs(self) -> list[tuple[str, str]]:
         return list(self.merge_pairs)
+
+    def reset_gui(self) -> None:
+        """Reset GUI to initial state after successful processing."""
+        # Reset file selections
+        self.excel_file = None
+        self.pdf_file = None
+
+        # Reset file labels
+        self.excel_label.config(text="No file selected", foreground="gray")
+        self.pdf_label.config(text="No file selected", foreground="gray")
+
+        # Reset filter state
+        self.filter_enabled.set(False)
+        self.filter_column = None
+        self.filter_values = []
+        self._filter_prompt_requested = False
+
+        # Reset merge state
+        self.merge_enabled.set(False)
+        self.merge_pairs = []
+
+        # Reset filter summary label
+        if hasattr(self, "filter_summary_label"):
+            self.filter_summary_label.config(text="", foreground="gray")
+
+        # Reset merge summary label
+        if hasattr(self, "merge_summary_label"):
+            self.merge_summary_label.config(text="", foreground="gray")
+
+        # Disable process button
+        self.process_button.config(state="disabled")
+
+        # Clear status log but keep recent completion message
+        if self.status_text:
+            # Keep the last few lines (completion messages)
+            content = self.status_text.get("1.0", tk.END)
+            lines = content.strip().split("\n")
+
+            # Keep last 3 lines if they exist (completion, success, etc.)
+            keep_lines = lines[-3:] if len(lines) >= 3 else lines
+
+            # Clear and add kept lines plus reset message
+            self.status_text.delete("1.0", tk.END)
+            for line in keep_lines:
+                if line.strip():  # Only add non-empty lines
+                    self.status_text.insert(tk.END, f"{line}\n")
+
+        # Log reset
+        self.log_status("GUI reset - ready for new files!")
+
+        # Note: We keep backup/sort/reorder settings as they are user preferences
 
 
 class AbstractRenumberTool:

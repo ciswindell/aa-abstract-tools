@@ -73,6 +73,9 @@ class UIController(Protocol):
     def show_success(self, message: str) -> None:
         """Show a success message to the user."""
 
+    def reset_gui(self) -> None:
+        """Reset GUI to initial state after successful processing."""
+
     def prompt_sheet_selection(
         self,
         file_path: str,

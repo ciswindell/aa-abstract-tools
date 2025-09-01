@@ -33,6 +33,68 @@ def create_backups(excel_path: str, pdf_path: str) -> tuple[str, str]:
     return create_backup(excel_path), create_backup(pdf_path)
 
 
+def atomic_save_with_backup(
+    original_path: str, write_func: Callable[[str], None], create_backup: bool = True
+) -> str | None:
+    """Atomically save to original file with optional backup.
+
+    For single-file workflows with backup enabled:
+    1. Create temp backup of original
+    2. Write new content to original path
+    3. Rename temp backup to timestamped backup
+
+    For single-file workflows without backup:
+    1. Write new content directly to original path
+
+    Args:
+        original_path: Path to the original file
+        write_func: Function that writes content to the given path
+        create_backup: Whether to create a backup of the original
+
+    Returns:
+        Backup path if backup was created, None otherwise
+    """
+    original = Path(original_path)
+
+    if not create_backup:
+        # Simple case: just write to original path
+        write_func(str(original))
+        return None
+
+    # Backup case: temp backup → write original → rename backup
+    temp_backup = None
+    try:
+        # Step 1: Create temp backup
+        with tempfile.NamedTemporaryFile(
+            prefix=f".tmp_backup_{original.stem}_",
+            suffix=original.suffix,
+            dir=original.parent,
+            delete=False,
+        ) as tf:
+            temp_backup = Path(tf.name)
+
+        shutil.copy2(original, temp_backup)
+
+        # Step 2: Write new content to original path
+        write_func(str(original))
+
+        # Step 3: Rename temp backup to timestamped backup
+        final_backup_path = generate_backup_filename(str(original))
+        temp_backup.rename(final_backup_path)
+        temp_backup = None  # Successfully renamed
+
+        return final_backup_path
+
+    except Exception:
+        # Cleanup temp backup on failure
+        if temp_backup and temp_backup.exists():
+            try:
+                temp_backup.unlink()
+            except Exception:
+                pass
+        raise
+
+
 def atomic_write_with_template(
     template_path: str,
     out_path: str,

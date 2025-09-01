@@ -106,6 +106,10 @@ class TkinterUIAdapter:
         self.gui.log_status("Complete!")
         messagebox.showinfo("Processing Complete", message)
 
+    def reset_gui(self) -> None:
+        """Reset GUI to initial state after successful processing."""
+        self.gui.reset_gui()
+
     def prompt_sheet_selection(
         self,
         file_path: str,

@@ -70,19 +70,16 @@ class PipelineContext:
             pdf_base = Path(self.pdf_path)
 
             if self.is_merge_workflow():
-                # For merge workflows, use "merged" suffix
+                # For merge workflows, use "merged" suffix (no backup needed)
                 excel_out = excel_base.with_name(
                     f"{excel_base.stem}_merged{excel_base.suffix}"
                 )
                 pdf_out = pdf_base.with_name(f"{pdf_base.stem}_merged{pdf_base.suffix}")
             else:
-                # For single-file workflows, use "renumbered" suffix
-                excel_out = excel_base.with_name(
-                    f"{excel_base.stem}_renumbered{excel_base.suffix}"
-                )
-                pdf_out = pdf_base.with_name(
-                    f"{pdf_base.stem}_renumbered{pdf_base.suffix}"
-                )
+                # For single-file workflows, output to original file names
+                # (backup logic will handle preserving originals)
+                excel_out = excel_base
+                pdf_out = pdf_base
 
             self.excel_out_path = str(excel_out)
             self.pdf_out_path = str(pdf_out)
