@@ -15,35 +15,35 @@
 
 ## Tasks
 
-- [ ] 1.0 Create FormatExcelStep Pipeline Step
-  - [ ] 1.1 Create `core/pipeline/steps/format_excel_step.py` file with basic class structure
-  - [ ] 1.2 Implement `FormatExcelStep` class inheriting from `BaseStep`
-  - [ ] 1.3 Add constructor with required dependencies (excel_repo, pdf_repo, logger, ui)
-  - [ ] 1.4 Implement `execute(context: PipelineContext)` method with error handling
-  - [ ] 1.5 Add comprehensive docstrings and type hints
-  - [ ] 1.6 Implement graceful error handling that logs warnings but doesn't fail pipeline
+- [x] 1.0 Create FormatExcelStep Pipeline Step
+  - [x] 1.1 Create `core/pipeline/steps/format_excel_step.py` file with basic class structure
+  - [x] 1.2 Implement `FormatExcelStep` class inheriting from `BaseStep`
+  - [x] 1.3 Add constructor with required dependencies (excel_repo, pdf_repo, logger, ui)
+  - [x] 1.4 Implement `execute(context: PipelineContext)` method with error handling
+  - [x] 1.5 Add comprehensive docstrings and type hints
+  - [x] 1.6 Implement graceful error handling that logs warnings but doesn't fail pipeline
 
-- [ ] 2.0 Implement Date Column Detection and Formatting
-  - [ ] 2.1 Create `_find_date_columns(worksheet)` method with robust case-insensitive pattern matching
-  - [ ] 2.2 Implement pattern matching for variations like "Date", "DATE", "Document Date", "Received Date"
-  - [ ] 2.3 Create `_apply_date_formatting(worksheet, date_columns, data_rows)` method
-  - [ ] 2.4 Implement `M/D/YYYY` number format creation using openpyxl NamedStyle
-  - [ ] 2.5 Apply date formatting to data rows plus 1000-row buffer
-  - [ ] 2.6 Add logging for date columns found and formatted
+- [x] 2.0 Implement Date Column Detection and Formatting
+  - [x] 2.1 Create `_find_date_columns(worksheet)` method with robust case-insensitive pattern matching
+  - [x] 2.2 Implement pattern matching for variations like "Date", "DATE", "Document Date", "Received Date"
+  - [x] 2.3 Create `_apply_date_formatting(worksheet, date_columns, data_rows)` method
+  - [x] 2.4 Implement `M/D/YYYY` number format creation using openpyxl NamedStyle
+  - [x] 2.5 Apply date formatting to data rows plus 1000-row buffer
+  - [x] 2.6 Add logging for date columns found and formatted
 
-- [ ] 3.0 Implement Auto-Filter Setup with Buffer
-  - [ ] 3.1 Create `_setup_auto_filter(worksheet, data_rows)` method
-  - [ ] 3.2 Calculate filter range from A1 to last column + 1000 rows
-  - [ ] 3.3 Apply auto-filter using openpyxl `worksheet.auto_filter.ref`
-  - [ ] 3.4 Handle edge cases (empty worksheets, single column, etc.)
-  - [ ] 3.5 Add logging for auto-filter range applied
+- [x] 3.0 Implement Auto-Filter Setup with Buffer
+  - [x] 3.1 Create `_setup_auto_filter(worksheet, data_rows)` method
+  - [x] 3.2 Calculate filter range from A1 to last column + 1000 rows
+  - [x] 3.3 Apply auto-filter using openpyxl `worksheet.auto_filter.ref`
+  - [x] 3.4 Handle edge cases (empty worksheets, single column, etc.)
+  - [x] 3.5 Add logging for auto-filter range applied
 
-- [ ] 4.0 Integrate FormatExcelStep into Pipeline
-  - [ ] 4.1 Import `FormatExcelStep` in `core/pipeline/pipeline.py`
-  - [ ] 4.2 Add step registration in `register_steps()` method after `SaveStep`
-  - [ ] 4.3 Ensure step receives proper dependencies (excel_repo, pdf_repo, logger, ui)
-  - [ ] 4.4 Verify step executes only when `context.excel_out_path` exists
-  - [ ] 4.5 Test integration with both single-file and merge workflows
+- [x] 4.0 Integrate FormatExcelStep into Pipeline
+  - [x] 4.1 Import `FormatExcelStep` in `core/pipeline/pipeline.py`
+  - [x] 4.2 Add step registration in `register_steps()` method after `SaveStep`
+  - [x] 4.3 Ensure step receives proper dependencies (excel_repo, pdf_repo, logger, ui)
+  - [x] 4.4 Verify step executes only when `context.excel_out_path` exists
+  - [x] 4.5 Test integration with both single-file and merge workflows
 
 - [ ] 5.0 Create Comprehensive Unit Tests
   - [ ] 5.1 Create `tests/core/pipeline/steps/format_excel_step_test.py` with test class setup

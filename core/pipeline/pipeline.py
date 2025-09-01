@@ -49,6 +49,7 @@ class Pipeline:
         """
 
         from core.pipeline.steps.filter_df_step import FilterDfStep
+        from core.pipeline.steps.format_excel_step import FormatExcelStep
         from core.pipeline.steps.load_step import LoadStep
         from core.pipeline.steps.rebuild_pdf_step import RebuildPdfStep
         from core.pipeline.steps.save_step import SaveStep
@@ -68,6 +69,9 @@ class Pipeline:
             RebuildPdfStep(self.excel_repo, self.pdf_repo, self.logger, self.ui)
         )
         self.add_step(SaveStep(self.excel_repo, self.pdf_repo, self.logger, self.ui))
+        self.add_step(
+            FormatExcelStep(self.excel_repo, self.pdf_repo, self.logger, self.ui)
+        )
 
     def execute(self, excel_path: str, pdf_path: str, options: Options) -> Result:
         """Execute the pipeline with fail-fast error handling.
