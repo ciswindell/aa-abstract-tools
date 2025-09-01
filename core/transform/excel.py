@@ -97,7 +97,8 @@ def sort_and_renumber(
         new_df = new_df.reset_index(drop=True)
 
     if index_col in new_df.columns:
-        new_df[index_col] = range(1, len(new_df) + 1)
+        # Keep Index# as string type to match ExcelRepo.load() behavior
+        new_df[index_col] = [str(i) for i in range(1, len(new_df) + 1)]
 
     return new_df
 

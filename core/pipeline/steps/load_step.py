@@ -186,15 +186,9 @@ class LoadStep(BaseStep):
                 self.logger.warning(f"Excel file is empty: {excel_path}")
                 # Continue processing even with empty DataFrame
 
-            # Clean data types before generating Document IDs to ensure consistent ID generation
-            # Inline essential cleaning logic (replaced removed clean_types function)
-            pair_df_cleaned = pair_df.copy()
-            if "Index#" in pair_df_cleaned.columns:
-                pair_df_cleaned["Index#"] = (
-                    pair_df_cleaned["Index#"].astype(str).str.strip().replace("nan", "")
-                )
-
-            pair_df_with_ids = add_document_ids(pair_df_cleaned, excel_path)
+            # Index# column is already cleaned to string format by ExcelRepo.load()
+            # Generate Document IDs using the loaded DataFrame
+            pair_df_with_ids = add_document_ids(pair_df, excel_path)
             self.logger.info(f"Loaded {len(pair_df_with_ids)} rows from {excel_path}")
 
         except Exception as e:

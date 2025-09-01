@@ -86,8 +86,8 @@ class ValidateStep(BaseStep):
                         f"Required column 'Index#' not found in sheet '{sheet_name}' of file '{excel_filename}'"
                     )
 
-                # Check for duplicate Index# values
-                index_col = df["Index#"].astype(str).str.strip()
+                # Check for duplicate Index# values (Index# is already string from ExcelRepo.load())
+                index_col = df["Index#"]
                 duplicates = index_col[index_col.duplicated()].unique()
 
                 if len(duplicates) > 0:
@@ -102,13 +102,10 @@ class ValidateStep(BaseStep):
                         f"Each Index# value must be unique for proper document linking."
                     )
 
-                # Check for empty Index# values (handle mixed types safely)
+                # Check for empty Index# values (Index# is already cleaned string from ExcelRepo.load())
                 try:
-                    # Convert to string first to handle mixed types safely
-                    index_col_str = index_col.astype(str).str.strip()
                     empty_indices = (
-                        index_col_str.isin(["", "nan", "None", "NaN"])
-                        | index_col.isna()
+                        index_col.isin(["", "nan", "None", "NaN"]) | index_col.isna()
                     )
                     empty_count = empty_indices.sum()
                 except Exception as e:
@@ -319,9 +316,9 @@ class ValidateStep(BaseStep):
             pdf_filename = Path(pdf_path).name
 
             try:
-                # Load Excel data to get Index# values
+                # Load Excel data to get Index# values (Index# is already string from ExcelRepo.load())
                 df = self.excel_repo.load(excel_path, sheet_name)
-                excel_indices = set(df["Index#"].astype(str).str.strip())
+                excel_indices = set(df["Index#"])
 
                 # Load PDF bookmarks to get bookmark indices
                 bookmarks, _ = self.pdf_repo.read(pdf_path)

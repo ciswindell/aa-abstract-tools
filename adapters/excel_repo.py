@@ -25,8 +25,20 @@ class ExcelOpenpyxlRepo:
     """Concrete ExcelRepo implementation using pandas/openpyxl."""
 
     def load(self, path: str, sheet: Optional[str]) -> pd.DataFrame:
-        """Load a worksheet into a DataFrame (values as strings)."""
-        return pd.read_excel(path, dtype=str, sheet_name=sheet)
+        """Load a worksheet into a DataFrame preserving native Excel data types.
+
+        Date columns remain as datetime objects, while Index# is converted to string
+        for consistent bookmark matching.
+        """
+        df = pd.read_excel(path, sheet_name=sheet)
+
+        # Convert Index# column to string for consistent bookmark matching
+        if "Index#" in df.columns:
+            df["Index#"] = (
+                df["Index#"].fillna("").astype(str).str.strip().replace("nan", "")
+            )
+
+        return df
 
     def get_sheet_names(self, path: str) -> list[str]:
         """Get list of sheet names in the Excel file."""

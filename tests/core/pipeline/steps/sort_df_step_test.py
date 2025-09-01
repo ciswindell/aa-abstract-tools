@@ -47,7 +47,7 @@ class TestSortDfStep:
             # Mock returns sorted DataFrame with renumbered Index#
             sorted_df = pd.DataFrame(
                 {
-                    "Index#": [1, 2],  # Renumbered
+                    "Index#": ["1", "2"],  # Renumbered as strings
                     "Document_ID": ["id3", "id2"],  # Sorted order
                     "Document Group": ["RS", "RS"],
                     "_include": [True, True],
@@ -87,7 +87,7 @@ class TestSortDfStep:
         with patch("core.pipeline.steps.sort_df_step.sort_and_renumber") as mock_sort:
             sorted_df = pd.DataFrame(
                 {
-                    "Index#": [1, 2, 3],  # Renumbered
+                    "Index#": ["1", "2", "3"],  # Renumbered as strings
                     "Document_ID": ["id1", "id2", "id3"],  # Sorted order
                     "Document Group": ["TS", "RS", "RS"],
                     "_include": [True, True, True],
@@ -127,7 +127,7 @@ class TestSortDfStep:
         with patch("core.pipeline.steps.sort_df_step.sort_and_renumber") as mock_sort:
             sorted_df = pd.DataFrame(
                 {
-                    "Index#": [1, 2, 3],
+                    "Index#": ["1", "2", "3"],  # String values
                     "Document_ID": ["id1", "id3", "id4"],
                     "Source": ["file1", "file2", "file2"],
                     "_include": [True, True, True],
@@ -220,7 +220,7 @@ class TestSortDfStep:
             # Return sorted flagged rows
             sorted_df = pd.DataFrame(
                 {
-                    "Index#": [1, 2],  # Renumbered
+                    "Index#": ["1", "2"],  # Renumbered as strings
                     "Document_ID": ["id2", "id3"],  # Sorted order (id2 before id3)
                     "Document Group": ["RS", "RS"],
                     "_include": [True, True],
@@ -278,7 +278,7 @@ class TestSortDfStep:
             # Return fewer rows than input
             sorted_df = pd.DataFrame(
                 {
-                    "Index#": [1],  # Only 1 row instead of 2
+                    "Index#": ["1"],  # Only 1 row instead of 2, as string
                     "Document_ID": ["id1"],
                     "_include": [True],
                 }
@@ -302,7 +302,7 @@ class TestSortDfStep:
         with patch("core.pipeline.steps.sort_df_step.sort_and_renumber") as mock_sort:
             sorted_df = pd.DataFrame(
                 {
-                    "Index#": [1, 2, 3],
+                    "Index#": ["1", "2", "3"],  # String values
                     "Document_ID": ["id1", "id2", "id3"],
                     "_include": [True, True, True],
                 }

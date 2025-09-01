@@ -42,18 +42,14 @@ def test_excel_save_parity_on_fixture():
 
     sheet = "Index"
 
-    # Load fixture as strings to mimic app behavior
-    df = pd.read_excel(fixture_path, dtype=str, sheet_name=sheet)
+    # Load fixture using ExcelRepo to mimic app behavior (preserves dates, cleans Index#)
+    repo = ExcelOpenpyxlRepo()
+    df = repo.load(str(fixture_path), sheet)
 
-    # Apply pure transforms (minimal data cleaning for test)
-    # Clean Index# column like clean_types() used to do
-    if "Index#" in df.columns:
-        df["Index#"] = df["Index#"].astype(str).str.strip().replace("nan", "")
-
+    # Apply pure transforms
     df_expected = sort_and_renumber(df)
 
     # Save into a temp output using the same template and target sheet
-    repo = ExcelOpenpyxlRepo()
     with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
         out_path = Path(tmp.name)
 
@@ -65,8 +61,8 @@ def test_excel_save_parity_on_fixture():
         out_path=str(out_path),
     )
 
-    # Read workbook back and compare on intersecting columns
-    df_out = pd.read_excel(out_path, dtype=str, sheet_name=sheet)
+    # Read workbook back using ExcelRepo to get same data types as input
+    df_out = repo.load(str(out_path), sheet)
 
     common_cols = [
         c
@@ -77,16 +73,18 @@ def test_excel_save_parity_on_fixture():
         "No common columns between expected DataFrame and saved workbook"
     )
 
-    # Align and compare content (string-wise), normalize dates (strip time part)
-    left = df_expected[common_cols].astype(str).reset_index(drop=True)
-    right = df_out[common_cols].astype(str).reset_index(drop=True)
-    # Normalize NaN-like strings to empty and strip time from dates
-    left = left.map(lambda s: "" if str(s).lower() == "nan" else s)
-    right = right.map(lambda s: "" if str(s).lower() == "nan" else s)
+    # Compare DataFrames - dates should now be preserved as datetime objects
+    # Only convert to string for Index# and text columns, preserve datetime for date columns
+    left = df_expected[common_cols].reset_index(drop=True)
+    right = df_out[common_cols].reset_index(drop=True)
+
+    # For date columns, normalize to date-only (remove time component) for comparison
     for date_col in ("Document Date", "Received Date"):
         if date_col in left.columns and date_col in right.columns:
-            left[date_col] = left[date_col].map(lambda s: s.split(" ")[0])
-            right[date_col] = right[date_col].map(lambda s: s.split(" ")[0])
+            # Convert to datetime if not already, then to date-only
+            left[date_col] = pd.to_datetime(left[date_col]).dt.date
+            right[date_col] = pd.to_datetime(right[date_col]).dt.date
+
     pd.testing.assert_frame_equal(left, right, check_dtype=False)
 
     # Cleanup temporary files

@@ -176,7 +176,7 @@ class SortDfStep(BaseStep):
         # Verify Index# column was properly renumbered for flagged rows
         if "Index#" in sorted_included_df.columns:
             flagged_index_values = sorted_included_df["Index#"].tolist()
-            expected_values = list(range(1, len(sorted_included_df) + 1))
+            expected_values = [str(i) for i in range(1, len(sorted_included_df) + 1)]
             if flagged_index_values != expected_values:
                 raise ValueError(
                     "Index# column was not properly renumbered to sequential 1..N values for flagged rows"
