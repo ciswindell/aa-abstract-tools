@@ -19,14 +19,13 @@ class TestValidateStep:
         """Set up test fixtures."""
         self.excel_repo = Mock()
         self.pdf_repo = Mock()
-        self.validator = Mock()
+
         self.logger = Mock()
         self.ui = Mock()
 
         self.validate_step = ValidateStep(
             excel_repo=self.excel_repo,
             pdf_repo=self.pdf_repo,
-            validator=self.validator,
             logger=self.logger,
             ui=self.ui,
         )

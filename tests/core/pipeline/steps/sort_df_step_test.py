@@ -22,7 +22,6 @@ class TestSortDfStep:
         self.step = SortDfStep(
             excel_repo=Mock(),
             pdf_repo=Mock(),
-            validator=Mock(),
             logger=self.mock_logger,
             ui=self.mock_ui,
         )

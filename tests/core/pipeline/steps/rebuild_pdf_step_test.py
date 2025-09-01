@@ -23,7 +23,6 @@ class TestRebuildPdfStep:
         self.step = RebuildPdfStep(
             excel_repo=Mock(),
             pdf_repo=Mock(),
-            validator=Mock(),
             logger=self.mock_logger,
             ui=self.mock_ui,
         )

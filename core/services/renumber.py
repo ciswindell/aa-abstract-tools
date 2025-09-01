@@ -10,7 +10,6 @@ Excel row ↔ PDF page range relationships throughout processing.
 from core.interfaces import ExcelRepo, Logger, PdfRepo, UIController
 from core.models import Options, Result
 from core.pipeline.pipeline import Pipeline
-from core.services.validate import ValidationService
 
 
 class RenumberService:
@@ -25,14 +24,12 @@ class RenumberService:
         self,
         excel_repo: ExcelRepo,
         pdf_repo: PdfRepo,
-        validator: ValidationService,
         logger: Logger,
         ui: UIController,
     ) -> None:
-        """Initialize with repositories, validator, logger, and UI."""
+        """Initialize with repositories, logger, and UI."""
         self._excel = excel_repo
         self._pdf = pdf_repo
-        self._validator = validator
         self._log = logger
         self._ui = ui
 
@@ -59,7 +56,6 @@ class RenumberService:
         pipeline = Pipeline(
             excel_repo=self._excel,
             pdf_repo=self._pdf,
-            validator=self._validator,
             logger=self._log,
             ui=self._ui,
         )

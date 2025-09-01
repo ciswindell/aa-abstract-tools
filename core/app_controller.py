@@ -15,7 +15,6 @@ from core.config import DEFAULT_REQUIRED_COLUMNS, DEFAULT_SHEET_NAME
 from core.interfaces import ExcelRepo, Logger, UIController
 from core.interfaces import PdfRepo as PdfRepoInterface
 from core.services.renumber import RenumberService
-from core.services.validate import ValidationService
 
 
 class AppController:
@@ -27,7 +26,6 @@ class AppController:
         excel_repo: Optional[ExcelRepo] = None,
         pdf_repo: Optional[PdfRepoInterface] = None,
         logger: Optional[Logger] = None,
-        validator: Optional[ValidationService] = None,
     ) -> None:
         """Initialize with UI controller and optional dependencies."""
         self.ui = ui
@@ -36,7 +34,6 @@ class AppController:
         self._excel_repo = excel_repo
         self._pdf_repo = pdf_repo
         self._logger = logger
-        self._validator = validator
 
     def process_files(self) -> None:
         """Main processing function."""
@@ -63,11 +60,10 @@ class AppController:
             if options.merge_pairs:
                 options.backup = False
 
-            # Build services for early validation (use injected or defaults)
+            # Build services (use injected or defaults)
             logger = self._logger or TkinterLogger(self.ui)
             excel_repo = self._excel_repo or ExcelOpenpyxlRepo()
             pdf_repo = self._pdf_repo or PdfRepo()
-            validator = self._validator or ValidationService(self.required_columns)
 
             # Filter prompt will happen after loading/merging in the pipeline
             # This ensures the user sees all merged data when selecting filter values
@@ -95,7 +91,7 @@ class AppController:
                 options.merge_pairs_with_sheets = pairs_with_sheets
 
             # Run processing
-            service = RenumberService(excel_repo, pdf_repo, validator, logger, self.ui)
+            service = RenumberService(excel_repo, pdf_repo, logger, self.ui)
             result = service.run(excel_file, pdf_file, options)
             if not result.success:
                 raise RuntimeError(result.message or "Unknown error")

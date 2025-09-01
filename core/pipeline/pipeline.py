@@ -13,7 +13,6 @@ from core.interfaces import ExcelRepo, Logger, PdfRepo, UIController
 from core.models import Options, Result
 from core.pipeline.context import PipelineContext
 from core.pipeline.steps import PipelineStep
-from core.services.validate import ValidationService
 
 
 class Pipeline:
@@ -28,14 +27,12 @@ class Pipeline:
         self,
         excel_repo: ExcelRepo,
         pdf_repo: PdfRepo,
-        validator: ValidationService,
         logger: Logger,
         ui: UIController,
     ) -> None:
         """Initialize pipeline with dependencies."""
         self.excel_repo = excel_repo
         self.pdf_repo = pdf_repo
-        self.validator = validator
         self.logger = logger
         self.ui = ui
         self.steps: List[PipelineStep] = []
@@ -60,35 +57,17 @@ class Pipeline:
 
         # Register steps in simplified DocumentUnit architecture order
         self.add_step(
-            ValidateStep(
-                self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
-            )
+            ValidateStep(self.excel_repo, self.pdf_repo, self.logger, self.ui)
         )
+        self.add_step(LoadStep(self.excel_repo, self.pdf_repo, self.logger, self.ui))
         self.add_step(
-            LoadStep(
-                self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
-            )
+            FilterDfStep(self.excel_repo, self.pdf_repo, self.logger, self.ui)
         )
+        self.add_step(SortDfStep(self.excel_repo, self.pdf_repo, self.logger, self.ui))
         self.add_step(
-            FilterDfStep(
-                self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
-            )
+            RebuildPdfStep(self.excel_repo, self.pdf_repo, self.logger, self.ui)
         )
-        self.add_step(
-            SortDfStep(
-                self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
-            )
-        )
-        self.add_step(
-            RebuildPdfStep(
-                self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
-            )
-        )
-        self.add_step(
-            SaveStep(
-                self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
-            )
-        )
+        self.add_step(SaveStep(self.excel_repo, self.pdf_repo, self.logger, self.ui))
 
     def execute(self, excel_path: str, pdf_path: str, options: Options) -> Result:
         """Execute the pipeline with fail-fast error handling.

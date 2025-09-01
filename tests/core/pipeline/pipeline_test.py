@@ -16,7 +16,7 @@ class MockStep(BaseStep):
 
     def __init__(self, name="MockStep", should_execute_result=True, execute_error=None):
         # Initialize with mock dependencies
-        super().__init__(Mock(), Mock(), Mock(), Mock(), Mock())
+        super().__init__(Mock(), Mock(), Mock(), Mock())
         self.name = name
         self.should_execute_result = should_execute_result
         self.execute_error = execute_error
@@ -40,14 +40,13 @@ class TestPipeline:
         """Set up test fixtures."""
         self.excel_repo = Mock()
         self.pdf_repo = Mock()
-        self.validator = Mock()
+
         self.logger = Mock()
         self.ui = Mock()
 
         self.pipeline = Pipeline(
             excel_repo=self.excel_repo,
             pdf_repo=self.pdf_repo,
-            validator=self.validator,
             logger=self.logger,
             ui=self.ui,
         )
@@ -56,7 +55,6 @@ class TestPipeline:
         """Test Pipeline initialization."""
         assert self.pipeline.excel_repo is self.excel_repo
         assert self.pipeline.pdf_repo is self.pdf_repo
-        assert self.pipeline.validator is self.validator
         assert self.pipeline.logger is self.logger
         assert self.pipeline.ui is self.ui
         assert self.pipeline.steps == []
@@ -103,22 +101,22 @@ class TestPipeline:
 
         # Verify all steps were created with correct dependencies
         mock_validate.assert_called_once_with(
-            self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
+            self.excel_repo, self.pdf_repo, self.logger, self.ui
         )
         mock_load.assert_called_once_with(
-            self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
+            self.excel_repo, self.pdf_repo, self.logger, self.ui
         )
         mock_filter.assert_called_once_with(
-            self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
+            self.excel_repo, self.pdf_repo, self.logger, self.ui
         )
         mock_sort.assert_called_once_with(
-            self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
+            self.excel_repo, self.pdf_repo, self.logger, self.ui
         )
         mock_rebuild.assert_called_once_with(
-            self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
+            self.excel_repo, self.pdf_repo, self.logger, self.ui
         )
         mock_save.assert_called_once_with(
-            self.excel_repo, self.pdf_repo, self.validator, self.logger, self.ui
+            self.excel_repo, self.pdf_repo, self.logger, self.ui
         )
 
         # Verify steps were added in correct order
@@ -411,7 +409,7 @@ class TestPipeline:
         # Create a step without should_execute method
         class SimpleStep(BaseStep):
             def __init__(self):
-                super().__init__(Mock(), Mock(), Mock(), Mock(), Mock())
+                super().__init__(Mock(), Mock(), Mock(), Mock())
                 self.execute_called = False
 
             def execute(self, context):

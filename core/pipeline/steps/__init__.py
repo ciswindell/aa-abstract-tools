@@ -13,7 +13,6 @@ from typing import Protocol
 
 from core.interfaces import ExcelRepo, Logger, PdfRepo, UIController
 from core.pipeline.context import PipelineContext
-from core.services.validate import ValidationService
 
 
 class PipelineStep(Protocol):
@@ -46,14 +45,12 @@ class BaseStep(ABC):
         self,
         excel_repo: ExcelRepo,
         pdf_repo: PdfRepo,
-        validator: ValidationService,
         logger: Logger,
         ui: UIController,
     ) -> None:
         """Initialize step with dependencies."""
         self.excel_repo = excel_repo
         self.pdf_repo = pdf_repo
-        self.validator = validator
         self.logger = logger
         self.ui = ui
 
