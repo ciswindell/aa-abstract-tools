@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-SortDfStep: Sort DataFrame rows and renumber Index# column.
+SortDfStep: Order-agnostic DataFrame sorting with DocumentUnit preservation.
+
+This step implements the DocumentUnit architecture's order-agnostic sorting approach.
+It sorts only flagged rows (_include=True) while preserving unflagged rows in their
+original positions, maintaining perfect alignment with DocumentUnit page ranges.
 """
 
 import pandas as pd
@@ -11,7 +15,11 @@ from core.transform.excel import sort_and_renumber
 
 
 class SortDfStep(BaseStep):
-    """Pipeline step for sorting DataFrame rows and renumbering Index# column."""
+    """Order-agnostic DataFrame sorting step with DocumentUnit preservation.
+
+    Sorts only flagged rows while preserving DocumentUnit alignment. Works correctly
+    regardless of whether FilterDfStep has executed before or after this step.
+    """
 
     def execute(self, context: PipelineContext) -> None:
         """Sort flagged DataFrame rows and renumber Index# column.

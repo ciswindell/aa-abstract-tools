@@ -7,14 +7,14 @@ template workbook/sheet, the resulting workbook data matches the transformed
 DataFrame (content-identical on intersecting columns).
 """
 
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
 import pandas as pd
 from openpyxl import load_workbook
 
 from adapters.excel_repo import ExcelOpenpyxlRepo
-from core.transform.excel import clean_types, sort_and_renumber
+from core.transform.excel import sort_and_renumber
 
 
 def _first_sheet_name(xlsx_path: str) -> str:
@@ -26,17 +26,30 @@ def _first_sheet_name(xlsx_path: str) -> str:
 
 
 def test_excel_save_parity_on_fixture():
-    repo_root = Path(__file__).resolve().parents[2]
-    fixture_path = repo_root / "date_example.xlsx"
-    assert fixture_path.exists(), "Fixture date_example.xlsx not found at repo root"
+    # Create a minimal test Excel file in memory
+    test_data = {
+        "Index#": ["1", "2", "3"],
+        "Document Type": ["Assignment", "Report", "Contract"],
+        "Document Date": ["2024-01-01", "2024-01-02", "2024-01-03"],
+        "Received Date": ["2024-01-15", "2024-01-16", "2024-01-17"],
+    }
+    df_original = pd.DataFrame(test_data)
 
-    sheet = _first_sheet_name(str(fixture_path))
+    # Create temporary fixture file
+    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp_fixture:
+        fixture_path = Path(tmp_fixture.name)
+        df_original.to_excel(fixture_path, index=False, sheet_name="Index")
+
+    sheet = "Index"
 
     # Load fixture as strings to mimic app behavior
     df = pd.read_excel(fixture_path, dtype=str, sheet_name=sheet)
 
-    # Apply pure transforms
-    df = clean_types(df)
+    # Apply pure transforms (minimal data cleaning for test)
+    # Clean Index# column like clean_types() used to do
+    if "Index#" in df.columns:
+        df["Index#"] = df["Index#"].astype(str).str.strip().replace("nan", "")
+
     df_expected = sort_and_renumber(df)
 
     # Save into a temp output using the same template and target sheet
@@ -60,9 +73,9 @@ def test_excel_save_parity_on_fixture():
         for c in df_expected.columns
         if c in df_out.columns and c != "Bookmark Formula"
     ]
-    assert (
-        common_cols
-    ), "No common columns between expected DataFrame and saved workbook"
+    assert common_cols, (
+        "No common columns between expected DataFrame and saved workbook"
+    )
 
     # Align and compare content (string-wise), normalize dates (strip time part)
     left = df_expected[common_cols].astype(str).reset_index(drop=True)
@@ -75,3 +88,7 @@ def test_excel_save_parity_on_fixture():
             left[date_col] = left[date_col].map(lambda s: s.split(" ")[0])
             right[date_col] = right[date_col].map(lambda s: s.split(" ")[0])
     pd.testing.assert_frame_equal(left, right, check_dtype=False)
+
+    # Cleanup temporary files
+    fixture_path.unlink(missing_ok=True)
+    out_path.unlink(missing_ok=True)

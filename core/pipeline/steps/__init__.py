@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
-Pipeline steps module with base Step protocol and common utilities.
+DocumentUnit architecture pipeline steps with base protocols and utilities.
+
+This module defines the pipeline step architecture that implements the DocumentUnit
+design pattern. Steps operate on immutable DocumentUnits that maintain atomic
+Excel row ↔ PDF page range relationships, preventing the data corruption issues
+that existed in the previous fragile separate bookmarks/pages list architecture.
 """
 
 from abc import ABC, abstractmethod
@@ -12,7 +17,11 @@ from core.services.validate import ValidationService
 
 
 class PipelineStep(Protocol):
-    """Protocol for pipeline steps."""
+    """Protocol for DocumentUnit architecture pipeline steps.
+
+    All pipeline steps operate on PipelineContext containing immutable DocumentUnits
+    that preserve Excel row ↔ PDF page range relationships throughout processing.
+    """
 
     def execute(self, context: PipelineContext) -> None:
         """Execute the pipeline step with the given context.
@@ -27,7 +36,11 @@ class PipelineStep(Protocol):
 
 
 class BaseStep(ABC):
-    """Base class for pipeline steps with common functionality."""
+    """Base class for DocumentUnit architecture pipeline steps.
+
+    Provides common functionality and dependency injection for steps that operate
+    on immutable DocumentUnits within the PipelineContext data flow.
+    """
 
     def __init__(
         self,

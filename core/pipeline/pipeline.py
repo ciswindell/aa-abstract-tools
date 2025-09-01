@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-Main pipeline orchestrator that executes steps in sequence.
+DocumentUnit architecture pipeline orchestrator with immutable data flow.
+
+This orchestrator implements the DocumentUnit architecture's two-phase processing
+approach that prevents data corruption by maintaining immutable Excel row ↔ PDF
+page range relationships throughout the pipeline execution.
 """
 
 from typing import List
@@ -13,7 +17,12 @@ from core.services.validate import ValidationService
 
 
 class Pipeline:
-    """Main pipeline orchestrator that executes steps in sequence."""
+    """DocumentUnit architecture pipeline orchestrator with immutable data flow.
+
+    Orchestrates the two-phase DocumentUnit processing pipeline that maintains atomic
+    Excel row ↔ PDF page range relationships and prevents the data corruption issues
+    of the previous fragile separate bookmarks/pages list architecture.
+    """
 
     def __init__(
         self,

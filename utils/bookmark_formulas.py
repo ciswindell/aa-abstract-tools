@@ -7,7 +7,19 @@ from typing import Optional
 
 import pandas as pd
 from openpyxl import load_workbook
-from utils.excel_utils import index_to_col_letter
+
+
+def _index_to_col_letter(position: int) -> str:
+    """Convert 0-based column index to Excel column letter (A, B, ..., AA, AB, ...)."""
+    if position < 0:
+        return ""
+
+    result = ""
+    col = position
+    while col >= 0:
+        result = chr(col % 26 + ord("A")) + result
+        col = col // 26 - 1
+    return result
 
 
 def _header_positions(ws) -> dict[str, int]:
@@ -45,9 +57,9 @@ def apply_bookmark_formulas(
         # Generate formulas for each data row
         for row_num in range(2, len(df) + 2):
             formula = (
-                f'={index_to_col_letter(index_col - 1)}{row_num}&"-"&'
-                f'{index_to_col_letter(doc_type_col - 1)}{row_num}&"-"&'
-                f'TEXT({index_to_col_letter(received_date_col - 1)}{row_num},"m/d/yyyy")'
+                f'={_index_to_col_letter(index_col - 1)}{row_num}&"-"&'
+                f'{_index_to_col_letter(doc_type_col - 1)}{row_num}&"-"&'
+                f'TEXT({_index_to_col_letter(received_date_col - 1)}{row_num},"m/d/yyyy")'
             )
             ws.cell(row=row_num, column=bookmark_col, value=formula)
 

@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """
-LoadStep: Load and merge Excel/PDF files with DocumentUnit linking.
+LoadStep: Phase 1 of DocumentUnit architecture - per-file linking and merging.
 
-This step processes Excel/PDF file pairs and creates the foundation for processing:
-1. Processes each Excel/PDF pair individually to prevent Document ID collisions
-2. Creates DocumentUnits that link Excel rows to PDF page ranges
-3. Merges all files into a single PDF and consolidated DataFrame
+This step implements the first phase of the two-phase DocumentUnit architecture:
+1. Per-file processing prevents Document ID collisions between files with duplicate Index# values
+2. Creates immutable DocumentUnits linking Excel rows to PDF page ranges in intermediate PDF
+3. Merges all files into single intermediate PDF and consolidated DataFrame
+4. Establishes the atomic Excel row ↔ PDF page range relationships that cannot be broken
+
+This phase separation ensures scalable multi-file processing and prevents the data
+corruption issues that existed in the previous fragile bookmark/page list architecture.
 """
 
 import tempfile
@@ -23,7 +27,12 @@ from core.transform.excel import add_document_ids
 
 
 class LoadStep(BaseStep):
-    """Load and merge Excel/PDF files with DocumentUnit linking."""
+    """Phase 1 implementation: per-file linking and merging with DocumentUnit creation.
+
+    Creates the foundational DocumentUnit data structure that makes Excel row ↔ PDF
+    page range relationships immutable and prevents the data corruption issues of
+    the previous separate bookmarks/pages list architecture.
+    """
 
     def execute(self, context: PipelineContext) -> None:
         """Load and merge Excel/PDF files, creating DocumentUnits for linked data.
@@ -178,9 +187,12 @@ class LoadStep(BaseStep):
                 # Continue processing even with empty DataFrame
 
             # Clean data types before generating Document IDs to ensure consistent ID generation
-            from core.transform.excel import clean_types
-
-            pair_df_cleaned = clean_types(pair_df)
+            # Inline essential cleaning logic (replaced removed clean_types function)
+            pair_df_cleaned = pair_df.copy()
+            if "Index#" in pair_df_cleaned.columns:
+                pair_df_cleaned["Index#"] = (
+                    pair_df_cleaned["Index#"].astype(str).str.strip().replace("nan", "")
+                )
 
             pair_df_with_ids = add_document_ids(pair_df_cleaned, excel_path)
             self.logger.info(f"Loaded {len(pair_df_with_ids)} rows from {excel_path}")

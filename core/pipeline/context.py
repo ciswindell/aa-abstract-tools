@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
-Pipeline context for passing data between pipeline steps.
+DocumentUnit architecture pipeline context for immutable data flow.
+
+This context replaces the fragile separate bookmarks/pages lists with a unified
+data structure containing immutable DocumentUnits. This prevents the data corruption
+issues that occurred when pipeline steps could break Excel row ↔ PDF page range
+relationships by modifying separate lists independently.
 """
 
 from dataclasses import dataclass
@@ -14,10 +19,15 @@ from core.models import DocumentUnit
 
 @dataclass
 class PipelineContext:
-    """Simplified context object that carries data through the pipeline steps.
+    """DocumentUnit architecture context for immutable data flow between pipeline steps.
 
-    This object is passed between pipeline steps and accumulates data
-    as it flows through the processing pipeline.
+    This context carries immutable DocumentUnits that maintain atomic Excel row ↔ PDF
+    page range relationships throughout the pipeline. It replaces the previous fragile
+    separate bookmarks/pages lists that could be corrupted by independent modifications.
+
+    The context accumulates data as it flows through the two-phase processing pipeline:
+    - Phase 1 (LoadStep): Creates DocumentUnits and intermediate merged PDF
+    - Phase 2 (Filter/Sort/Rebuild): Processes DocumentUnits while preserving relationships
     """
 
     # Input configuration

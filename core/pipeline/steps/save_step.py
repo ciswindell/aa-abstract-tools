@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-SaveStep: Save Excel and PDF outputs using existing repo methods.
+SaveStep: Atomic save operations with backup support for DocumentUnit architecture.
+
+This step handles final output with proper backup creation for single-file workflows
+and direct saving for merge workflows. It saves filtered/sorted DataFrame data and
+reconstructed PDF with fresh bookmarks generated from DocumentUnits.
 """
 
 from core.pipeline.context import PipelineContext
@@ -9,7 +13,11 @@ from fileops.files import atomic_save_with_backup
 
 
 class SaveStep(BaseStep):
-    """Pipeline step for saving final Excel and PDF outputs."""
+    """Atomic save operations with backup support for DocumentUnit architecture.
+
+    Handles final output phase with appropriate backup strategies for different
+    workflow types (single-file vs merge) and atomic write operations.
+    """
 
     def execute(self, context: PipelineContext) -> None:
         """Save Excel and PDF outputs using DocumentUnit-based architecture.

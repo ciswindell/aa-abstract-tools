@@ -7,12 +7,11 @@ Functions here are side‑effect free and return new DataFrames.
 
 import hashlib
 from pathlib import Path
-from typing import Any, Iterable, List, Optional, Sequence
+from typing import List, Optional
 
 import pandas as pd
 
 from core.config import DEFAULT_SORT_COLUMNS
-from utils.dates import parse_robust
 
 
 def generate_document_id(
@@ -78,58 +77,7 @@ def add_document_ids(
     return new_df
 
 
-def clean_types(
-    df: pd.DataFrame,
-    index_col: str = "Index#",
-    text_columns: Optional[Iterable[str]] = None,
-    date_columns: Optional[Iterable[str]] = None,
-) -> pd.DataFrame:
-    """Return a copy of df with light type cleaning.
-
-    Single responsibility: Clean and normalize data types.
-
-    - Ensures index_col is a trimmed string
-    - Normalizes common text columns to trimmed strings
-    - Attempts to parse date columns; leaves values unchanged on parse failure
-    """
-
-    new_df = df.copy()
-
-    if text_columns is None:
-        text_columns = [
-            "Legal Description",
-            "Grantee",
-            "Grantor",
-            "Document Type",
-        ]
-    if date_columns is None:
-        date_columns = ["Document Date", "Received Date"]
-
-    # Clean index column safely
-    if index_col in new_df.columns:
-        try:
-            new_df[index_col] = new_df[index_col].astype(str).str.strip()
-            new_df[index_col] = new_df[index_col].replace("nan", "")
-        except Exception as e:
-            raise ValueError(f"Failed to clean index column '{index_col}': {e}") from e
-
-    # Clean text columns safely
-    for col in text_columns:
-        if col in new_df.columns:
-            try:
-                new_df[col] = new_df[col].astype(str).str.strip().replace("nan", "")
-            except Exception as e:
-                raise ValueError(f"Failed to clean text column '{col}': {e}") from e
-
-    # Parse date columns safely
-    for col in date_columns:
-        if col in new_df.columns:
-            try:
-                new_df[col] = new_df[col].map(parse_robust)
-            except Exception as e:
-                raise ValueError(f"Failed to parse date column '{col}': {e}") from e
-
-    return new_df
+# Removed unused function clean_types() - data cleaning is now handled in pipeline steps
 
 
 def sort_and_renumber(
@@ -154,17 +102,4 @@ def sort_and_renumber(
     return new_df
 
 
-def filter_df(
-    df: pd.DataFrame, column: Optional[str], values: Optional[Sequence[Any]]
-) -> pd.DataFrame:
-    """Return a filtered copy of df where df[column] is in values.
-
-    If column or values are not provided, or column is missing, returns df copy.
-    Always resets index.
-    """
-
-    if not column or not values or column not in df.columns:
-        return df.copy()
-
-    filtered = df[df[column].isin(values)].copy()
-    return filtered.reset_index(drop=True)
+# Removed unused function filter_df() - replaced by FilterDfStep with _include flag approach

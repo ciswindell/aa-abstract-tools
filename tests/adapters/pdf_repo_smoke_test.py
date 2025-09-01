@@ -6,15 +6,15 @@ Creates a small PDF with blank pages, writes bookmarks, reads them back,
 and asserts title order/content parity.
 """
 
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
-from pypdf import PdfReader, PdfWriter
+from pypdf import PdfWriter
 
 from adapters.pdf_repo import PdfRepo
 
 
-def test_pdf_bookmark_parity_roundtrip(pdf_engine_env):
+def test_pdf_bookmark_parity_roundtrip():
     # Create a temporary source PDF with 3 blank pages
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as src_tmp:
         src_path = Path(src_tmp.name)
@@ -48,3 +48,7 @@ def test_pdf_bookmark_parity_roundtrip(pdf_engine_env):
     roundtrip_bookmarks, _ = repo.read(str(out_path))
     roundtrip_titles = [b.get("title", "") for b in roundtrip_bookmarks]
     assert roundtrip_titles == expected_titles
+
+    # Cleanup temporary files
+    src_path.unlink(missing_ok=True)
+    out_path.unlink(missing_ok=True)

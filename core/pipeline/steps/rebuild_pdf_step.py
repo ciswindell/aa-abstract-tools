@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 """
-RebuildPdfStep: PyPDF-optimized three-phase PDF reconstruction.
+RebuildPdfStep: Phase 2 final step - PyPDF-optimized DocumentUnit reconstruction.
 
-This step implements the robust PDF reconstruction architecture using PyPDF's
-native capabilities for maximum reliability and performance.
+This step implements the final phase of the DocumentUnit architecture using PyPDF's
+native capabilities for maximum reliability and performance. It reconstructs the final
+PDF from immutable DocumentUnits, ensuring that the Excel row ↔ PDF page range
+relationships established in LoadStep are preserved throughout filtering and sorting.
+
+Three-phase reconstruction process:
+1. Filter: Extract only DocumentUnits for flagged DataFrame rows (_include=True)
+2. Reorder: Arrange pages according to sorted DataFrame order (if enabled)
+3. Rebuild: Create fresh PDF with new bookmarks pointing to final page positions
 """
 
 from pathlib import Path
@@ -18,7 +25,12 @@ from core.transform.pdf import make_titles
 
 
 class RebuildPdfStep(BaseStep):
-    """Pipeline step for PyPDF-optimized three-phase PDF reconstruction."""
+    """Phase 2 final step: PyPDF-optimized DocumentUnit reconstruction.
+
+    Reconstructs final PDF from immutable DocumentUnits while preserving the atomic
+    Excel row ↔ PDF page range relationships established in LoadStep. Uses three-phase
+    approach for optimal memory efficiency and reliability.
+    """
 
     def should_execute(self, context: PipelineContext) -> bool:
         """Always execute - this step is required for final PDF generation."""
@@ -217,7 +229,10 @@ class RebuildPdfStep(BaseStep):
         writer.page_mode = "/UseOutlines"  # Show bookmark panel by default
 
         # Generate bookmark titles from flagged DataFrame
-        flagged_df = context.df[context.df.get("_include", True)]
+        if "_include" in context.df.columns:
+            flagged_df = context.df[context.df["_include"]]
+        else:
+            flagged_df = context.df
         bookmark_titles = make_titles(flagged_df)
 
         # Collect bookmark information during page processing

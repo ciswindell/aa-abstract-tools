@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-RenumberService: orchestrates Excel/PDF load, validate, transform, and save using pipeline architecture.
+RenumberService: DocumentUnit architecture orchestration with immutable data flow.
+
+This service maintains the exact same external API while internally using the new
+DocumentUnit architecture that prevents data corruption by maintaining immutable
+Excel row ↔ PDF page range relationships throughout processing.
 """
 
 from core.interfaces import ExcelRepo, Logger, PdfRepo, UIController
@@ -10,7 +14,12 @@ from core.services.validate import ValidationService
 
 
 class RenumberService:
-    """Single entrypoint for the renumber workflow using pipeline architecture."""
+    """Single entrypoint for DocumentUnit architecture renumber workflow.
+
+    Maintains backward compatibility while internally using the new DocumentUnit
+    architecture that prevents the data corruption issues of the previous fragile
+    separate bookmarks/pages list approach.
+    """
 
     def __init__(
         self,
@@ -28,10 +37,15 @@ class RenumberService:
         self._ui = ui
 
     def run(self, excel_path: str, pdf_path: str, opts: Options) -> Result:
-        """Execute the end-to-end renumber process using pipeline architecture.
+        """Execute the end-to-end renumber process using DocumentUnit architecture.
 
         This method maintains the exact same signature and behavior as the original
-        monolithic implementation, but now uses a clean pipeline of discrete steps.
+        implementation, but now uses the DocumentUnit architecture that prevents data
+        corruption by maintaining immutable Excel row ↔ PDF page range relationships.
+
+        The two-phase processing approach:
+        - Phase 1 (LoadStep): Per-file linking and merging with DocumentUnit creation
+        - Phase 2 (Filter/Sort/Rebuild): Process DocumentUnits while preserving relationships
 
         Args:
             excel_path: Path to Excel file

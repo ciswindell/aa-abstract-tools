@@ -6,31 +6,14 @@ File helpers for backups and atomic writes.
 import os
 import shutil
 import tempfile
-from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-
-def generate_backup_filename(original_path: str) -> str:
-    """Return a timestamped backup filename in the same directory."""
-
-    p = Path(original_path)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return str(p.with_name(f"{p.stem}_backup_{ts}{p.suffix}"))
-
-
-def create_backup(path: str) -> str:
-    """Copy file to a timestamped backup path and return the backup path."""
-
-    backup_path = generate_backup_filename(path)
-    shutil.copy2(path, backup_path)
-    return backup_path
-
-
-def create_backups(excel_path: str, pdf_path: str) -> tuple[str, str]:
-    """Create backups for Excel and PDF files, returning their backup paths."""
-
-    return create_backup(excel_path), create_backup(pdf_path)
+# Removed unused backup functions:
+# - generate_backup_filename()
+# - create_backup()
+# - create_backups()
+# These were replaced by atomic_save_with_backup() which handles backups internally.
 
 
 def atomic_save_with_backup(
@@ -79,7 +62,13 @@ def atomic_save_with_backup(
         write_func(str(original))
 
         # Step 3: Rename temp backup to timestamped backup
-        final_backup_path = generate_backup_filename(str(original))
+        # Inline backup filename generation (replaced removed function)
+        from datetime import datetime
+
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        final_backup_path = str(
+            original.with_name(f"{original.stem}_backup_{ts}{original.suffix}")
+        )
         temp_backup.rename(final_backup_path)
         temp_backup = None  # Successfully renamed
 

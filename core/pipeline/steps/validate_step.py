@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-ValidateStep: Wrap existing ValidationService in pipeline step.
+ValidateStep: Comprehensive input validation for DocumentUnit architecture.
+
+This step performs fail-fast validation of all input files before expensive loading
+and merging operations. It validates file existence, Excel data integrity, PDF
+bookmark structure, and cross-references between Excel rows and PDF bookmarks.
 """
 
 from pathlib import Path
@@ -10,7 +14,11 @@ from core.pipeline.steps import BaseStep
 
 
 class ValidateStep(BaseStep):
-    """Pipeline step for validating Excel and PDF data."""
+    """Comprehensive input validation step for DocumentUnit architecture.
+
+    Performs early validation to prevent processing failures and ensure data integrity
+    before DocumentUnit creation and PDF merging operations begin.
+    """
 
     def execute(self, context: PipelineContext) -> None:
         """Validate input files before loading to ensure fail-fast behavior.

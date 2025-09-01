@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
-FilterDfStep: Filter DataFrame rows by column values with conditional execution.
+FilterDfStep: Order-agnostic DataFrame filtering using _include flags.
+
+This step implements the DocumentUnit architecture's order-agnostic filtering approach.
+Instead of removing rows (which would break DocumentUnit alignment), it flags rows
+for inclusion/exclusion using an '_include' column. This allows FilterDfStep and
+SortDfStep to run in any order without data corruption.
 """
 
 import pandas as pd
@@ -10,7 +15,11 @@ from core.pipeline.steps import BaseStep
 
 
 class FilterDfStep(BaseStep):
-    """Pipeline step for filtering DataFrame rows by column values."""
+    """Order-agnostic DataFrame filtering step using _include flags.
+
+    This step preserves DocumentUnit alignment by flagging rows instead of removing them.
+    Works correctly regardless of whether SortDfStep has executed before or after.
+    """
 
     def should_execute(self, context: PipelineContext) -> bool:
         """Only execute if filtering is enabled."""
