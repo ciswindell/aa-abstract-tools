@@ -78,8 +78,16 @@ class TestPipeline:
     @patch("core.pipeline.steps.sort_df_step.SortDfStep")
     @patch("core.pipeline.steps.rebuild_pdf_step.RebuildPdfStep")
     @patch("core.pipeline.steps.save_step.SaveStep")
+    @patch("core.pipeline.steps.format_excel_step.FormatExcelStep")
     def test_register_steps(
-        self, mock_save, mock_rebuild, mock_sort, mock_filter, mock_load, mock_validate
+        self,
+        mock_format,
+        mock_save,
+        mock_rebuild,
+        mock_sort,
+        mock_filter,
+        mock_load,
+        mock_validate,
     ):
         """Test step registration in correct order."""
         # Mock step constructors
@@ -89,6 +97,7 @@ class TestPipeline:
         mock_sort_instance = Mock()
         mock_rebuild_instance = Mock()
         mock_save_instance = Mock()
+        mock_format_instance = Mock()
 
         mock_validate.return_value = mock_validate_instance
         mock_load.return_value = mock_load_instance
@@ -96,6 +105,7 @@ class TestPipeline:
         mock_sort.return_value = mock_sort_instance
         mock_rebuild.return_value = mock_rebuild_instance
         mock_save.return_value = mock_save_instance
+        mock_format.return_value = mock_format_instance
 
         self.pipeline.register_steps()
 
@@ -118,15 +128,19 @@ class TestPipeline:
         mock_save.assert_called_once_with(
             self.excel_repo, self.pdf_repo, self.logger, self.ui
         )
+        mock_format.assert_called_once_with(
+            self.excel_repo, self.pdf_repo, self.logger, self.ui
+        )
 
         # Verify steps were added in correct order
-        assert len(self.pipeline.steps) == 6
+        assert len(self.pipeline.steps) == 7
         assert self.pipeline.steps[0] is mock_validate_instance
         assert self.pipeline.steps[1] is mock_load_instance
         assert self.pipeline.steps[2] is mock_filter_instance
         assert self.pipeline.steps[3] is mock_sort_instance
         assert self.pipeline.steps[4] is mock_rebuild_instance
         assert self.pipeline.steps[5] is mock_save_instance
+        assert self.pipeline.steps[6] is mock_format_instance
 
     def test_execute_single_file_success(self):
         """Test successful execution with single file."""

@@ -72,7 +72,7 @@ class TestDocumentUnitWorkflowIntegration:
 
         # Test pipeline step registration
         self.pipeline.register_steps()
-        assert len(self.pipeline.steps) == 6
+        assert len(self.pipeline.steps) == 7
 
         # Verify step types
         step_names = [step.__class__.__name__ for step in self.pipeline.steps]
@@ -83,6 +83,7 @@ class TestDocumentUnitWorkflowIntegration:
             "SortDfStep",
             "RebuildPdfStep",
             "SaveStep",
+            "FormatExcelStep",
         ]
         assert step_names == expected_steps
 
@@ -212,7 +213,7 @@ class TestDocumentUnitWorkflowIntegration:
         self.pipeline.register_steps()
 
         # Verify correct number of steps
-        assert len(self.pipeline.steps) == 6
+        assert len(self.pipeline.steps) == 7
 
         # Verify step order
         step_names = [step.__class__.__name__ for step in self.pipeline.steps]
@@ -223,6 +224,7 @@ class TestDocumentUnitWorkflowIntegration:
             "SortDfStep",
             "RebuildPdfStep",
             "SaveStep",
+            "FormatExcelStep",
         ]
         assert step_names == expected_order
 
@@ -277,7 +279,7 @@ class TestDocumentUnitWorkflowIntegration:
         assert hasattr(result, "message")
 
         # Verify pipeline was initialized
-        assert len(self.pipeline.steps) == 6
+        assert len(self.pipeline.steps) == 7
 
     def test_document_unit_dataclass_integration(self):
         """Test DocumentUnit dataclass integration with pipeline context."""
