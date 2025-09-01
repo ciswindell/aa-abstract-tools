@@ -102,11 +102,15 @@ class SaveStep(BaseStep):
 
         # Define the write function for atomic save
         def write_excel(output_path: str) -> None:
+            # Check if user wants to add missing columns (Document_Found)
+            add_missing_columns = context.options.get("check_document_images", False)
+
             self.excel_repo.save(
                 df=df_to_save,
                 template_path=context.excel_path,
                 target_sheet=target_sheet,
                 out_path=output_path,
+                add_missing_columns=add_missing_columns,
             )
 
         # Use atomic save with backup if needed

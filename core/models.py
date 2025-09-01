@@ -24,6 +24,7 @@ class Options:
         merge_pairs: List of (excel_path, pdf_path) pairs to merge (None = no merge).
         merge_pairs_with_sheets: Optional list of (excel_path, pdf_path, sheet_name) for
             per-file sheet selection during merge.
+        check_document_images: Whether to add/update Document_Found column in Excel output.
     """
 
     backup: bool
@@ -35,6 +36,7 @@ class Options:
     filter_values: Optional[List[str]] = None
     merge_pairs: Optional[List[Tuple[str, str]]] = None
     merge_pairs_with_sheets: Optional[List[Tuple[str, str, str]]] = None
+    check_document_images: bool = False
 
 
 @dataclass

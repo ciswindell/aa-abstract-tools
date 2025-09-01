@@ -31,6 +31,9 @@ class AbstractRenumberGUI:
         self.reorder_pages_enabled: tk.BooleanVar = tk.BooleanVar(
             value=False
         )  # Reorder pages disabled by default
+        self.check_document_images_enabled: tk.BooleanVar = tk.BooleanVar(
+            value=True
+        )  # Check for document images enabled by default
 
         # Filter UI state (selection will be prompted during processing)
         self.filter_enabled: tk.BooleanVar = tk.BooleanVar(value=False)
@@ -52,6 +55,8 @@ class AbstractRenumberGUI:
         self.sort_bookmarks_checkbox: Optional[ttk.Checkbutton] = None
         self.reorder_pages_checkbox: Optional[ttk.Checkbutton] = None
         self.reorder_pages_info_label: Optional[ttk.Label] = None
+        self.check_document_images_checkbox: Optional[ttk.Checkbutton] = None
+        self.check_document_images_info_label: Optional[ttk.Label] = None
 
         self.setup_window()
         self.setup_gui()
@@ -305,6 +310,30 @@ class AbstractRenumberGUI:
 
         self.merge_enabled.trace_add("write", on_merge_toggle)
 
+        # Check for Document Images checkbox
+        check_images_frame = ttk.Frame(options_frame)
+        check_images_frame.grid(row=5, column=0, sticky=(tk.W, tk.E), pady=(15, 5))
+        check_images_frame.grid_columnconfigure(1, weight=1)
+
+        self.check_document_images_checkbox = ttk.Checkbutton(
+            check_images_frame,
+            text="Check for Document Images",
+            variable=self.check_document_images_enabled,
+            command=self._on_check_document_images_option_changed,
+        )
+        self.check_document_images_checkbox.grid(row=0, column=0, sticky=tk.W)
+
+        # Info label for check document images option
+        self.check_document_images_info_label = ttk.Label(
+            check_images_frame,
+            text="📄 Adds 'Document_Found' column if missing (always updates if present)",
+            foreground="blue",
+            font=("Arial", 9),
+        )
+        self.check_document_images_info_label.grid(
+            row=1, column=0, sticky=tk.W, padx=(20, 0), pady=(2, 0)
+        )
+
     def _on_backup_option_changed(self) -> None:
         """Handle changes to the backup option checkbox."""
         if self.backup_enabled.get():
@@ -335,6 +364,15 @@ class AbstractRenumberGUI:
             self.reorder_pages_info_label.config(
                 text="Requires 'Sort PDF Bookmarks' to be enabled", foreground="gray"
             )
+
+    def _on_check_document_images_option_changed(self) -> None:
+        """Handle check document images option change."""
+        if self.check_document_images_enabled.get():
+            self.log_status(
+                "Document image checking enabled - will add Document_Found column"
+            )
+        else:
+            self.log_status("Document image checking disabled")
 
     # choose button removed; filter will be prompted during processing when enabled
 
@@ -439,6 +477,10 @@ class AbstractRenumberGUI:
         """Return whether page reordering is enabled."""
         return self.reorder_pages_enabled.get()
 
+    def get_check_document_images_enabled(self) -> bool:
+        """Return whether document image checking is enabled."""
+        return self.check_document_images_enabled.get()
+
     # Accessors for filter state (used by UI adapter/controller later)
     def get_filter_enabled(self) -> bool:
         return self.filter_enabled.get()
@@ -482,6 +524,9 @@ class AbstractRenumberGUI:
         # Reset merge state
         self.merge_enabled.set(False)
         self.merge_pairs = []
+
+        # Reset check document images to default True state (don't remember previous setting)
+        self.check_document_images_enabled.set(True)
 
         # Reset filter summary label
         if hasattr(self, "filter_summary_label"):

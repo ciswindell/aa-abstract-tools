@@ -48,6 +48,7 @@ class TkinterUIAdapter:
             backup=self.gui.get_backup_enabled(),
             sort_bookmarks=self.gui.get_sort_bookmarks_enabled(),
             reorder_pages=self.gui.get_reorder_pages_enabled(),
+            check_document_images=self.gui.get_check_document_images_enabled(),
             sheet_name=None,  # Will be set separately
             filter_enabled=bool(filter_enabled),
             filter_column=filter_column,

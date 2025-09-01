@@ -94,6 +94,7 @@ class Pipeline:
                 "backup": options.backup,
                 "sort_bookmarks": options.sort_bookmarks,
                 "reorder_pages": options.reorder_pages,
+                "check_document_images": options.check_document_images,
                 "sheet_name": options.sheet_name,
                 "filter_enabled": options.filter_enabled,
                 "filter_column": options.filter_column,

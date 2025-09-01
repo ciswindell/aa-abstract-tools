@@ -244,6 +244,19 @@ class LoadStep(BaseStep):
                 f"Created {len(document_units)} DocumentUnits from {excel_path}:{pdf_path}"
             )
 
+            # Add Document_Found column calculation (always calculated for consistency)
+            linked_document_ids = {unit.document_id for unit in document_units}
+            pair_df_with_ids["Document_Found"] = pair_df_with_ids["Document_ID"].isin(
+                linked_document_ids
+            )
+
+            # Log document linking statistics
+            linked_count = pair_df_with_ids["Document_Found"].sum()
+            total_count = len(pair_df_with_ids)
+            self.logger.info(
+                f"Document linking: {linked_count}/{total_count} Excel rows have corresponding PDF documents"
+            )
+
             # Log linking statistics
             if pair_bookmarks and not document_units:
                 self.logger.warning(
