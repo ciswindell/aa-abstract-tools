@@ -5,7 +5,7 @@ Unit tests for core models, specifically the DocumentUnit dataclass.
 
 import pandas as pd
 
-from core.models import DocumentUnit
+from core.models import DocumentUnit, Options
 
 
 class TestDocumentUnit:
@@ -160,3 +160,101 @@ class TestDocumentUnit:
         )
 
         assert unit1.document_id != unit3.document_id
+
+
+class TestOptions:
+    """Test cases for Options dataclass."""
+
+    def test_options_default_values(self):
+        """Test Options dataclass with default values."""
+        options = Options()
+
+        # Test all default values
+        assert options.backup is False
+        assert options.sort_bookmarks is False
+        assert options.reorder_pages is False
+        assert options.check_document_images is False
+        assert options.sheet_name is None
+        assert options.filter_enabled is False
+        assert options.filter_column is None
+        assert options.filter_values == []
+        assert options.merge_pairs_with_sheets == []
+
+    def test_options_check_document_images_field(self):
+        """Test the new check_document_images field specifically."""
+        # Test default value
+        options = Options()
+        assert options.check_document_images is False
+
+        # Test explicit True value
+        options_enabled = Options(check_document_images=True)
+        assert options_enabled.check_document_images is True
+
+        # Test explicit False value
+        options_disabled = Options(check_document_images=False)
+        assert options_disabled.check_document_images is False
+
+    def test_options_with_all_fields_set(self):
+        """Test Options with all fields explicitly set."""
+        options = Options(
+            backup=True,
+            sort_bookmarks=True,
+            reorder_pages=True,
+            check_document_images=True,
+            sheet_name="TestSheet",
+            filter_enabled=True,
+            filter_column="Status",
+            filter_values=["Active", "Pending"],
+            merge_pairs_with_sheets=[("file1.xlsx", "file1.pdf", "Sheet1")],
+        )
+
+        # Verify all fields
+        assert options.backup is True
+        assert options.sort_bookmarks is True
+        assert options.reorder_pages is True
+        assert options.check_document_images is True
+        assert options.sheet_name == "TestSheet"
+        assert options.filter_enabled is True
+        assert options.filter_column == "Status"
+        assert options.filter_values == ["Active", "Pending"]
+        assert len(options.merge_pairs_with_sheets) == 1
+        assert options.merge_pairs_with_sheets[0] == (
+            "file1.xlsx",
+            "file1.pdf",
+            "Sheet1",
+        )
+
+    def test_options_check_document_images_integration(self):
+        """Test check_document_images field in realistic scenarios."""
+        # Scenario 1: User wants document checking with other features
+        options_full = Options(
+            backup=True,
+            check_document_images=True,
+            filter_enabled=True,
+            filter_column="Document Type",
+            filter_values=["Assignment"],
+        )
+
+        assert options_full.check_document_images is True
+        assert options_full.backup is True
+        assert options_full.filter_enabled is True
+
+        # Scenario 2: User disables document checking but enables other features
+        options_partial = Options(
+            sort_bookmarks=True, reorder_pages=True, check_document_images=False
+        )
+
+        assert options_partial.check_document_images is False
+        assert options_partial.sort_bookmarks is True
+        assert options_partial.reorder_pages is True
+
+    def test_options_immutability_check(self):
+        """Test that Options behaves as expected for field access."""
+        options = Options(check_document_images=True)
+
+        # Should be able to read the field
+        assert options.check_document_images is True
+
+        # Field should maintain its value
+        original_value = options.check_document_images
+        assert options.check_document_images == original_value

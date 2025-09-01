@@ -465,3 +465,320 @@ class TestLoadStep:
 
         expected = pd.DataFrame({"col1": [1, 2, 3, 4]})
         pd.testing.assert_frame_equal(result.reset_index(drop=True), expected)
+
+
+class TestLoadStepDocumentFoundColumn:
+    """Test cases for Document_Found column calculation in LoadStep."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        # Create mock repositories and logger
+        self.excel_repo = Mock()
+        self.pdf_repo = Mock()
+        self.logger = Mock()
+        self.ui = Mock()
+
+        # Create LoadStep instance
+        self.load_step = LoadStep(
+            excel_repo=self.excel_repo,
+            pdf_repo=self.pdf_repo,
+            logger=self.logger,
+            ui=self.ui,
+        )
+
+    def test_document_found_all_linked(self):
+        """Test Document_Found column when all Excel rows have corresponding PDF documents."""
+        # Setup Excel data with 3 rows
+        excel_df = pd.DataFrame(
+            {
+                "Index#": ["1", "2", "3"],
+                "Document Type": ["Type1", "Type2", "Type3"],
+                "Received Date": ["2024-01-01", "2024-01-02", "2024-01-03"],
+            }
+        )
+
+        # Setup PDF bookmarks that match all Excel rows
+        bookmarks = [
+            {"title": "1-Doc1", "page": 1, "level": 0},
+            {"title": "2-Doc2", "page": 5, "level": 0},
+            {"title": "3-Doc3", "page": 10, "level": 0},
+        ]
+
+        # Mock repository responses
+        self.excel_repo.load.return_value = excel_df
+        self.pdf_repo.get_bookmarks.return_value = bookmarks
+        self.pdf_repo.get_page_count.return_value = 15
+
+        # Create context for single file workflow
+        context = PipelineContext(
+            file_pairs=[("test.xlsx", "test.pdf", "Sheet1")],
+            options={"backup": False, "sort_bookmarks": False, "reorder_pages": False},
+        )
+
+        # Execute LoadStep
+        self.load_step.execute(context)
+
+        # Verify Document_Found column exists and all values are True
+        assert "Document_Found" in context.df.columns
+        assert context.df["Document_Found"].tolist() == [True, True, True]
+
+        # Verify logging was called with correct statistics
+        expected_log_calls = [
+            call
+            for call in self.logger.info.call_args_list
+            if "Document linking:" in str(call)
+        ]
+        assert len(expected_log_calls) > 0
+        # Should log "3/3 Excel rows have corresponding PDF documents"
+        log_message = str(expected_log_calls[0])
+        assert "3/3" in log_message
+        assert "corresponding PDF documents" in log_message
+
+    def test_document_found_none_linked(self):
+        """Test Document_Found column when no Excel rows have corresponding PDF documents."""
+        # Setup Excel data with 3 rows
+        excel_df = pd.DataFrame(
+            {
+                "Index#": ["1", "2", "3"],
+                "Document Type": ["Type1", "Type2", "Type3"],
+                "Received Date": ["2024-01-01", "2024-01-02", "2024-01-03"],
+            }
+        )
+
+        # Setup PDF bookmarks that don't match any Excel rows
+        bookmarks = [
+            {"title": "X-NoMatch1", "page": 1, "level": 0},
+            {"title": "Y-NoMatch2", "page": 5, "level": 0},
+            {"title": "Z-NoMatch3", "page": 10, "level": 0},
+        ]
+
+        # Mock repository responses
+        self.excel_repo.load.return_value = excel_df
+        self.pdf_repo.get_bookmarks.return_value = bookmarks
+        self.pdf_repo.get_page_count.return_value = 15
+
+        # Create context for single file workflow
+        context = PipelineContext(
+            file_pairs=[("test.xlsx", "test.pdf", "Sheet1")],
+            options={"backup": False, "sort_bookmarks": False, "reorder_pages": False},
+        )
+
+        # Execute LoadStep
+        self.load_step.execute(context)
+
+        # Verify Document_Found column exists and all values are False
+        assert "Document_Found" in context.df.columns
+        assert context.df["Document_Found"].tolist() == [False, False, False]
+
+        # Verify logging shows 0/3 linked
+        expected_log_calls = [
+            call
+            for call in self.logger.info.call_args_list
+            if "Document linking:" in str(call)
+        ]
+        assert len(expected_log_calls) > 0
+        log_message = str(expected_log_calls[0])
+        assert "0/3" in log_message
+
+    def test_document_found_partial_linked(self):
+        """Test Document_Found column when some Excel rows have corresponding PDF documents."""
+        # Setup Excel data with 4 rows
+        excel_df = pd.DataFrame(
+            {
+                "Index#": ["1", "2", "3", "4"],
+                "Document Type": ["Type1", "Type2", "Type3", "Type4"],
+                "Received Date": [
+                    "2024-01-01",
+                    "2024-01-02",
+                    "2024-01-03",
+                    "2024-01-04",
+                ],
+            }
+        )
+
+        # Setup PDF bookmarks that match only rows 1 and 3
+        bookmarks = [
+            {"title": "1-Doc1", "page": 1, "level": 0},
+            {"title": "X-NoMatch", "page": 5, "level": 0},
+            {"title": "3-Doc3", "page": 10, "level": 0},
+        ]
+
+        # Mock repository responses
+        self.excel_repo.load.return_value = excel_df
+        self.pdf_repo.get_bookmarks.return_value = bookmarks
+        self.pdf_repo.get_page_count.return_value = 15
+
+        # Create context for single file workflow
+        context = PipelineContext(
+            file_pairs=[("test.xlsx", "test.pdf", "Sheet1")],
+            options={"backup": False, "sort_bookmarks": False, "reorder_pages": False},
+        )
+
+        # Execute LoadStep
+        self.load_step.execute(context)
+
+        # Verify Document_Found column has correct True/False pattern
+        assert "Document_Found" in context.df.columns
+        expected_values = [True, False, True, False]  # Rows 1,3 linked; 2,4 not linked
+        assert context.df["Document_Found"].tolist() == expected_values
+
+        # Verify logging shows 2/4 linked
+        expected_log_calls = [
+            call
+            for call in self.logger.info.call_args_list
+            if "Document linking:" in str(call)
+        ]
+        assert len(expected_log_calls) > 0
+        log_message = str(expected_log_calls[0])
+        assert "2/4" in log_message
+
+    def test_document_found_merge_workflow(self):
+        """Test Document_Found column calculation in merge workflow with multiple files."""
+        # Setup Excel data for two files
+        excel_df1 = pd.DataFrame(
+            {
+                "Index#": ["1", "2"],
+                "Document Type": ["Type1", "Type2"],
+                "Received Date": ["2024-01-01", "2024-01-02"],
+            }
+        )
+
+        excel_df2 = pd.DataFrame(
+            {
+                "Index#": ["10", "20"],
+                "Document Type": ["Type10", "Type20"],
+                "Received Date": ["2024-02-01", "2024-02-02"],
+            }
+        )
+
+        # Setup PDF bookmarks for two files
+        bookmarks1 = [
+            {"title": "1-Doc1", "page": 1, "level": 0},  # Matches row 1
+            {"title": "X-NoMatch", "page": 3, "level": 0},  # No match
+        ]
+
+        bookmarks2 = [
+            {"title": "10-Doc10", "page": 1, "level": 0},  # Matches row 10
+            {"title": "20-Doc20", "page": 5, "level": 0},  # Matches row 20
+        ]
+
+        # Mock repository responses for both files
+        self.excel_repo.load.side_effect = [excel_df1, excel_df2]
+        self.pdf_repo.get_bookmarks.side_effect = [bookmarks1, bookmarks2]
+        self.pdf_repo.get_page_count.side_effect = [5, 8]
+
+        # Create context for merge workflow
+        context = PipelineContext(
+            file_pairs=[
+                ("file1.xlsx", "file1.pdf", "Sheet1"),
+                ("file2.xlsx", "file2.pdf", "Sheet1"),
+            ],
+            options={"backup": False, "sort_bookmarks": False, "reorder_pages": False},
+        )
+
+        # Execute LoadStep
+        self.load_step.execute(context)
+
+        # Verify Document_Found column exists in merged DataFrame
+        assert "Document_Found" in context.df.columns
+
+        # Should have 4 rows total (2 from each file)
+        assert len(context.df) == 4
+
+        # Expected pattern: file1 has 1 match out of 2, file2 has 2 matches out of 2
+        # So we should have [True, False, True, True] for rows 1,2,10,20 respectively
+        document_found_values = context.df["Document_Found"].tolist()
+
+        # Count True values - should be 3 total (1 from file1, 2 from file2)
+        true_count = sum(document_found_values)
+        assert true_count == 3
+
+    def test_document_found_with_duplicate_document_ids(self):
+        """Test Document_Found column when Excel has duplicate Document_ID values."""
+        # Setup Excel data with duplicate Document_ID
+        excel_df = pd.DataFrame(
+            {
+                "Index#": ["1", "1", "2"],  # Duplicate Index# values
+                "Document Type": ["Type1", "Type1Dup", "Type2"],
+                "Received Date": ["2024-01-01", "2024-01-01", "2024-01-02"],
+            }
+        )
+
+        # Setup PDF bookmarks - only one bookmark for "1"
+        bookmarks = [
+            {"title": "1-Doc1", "page": 1, "level": 0},
+            {"title": "X-NoMatch", "page": 5, "level": 0},
+        ]
+
+        # Mock repository responses
+        self.excel_repo.load.return_value = excel_df
+        self.pdf_repo.get_bookmarks.return_value = bookmarks
+        self.pdf_repo.get_page_count.return_value = 10
+
+        # Create context for single file workflow
+        context = PipelineContext(
+            file_pairs=[("test.xlsx", "test.pdf", "Sheet1")],
+            options={"backup": False, "sort_bookmarks": False, "reorder_pages": False},
+        )
+
+        # Execute LoadStep
+        self.load_step.execute(context)
+
+        # Both rows with Document_ID "1" should be marked as True (found)
+        # Row with Document_ID "2" should be False (not found)
+        assert "Document_Found" in context.df.columns
+        expected_values = [True, True, False]  # Both "1" rows found, "2" not found
+        assert context.df["Document_Found"].tolist() == expected_values
+
+    def test_document_found_column_type(self):
+        """Test that Document_Found column has correct boolean type."""
+        # Setup minimal test data
+        excel_df = pd.DataFrame({"Index#": ["1"], "Document Type": ["Type1"]})
+        bookmarks = [{"title": "1-Doc1", "page": 1, "level": 0}]
+
+        # Mock repository responses
+        self.excel_repo.load.return_value = excel_df
+        self.pdf_repo.get_bookmarks.return_value = bookmarks
+        self.pdf_repo.get_page_count.return_value = 5
+
+        # Create context
+        context = PipelineContext(
+            file_pairs=[("test.xlsx", "test.pdf", "Sheet1")],
+            options={"backup": False, "sort_bookmarks": False, "reorder_pages": False},
+        )
+
+        # Execute LoadStep
+        self.load_step.execute(context)
+
+        # Verify column type is boolean
+        assert "Document_Found" in context.df.columns
+        assert context.df["Document_Found"].dtype == bool
+
+        # Verify values are actual boolean types, not strings
+        for value in context.df["Document_Found"]:
+            assert isinstance(value, (bool, pd.BooleanDtype))
+
+    def test_document_found_empty_dataframe(self):
+        """Test Document_Found column with empty Excel DataFrame."""
+        # Setup empty Excel data
+        excel_df = pd.DataFrame({"Index#": [], "Document Type": []})
+        bookmarks = []
+
+        # Mock repository responses
+        self.excel_repo.load.return_value = excel_df
+        self.pdf_repo.get_bookmarks.return_value = bookmarks
+        self.pdf_repo.get_page_count.return_value = 0
+
+        # Create context
+        context = PipelineContext(
+            file_pairs=[("test.xlsx", "test.pdf", "Sheet1")],
+            options={"backup": False, "sort_bookmarks": False, "reorder_pages": False},
+        )
+
+        # Execute LoadStep
+        self.load_step.execute(context)
+
+        # Should have Document_Found column even with empty DataFrame
+        assert "Document_Found" in context.df.columns
+        assert len(context.df) == 0
+        assert context.df["Document_Found"].dtype == bool
