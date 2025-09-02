@@ -346,6 +346,7 @@ class TestPipeline:
             "backup": True,
             "sort_bookmarks": False,
             "reorder_pages": True,
+            "check_document_images": False,
             "sheet_name": "CustomSheet",
             "filter_enabled": True,
             "filter_column": "Type",

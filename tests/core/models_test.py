@@ -167,7 +167,9 @@ class TestOptions:
 
     def test_options_default_values(self):
         """Test Options dataclass with default values."""
-        options = Options()
+        options = Options(
+            backup=False, sort_bookmarks=False, reorder_pages=False, sheet_name=None
+        )
 
         # Test all default values
         assert options.backup is False
@@ -177,21 +179,35 @@ class TestOptions:
         assert options.sheet_name is None
         assert options.filter_enabled is False
         assert options.filter_column is None
-        assert options.filter_values == []
-        assert options.merge_pairs_with_sheets == []
+        assert options.filter_values is None
+        assert options.merge_pairs_with_sheets is None
 
     def test_options_check_document_images_field(self):
         """Test the new check_document_images field specifically."""
         # Test default value
-        options = Options()
+        options = Options(
+            backup=False, sort_bookmarks=False, reorder_pages=False, sheet_name=None
+        )
         assert options.check_document_images is False
 
         # Test explicit True value
-        options_enabled = Options(check_document_images=True)
+        options_enabled = Options(
+            backup=False,
+            sort_bookmarks=False,
+            reorder_pages=False,
+            sheet_name=None,
+            check_document_images=True,
+        )
         assert options_enabled.check_document_images is True
 
         # Test explicit False value
-        options_disabled = Options(check_document_images=False)
+        options_disabled = Options(
+            backup=False,
+            sort_bookmarks=False,
+            reorder_pages=False,
+            sheet_name=None,
+            check_document_images=False,
+        )
         assert options_disabled.check_document_images is False
 
     def test_options_with_all_fields_set(self):
@@ -229,6 +245,9 @@ class TestOptions:
         # Scenario 1: User wants document checking with other features
         options_full = Options(
             backup=True,
+            sort_bookmarks=False,
+            reorder_pages=False,
+            sheet_name="TestSheet",
             check_document_images=True,
             filter_enabled=True,
             filter_column="Document Type",
@@ -241,7 +260,11 @@ class TestOptions:
 
         # Scenario 2: User disables document checking but enables other features
         options_partial = Options(
-            sort_bookmarks=True, reorder_pages=True, check_document_images=False
+            backup=False,
+            sort_bookmarks=True,
+            reorder_pages=True,
+            sheet_name="AnotherSheet",
+            check_document_images=False,
         )
 
         assert options_partial.check_document_images is False
@@ -250,7 +273,13 @@ class TestOptions:
 
     def test_options_immutability_check(self):
         """Test that Options behaves as expected for field access."""
-        options = Options(check_document_images=True)
+        options = Options(
+            backup=False,
+            sort_bookmarks=False,
+            reorder_pages=False,
+            sheet_name=None,
+            check_document_images=True,
+        )
 
         # Should be able to read the field
         assert options.check_document_images is True
