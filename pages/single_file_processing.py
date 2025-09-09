@@ -190,18 +190,9 @@ def show_single_file_processing():
     # Processing options sidebar
     show_processing_options_sidebar()
 
-    # Filter preview section (only show if both files uploaded and filtering enabled)
+    # Progressive workflow after files are uploaded
     if uploaded_excel and uploaded_pdf:
-        show_filter_preview_section()
-
-    # Processing section
-    if uploaded_excel and uploaded_pdf:
-        st.markdown("---")
-
-        # Simple process button
-        if st.button("🚀 Process Files", type="primary", use_container_width=True):
-            process_files()
-            st.session_state.show_downloads = True
+        show_progressive_workflow()
 
         # Handle post-processing workflow if processing completed
         if st.session_state.get("show_downloads"):
@@ -216,135 +207,238 @@ def show_single_file_processing():
 
 
 def show_processing_options_sidebar():
-    """Display processing options in the sidebar."""
+    """Display minimal sidebar info."""
     with st.sidebar:
-        st.markdown("### ⚙️ Processing Options")
+        st.markdown("### ℹ️ Processing Info")
+        st.info("Upload your files to begin the guided workflow.")
 
-        # Sort bookmarks option
-        sort_bookmarks = st.checkbox(
-            "Sort PDF Bookmarks",
-            value=st.session_state.get("sort_bookmarks_enabled", True),
-            key="sort_bookmarks_enabled",
-            help="Sort PDF bookmarks naturally",
-        )
-
-        # Reorder pages option (dependent on sort bookmarks)
-        st.checkbox(
-            "Reorder Pages to Match Bookmarks",
-            value=st.session_state.get("reorder_pages_enabled", True)
-            and sort_bookmarks,
-            key="reorder_pages_enabled",
-            disabled=not sort_bookmarks,
-            help="Physically reorder pages to match sorted bookmarks",
-        )
-
-        # Check document images option
-        st.checkbox(
-            "Check for Document Images",
-            value=st.session_state.get("check_document_images_enabled", True),
-            key="check_document_images_enabled",
-            help="Add/update Document_Found column in Excel output",
-        )
-
-        # Filter option
-        st.checkbox(
-            "Enable Data Filtering",
-            value=st.session_state.get("filter_enabled", False),
-            key="filter_enabled",
-            help="Configure data filtering in the main interface below",
-        )
+        # Show current workflow step if in progress
+        if st.session_state.get("filter_decision_made"):
+            if st.session_state.get("wants_filtering") and not st.session_state.get(
+                "filter_configured"
+            ):
+                st.info("📍 **Current Step:** Filter Configuration")
+            elif not st.session_state.get("processing_options_decided"):
+                st.info("📍 **Current Step:** Processing Options")
+            elif st.session_state.get("processing_options_decided"):
+                st.info("📍 **Current Step:** Ready to Process")
+        elif st.session_state.get("excel_temp_path") and st.session_state.get(
+            "pdf_temp_path"
+        ):
+            st.info("📍 **Current Step:** Filter Decision")
 
 
-def show_filter_preview_section():
-    """Display filter preview section if filtering is enabled."""
-    if not st.session_state.get("filter_enabled", False):
+def show_progressive_workflow():
+    """Show the progressive workflow with decision points."""
+    st.markdown("---")
+
+    # Step 1: Filter Decision Point
+    if "filter_decision_made" not in st.session_state:
+        show_filter_decision_point()
         return
 
-    st.markdown("---")
-    st.markdown("### 🔍 Data Filtering")
+    # Step 2: Filter Configuration (if filtering was chosen)
+    if st.session_state.get("filter_decision_made") and st.session_state.get(
+        "wants_filtering"
+    ):
+        if "filter_configured" not in st.session_state:
+            show_filter_configuration()
+            return
 
-    # Load Excel data for preview
+    # Step 3: Processing Options Decision Point
+    if "processing_options_decided" not in st.session_state:
+        show_processing_options_decision()
+        return
+
+    # Step 4: Final Processing
+    show_final_processing_section()
+
+
+def show_filter_decision_point():
+    """Show the filter decision point."""
+    st.markdown("### 🔍 Data Filtering")
+    st.markdown("Would you like to filter this data before processing?")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button(
+            "📊 No, Process All Data", type="primary", use_container_width=True
+        ):
+            st.session_state.filter_decision_made = True
+            st.session_state.wants_filtering = False
+            st.session_state.filter_enabled = False
+            st.session_state.filter_column = None
+            st.session_state.filter_values = []
+            st.rerun()
+
+    with col2:
+        if st.button("🔍 Yes, Set Up Filtering", use_container_width=True):
+            st.session_state.filter_decision_made = True
+            st.session_state.wants_filtering = True
+            st.session_state.filter_enabled = True
+            st.rerun()
+
+
+def show_filter_configuration():
+    """Show filter configuration interface."""
+    st.markdown("### 🔍 Filter Configuration")
+
+    # Load Excel data for filtering
     excel_path = st.session_state.get("excel_temp_path")
     if not excel_path:
-        st.warning("Excel file not found. Please re-upload your Excel file.")
+        st.error("Excel file not found. Please re-upload your Excel file.")
         return
 
     try:
-        # Load Excel data using the same method as the backend
         from adapters.excel_repo import ExcelOpenpyxlRepo
 
         excel_repo = ExcelOpenpyxlRepo()
         df = excel_repo.load(excel_path, sheet="Sheet")
 
         if df is None or df.empty:
-            st.warning("No data found in Excel file.")
+            st.error("Could not load Excel data for filtering.")
             return
 
-        # Show data preview
-        with st.expander("📊 Data Preview", expanded=False):
-            st.dataframe(df.head(10), use_container_width=True)
-            st.caption(f"Showing first 10 rows of {len(df)} total rows")
-
-        # Filter configuration
-        st.markdown("**Configure Filtering:**")
-
         # Get filterable columns (exclude system columns)
-        filterable_columns = [
-            col
-            for col in df.columns
-            if not col.startswith("_") and col not in ["Index#", "Document_ID"]
-        ]
+        system_columns = {"_include", "Index#", "Document_ID"}
+        filterable_columns = [col for col in df.columns if col not in system_columns]
 
-        col1, col2 = st.columns([1, 2])
+        if not filterable_columns:
+            st.warning("No filterable columns found in the Excel data.")
+            return
 
-        with col1:
-            # Column selection
-            filter_column = st.selectbox(
-                "Filter by column:",
-                options=["None"] + filterable_columns,
-                key="filter_column_preview",
-                help="Select a column to filter the data",
+        # Column selection
+        filter_column = st.selectbox(
+            "Select column to filter by:",
+            options=filterable_columns,
+            key="filter_column_widget",
+            help="Choose which column to use for filtering the data",
+        )
+
+        if filter_column:
+            # Get unique values for the selected column
+            unique_values = sorted(df[filter_column].dropna().unique().tolist())
+
+            if not unique_values:
+                st.warning(f"No values found in column '{filter_column}'.")
+                return
+
+            # Value selection
+            filter_values = st.multiselect(
+                f"Select values to include from '{filter_column}':",
+                options=unique_values,
+                key="filter_values_widget",
+                help="Choose which values to include. Only rows with these values will be processed.",
             )
 
-        with col2:
-            if filter_column and filter_column != "None":
-                # Get unique values for selected column
-                unique_values = sorted(
-                    [str(val) for val in df[filter_column].dropna().unique()]
+            # Show filter summary
+            if filter_values:
+                filtered_count = len(df[df[filter_column].isin(filter_values)])
+                st.success(
+                    f"📈 **Filter Summary:** {filtered_count} out of {len(df)} rows will be included"
                 )
 
-                # Value selection
-                selected_values = st.multiselect(
-                    f"Select values to keep from '{filter_column}':",
-                    options=unique_values,
-                    key="filter_values_preview",
-                    help=f"Choose which {filter_column} values to include in processing",
-                )
-
-                # Store selections in session state for the pipeline
-                st.session_state.filter_column = filter_column
-                st.session_state.filter_values = selected_values
-
-                # Show filter summary
-                if selected_values:
-                    filtered_count = len(
-                        df[df[filter_column].astype(str).isin(selected_values)]
-                    )
-                    st.info(
-                        f"📈 Filter will include **{filtered_count:,}** of **{len(df):,}** rows ({filtered_count / len(df) * 100:.1f}%)"
-                    )
-                else:
-                    st.info("⚠️ No values selected - all data will be processed")
+                # Continue button
+                if st.button(
+                    "✅ Continue with Filter Settings",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    # Explicitly store the filter values before moving to next step
+                    st.session_state.filter_column = filter_column
+                    st.session_state.filter_values = filter_values
+                    st.session_state.filter_configured = True
+                    st.rerun()
             else:
-                # Clear filter selections
-                st.session_state.filter_column = None
-                st.session_state.filter_values = []
-                st.info("ℹ️ No filtering configured - all data will be processed")
+                st.info("Select values above to continue.")
 
     except Exception as e:
         st.error(f"Error loading Excel data for filtering: {e}")
-        st.session_state.filter_column = None
-        st.session_state.filter_values = []
+
+
+def show_processing_options_decision():
+    """Show processing options decision point."""
+    st.markdown("### ⚙️ Processing Options")
+    st.markdown("Configure how you want your files processed:")
+
+    # Default values
+    default_sort = True
+    default_reorder = True
+    default_check_images = True
+
+    # Processing options with defaults
+    sort_bookmarks = st.checkbox(
+        "Sort PDF Bookmarks",
+        value=default_sort,
+        key="sort_bookmarks_enabled",
+        help="Sort PDF bookmarks naturally",
+    )
+
+    st.checkbox(
+        "Reorder Pages to Match Bookmarks",
+        value=default_reorder and sort_bookmarks,
+        key="reorder_pages_enabled",
+        disabled=not sort_bookmarks,
+        help="Physically reorder pages to match sorted bookmarks",
+    )
+
+    st.checkbox(
+        "Check Document Images",
+        value=default_check_images,
+        key="check_document_images_enabled",
+        help="Verify document images during processing",
+    )
+
+    # Continue button
+    if st.button(
+        "✅ Continue with These Settings", type="primary", use_container_width=True
+    ):
+        st.session_state.processing_options_decided = True
+        st.rerun()
+
+
+def show_final_processing_section():
+    """Show the final processing section."""
+    st.markdown("### 🚀 Ready to Process")
+
+    # Show summary of what will be processed
+    summary_parts = []
+
+    # Filter summary
+    if st.session_state.get("wants_filtering"):
+        filter_column = st.session_state.get("filter_column")
+        filter_values = st.session_state.get("filter_values", [])
+        if filter_column and filter_values:
+            summary_parts.append(f"**Filtering:** {filter_column} = {filter_values}")
+        else:
+            summary_parts.append("**Filtering:** Configured but no values selected")
+    else:
+        summary_parts.append("**Filtering:** Process all data")
+
+    # Processing options summary
+    options = []
+    if st.session_state.get("sort_bookmarks_enabled", True):
+        options.append("Sort bookmarks")
+    if st.session_state.get("reorder_pages_enabled", True):
+        options.append("Reorder pages")
+    if st.session_state.get("check_document_images_enabled", True):
+        options.append("Check images")
+
+    if options:
+        summary_parts.append(f"**Options:** {', '.join(options)}")
+
+    # Display summary
+    if summary_parts:
+        st.info(
+            "📋 **Processing Summary:**\n"
+            + "\n".join(f"- {part}" for part in summary_parts)
+        )
+
+    # Process button
+    if st.button("🚀 Process Files", type="primary", use_container_width=True):
+        process_files()
+        st.session_state.show_downloads = True
 
 
 def process_files():
@@ -423,7 +517,12 @@ def show_reset_ui():
     if st.button("🔄 Process New Files", use_container_width=True, type="secondary"):
         clear_file_uploaders()
         st.session_state.show_downloads = False
-        # Clear filter selections
+        # Clear all workflow state
+        st.session_state.filter_decision_made = False
+        st.session_state.wants_filtering = False
+        st.session_state.filter_configured = False
+        st.session_state.processing_options_decided = False
+        st.session_state.filter_enabled = False
         st.session_state.filter_column = None
         st.session_state.filter_values = []
         st.session_state.ui_adapter.reset_gui()
