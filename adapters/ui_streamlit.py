@@ -49,8 +49,13 @@ class StreamlitUIAdapter:
         filter_enabled = st.session_state.get(
             "filter_enabled", False
         ) or st.session_state.get("filter_enabled_merge", False)
-        filter_column = st.session_state.get("filter_column", None)
-        filter_values = st.session_state.get("filter_values", None)
+        # Use pre-selected filter values from the filter preview section
+        filter_column = (
+            st.session_state.get("filter_column", None) if filter_enabled else None
+        )
+        filter_values = (
+            st.session_state.get("filter_values", None) if filter_enabled else None
+        )
         merge_pairs = st.session_state.get("merge_pairs", None)
 
         return Options(

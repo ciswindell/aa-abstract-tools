@@ -6,6 +6,7 @@ Handles the workflow for merging multiple Excel/PDF file pairs.
 """
 
 import io
+import time
 import zipfile
 from pathlib import Path
 
@@ -15,8 +16,112 @@ from adapters.ui_streamlit import StreamlitUIAdapter
 from core.app_controller import AppController
 
 
+# Custom CSS for button styling
+def inject_custom_css():
+    """Inject custom CSS for button styling."""
+    st.markdown(
+        """
+        <style>
+        /* Download button - Green primary style */
+        .stDownloadButton > button {
+            background-color: #28a745 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 6px !important;
+            font-weight: 600 !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .stDownloadButton > button:hover {
+            background-color: #218838 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3) !important;
+        }
+        
+        /* Alternative selector for download button */
+        button[kind="primary"] {
+            background-color: #28a745 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 6px !important;
+            font-weight: 600 !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        button[kind="primary"]:hover {
+            background-color: #218838 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3) !important;
+        }
+        
+        /* Process button - Red primary style - Multiple selectors to ensure it works */
+        .stButton > button[kind="primary"]:not([data-testid*="download"]) {
+            background-color: #dc3545 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 6px !important;
+            font-weight: 600 !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .stButton > button[kind="primary"]:not([data-testid*="download"]):hover {
+            background-color: #c82333 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3) !important;
+        }
+        
+        /* Alternative selector for process button */
+        button[data-testid="baseButton-primary"] {
+            background-color: #dc3545 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 6px !important;
+            font-weight: 600 !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        button[data-testid="baseButton-primary"]:hover {
+            background-color: #c82333 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3) !important;
+        }
+
+        /* Reset button - Orange secondary style */
+        .stButton > button[kind="secondary"] {
+            background-color: #fd7e14 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 6px !important;
+            font-weight: 500 !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .stButton > button[kind="secondary"]:hover {
+            background-color: #e8690b !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(253, 126, 20, 0.3) !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def clear_file_uploaders():
+    """Clear file uploaders by rotating their keys."""
+    # Generate new unique keys to force uploader reset
+    timestamp = int(time.time() * 1000)  # Use milliseconds for uniqueness
+    st.session_state.primary_excel_uploader_key = f"primary_excel_{timestamp}"
+    st.session_state.primary_pdf_uploader_key = f"primary_pdf_{timestamp + 1}"
+    st.session_state.additional_excel_uploader_key = f"additional_excel_{timestamp + 2}"
+    st.session_state.additional_pdf_uploader_key = f"additional_pdf_{timestamp + 3}"
+
+
 def show_multi_file_merge():
     """Display the multi-file merge page."""
+    # Inject custom CSS for button styling
+    inject_custom_css()
+
     st.title("📚 Multi-File Merge")
     st.markdown("---")
 
@@ -29,6 +134,16 @@ def show_multi_file_merge():
         st.session_state.primary_pair = None
     if "additional_pairs" not in st.session_state:
         st.session_state.additional_pairs = []
+
+    # Initialize uploader keys for clearing functionality
+    if "primary_excel_uploader_key" not in st.session_state:
+        st.session_state.primary_excel_uploader_key = "primary_excel_0"
+    if "primary_pdf_uploader_key" not in st.session_state:
+        st.session_state.primary_pdf_uploader_key = "primary_pdf_0"
+    if "additional_excel_uploader_key" not in st.session_state:
+        st.session_state.additional_excel_uploader_key = "additional_excel_0"
+    if "additional_pdf_uploader_key" not in st.session_state:
+        st.session_state.additional_pdf_uploader_key = "additional_pdf_0"
 
     # Back to mode selection button
     if st.button("← Back to Mode Selection", key="back_to_mode_merge"):
@@ -76,14 +191,16 @@ def show_multi_file_merge():
             "🚀 Process All File Pairs", type="primary", use_container_width=True
         ):
             process_merge_files()
+            st.session_state.show_downloads = True
 
-    # Status messages
+    # Download section - only show if processing completed
+    if st.session_state.get("show_downloads"):
+        handle_post_processing()
+
+    # Status messages - exactly like single file processing
     if st.session_state.get("status_messages"):
         st.markdown("---")
         st.session_state.ui_adapter.display_status_messages()
-
-    # Download section
-    show_download_section()
 
 
 def show_primary_pair_interface():
@@ -116,7 +233,7 @@ def show_primary_pair_interface():
             excel_file = st.file_uploader(
                 "Choose primary Excel file",
                 type=["xlsx", "xls"],
-                key="primary_excel_uploader",
+                key=st.session_state.primary_excel_uploader_key,
                 help="Maximum file size: 400MB",
             )
 
@@ -125,7 +242,7 @@ def show_primary_pair_interface():
             pdf_file = st.file_uploader(
                 "Choose primary PDF file",
                 type=["pdf"],
-                key="primary_pdf_uploader",
+                key=st.session_state.primary_pdf_uploader_key,
                 help="Maximum file size: 400MB",
             )
 
@@ -196,7 +313,7 @@ def add_additional_pair_interface():
         excel_file = st.file_uploader(
             "Choose additional Excel file",
             type=["xlsx", "xls"],
-            key="additional_excel_uploader",
+            key=st.session_state.additional_excel_uploader_key,
             help="Maximum file size: 400MB",
         )
 
@@ -205,7 +322,7 @@ def add_additional_pair_interface():
         pdf_file = st.file_uploader(
             "Choose additional PDF file",
             type=["pdf"],
-            key="additional_pdf_uploader",
+            key=st.session_state.additional_pdf_uploader_key,
             help="Maximum file size: 400MB",
         )
 
@@ -384,31 +501,40 @@ def process_merge_files():
             progress_bar.progress(100)
             status_container.text("Processing complete!")
 
-        st.session_state.processing_complete = True
-
     except Exception as e:
         st.error(f"Processing failed: {str(e)}")
         st.session_state.ui_adapter.log_status(f"ERROR: {str(e)}")
 
 
-def show_download_section():
-    """Display download section for processed merged files."""
-    if st.session_state.get("processing_complete"):
-        st.markdown("---")
-        st.markdown("### 📥 Download Merged Files")
+def show_reset_ui():
+    """Display reset UI and handle reset functionality."""
+    st.markdown("---")
+    if st.button("🔄 Process New Files", use_container_width=True, type="secondary"):
+        clear_file_uploaders()
+        st.session_state.show_downloads = False
+        st.session_state.primary_pair = None
+        st.session_state.additional_pairs = []
+        st.session_state.ui_adapter.reset_gui()
+        st.rerun()
 
-        # Get the base paths from the primary pair
-        if not st.session_state.primary_pair:
-            st.error("No primary pair available for download")
-            return
 
-        primary = st.session_state.primary_pair
-        excel_base_path = Path(primary["excel_path"])
-        pdf_base_path = Path(primary["pdf_path"])
+def handle_post_processing():
+    """Handle post-processing workflow: downloads and reset functionality."""
+    st.markdown("### 📥 Download Processed Files")
 
-        # Determine if this was a merge workflow or single file
-        is_merge = len(st.session_state.additional_pairs) > 0
+    # Get the base paths from the primary pair
+    if not st.session_state.primary_pair:
+        st.error("No primary pair available for download")
+        return
 
+    primary = st.session_state.primary_pair
+    excel_base_path = Path(primary["excel_path"])
+    pdf_base_path = Path(primary["pdf_path"])
+
+    # Determine if this was a merge workflow or single file
+    is_merge = len(st.session_state.additional_pairs) > 0
+
+    try:
         if is_merge:
             # For merge workflows, files are saved with "_merged" suffix
             excel_output_path = excel_base_path.with_name(
@@ -417,9 +543,16 @@ def show_download_section():
             pdf_output_path = pdf_base_path.with_name(
                 f"{pdf_base_path.stem}_merged{pdf_base_path.suffix}"
             )
-            zip_filename = "merged_documents_processed.zip"
-            excel_zip_name = "merged_documents_processed.xlsx"
-            pdf_zip_name = "merged_documents_processed.pdf"
+
+            # Get original filenames from primary pair for naming
+            primary_excel_name = primary["excel_name"]
+            primary_pdf_name = primary["pdf_name"]
+            excel_base_name = Path(primary_excel_name).stem
+            pdf_base_name = Path(primary_pdf_name).stem
+
+            zip_filename = f"{excel_base_name}_merged.zip"
+            excel_zip_name = f"{excel_base_name}_merged.xlsx"
+            pdf_zip_name = f"{pdf_base_name}_merged.pdf"
         else:
             # For single file workflows, files are saved to original paths
             excel_output_path = excel_base_path
@@ -446,6 +579,10 @@ def show_download_section():
 
             zip_buffer.seek(0)
 
+            # Create download button with timestamp for uniqueness
+            timestamp = int(time.time())
+            download_key = f"download_merge_zip_{timestamp}"
+
             st.download_button(
                 label="📦 Download Processed Files (ZIP)",
                 data=zip_buffer.getvalue(),
@@ -453,17 +590,20 @@ def show_download_section():
                 mime="application/zip",
                 use_container_width=True,
                 help="Downloads both processed Excel and PDF files in a ZIP archive",
+                key=download_key,
+                type="primary",
             )
 
-            # Show what's included
-            st.info(
-                f"📁 **{zip_filename}** contains:\n- 📊 {excel_zip_name}\n- 📄 {pdf_zip_name}"
-            )
+            # Show reset UI
+            show_reset_ui()
 
         else:
             st.error(
                 f"Processed files not available for download. Expected files:\n- {excel_output_path}\n- {pdf_output_path}"
             )
+
+    except Exception as e:
+        st.error(f"Error preparing download: {e}")
 
 
 if __name__ == "__main__":

@@ -190,6 +190,10 @@ def show_single_file_processing():
     # Processing options sidebar
     show_processing_options_sidebar()
 
+    # Filter preview section (only show if both files uploaded and filtering enabled)
+    if uploaded_excel and uploaded_pdf:
+        show_filter_preview_section()
+
     # Processing section
     if uploaded_excel and uploaded_pdf:
         st.markdown("---")
@@ -247,8 +251,100 @@ def show_processing_options_sidebar():
             "Enable Data Filtering",
             value=st.session_state.get("filter_enabled", False),
             key="filter_enabled",
-            help="Filter data by column values (will prompt during processing)",
+            help="Configure data filtering in the main interface below",
         )
+
+
+def show_filter_preview_section():
+    """Display filter preview section if filtering is enabled."""
+    if not st.session_state.get("filter_enabled", False):
+        return
+
+    st.markdown("---")
+    st.markdown("### 🔍 Data Filtering")
+
+    # Load Excel data for preview
+    excel_path = st.session_state.get("excel_temp_path")
+    if not excel_path:
+        st.warning("Excel file not found. Please re-upload your Excel file.")
+        return
+
+    try:
+        # Load Excel data using the same method as the backend
+        from adapters.excel_repo import ExcelOpenpyxlRepo
+
+        excel_repo = ExcelOpenpyxlRepo()
+        df = excel_repo.load(excel_path, sheet="Sheet")
+
+        if df is None or df.empty:
+            st.warning("No data found in Excel file.")
+            return
+
+        # Show data preview
+        with st.expander("📊 Data Preview", expanded=False):
+            st.dataframe(df.head(10), use_container_width=True)
+            st.caption(f"Showing first 10 rows of {len(df)} total rows")
+
+        # Filter configuration
+        st.markdown("**Configure Filtering:**")
+
+        # Get filterable columns (exclude system columns)
+        filterable_columns = [
+            col
+            for col in df.columns
+            if not col.startswith("_") and col not in ["Index#", "Document_ID"]
+        ]
+
+        col1, col2 = st.columns([1, 2])
+
+        with col1:
+            # Column selection
+            filter_column = st.selectbox(
+                "Filter by column:",
+                options=["None"] + filterable_columns,
+                key="filter_column_preview",
+                help="Select a column to filter the data",
+            )
+
+        with col2:
+            if filter_column and filter_column != "None":
+                # Get unique values for selected column
+                unique_values = sorted(
+                    [str(val) for val in df[filter_column].dropna().unique()]
+                )
+
+                # Value selection
+                selected_values = st.multiselect(
+                    f"Select values to keep from '{filter_column}':",
+                    options=unique_values,
+                    key="filter_values_preview",
+                    help=f"Choose which {filter_column} values to include in processing",
+                )
+
+                # Store selections in session state for the pipeline
+                st.session_state.filter_column = filter_column
+                st.session_state.filter_values = selected_values
+
+                # Show filter summary
+                if selected_values:
+                    filtered_count = len(
+                        df[df[filter_column].astype(str).isin(selected_values)]
+                    )
+                    st.info(
+                        f"📈 Filter will include **{filtered_count:,}** of **{len(df):,}** rows ({filtered_count / len(df) * 100:.1f}%)"
+                    )
+                else:
+                    st.info("⚠️ No values selected - all data will be processed")
+            else:
+                # Clear filter selections
+                st.session_state.filter_column = None
+                st.session_state.filter_values = []
+                st.info("ℹ️ No filtering configured - all data will be processed")
+
+    except Exception as e:
+        st.error(f"Error loading Excel data for filtering: {e}")
+        st.session_state.filter_column = None
+        st.session_state.filter_values = []
 
 
 def process_files():
@@ -327,6 +423,9 @@ def show_reset_ui():
     if st.button("🔄 Process New Files", use_container_width=True, type="secondary"):
         clear_file_uploaders()
         st.session_state.show_downloads = False
+        # Clear filter selections
+        st.session_state.filter_column = None
+        st.session_state.filter_values = []
         st.session_state.ui_adapter.reset_gui()
         st.rerun()
 
