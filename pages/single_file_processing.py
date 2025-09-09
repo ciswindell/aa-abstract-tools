@@ -81,13 +81,23 @@ def show_single_file_processing():
     # Processing options sidebar
     show_processing_options_sidebar()
 
-    # Processing section
+    # Processing/Download section
     if uploaded_excel and uploaded_pdf:
         st.markdown("---")
-        st.markdown("### ⚙️ Processing")
 
-        if st.button("🚀 Process Files", type="primary", use_container_width=True):
+        # Check if we should process files
+        if st.button(
+            "🚀 Process Files",
+            type="primary",
+            use_container_width=True,
+            disabled=st.session_state.get("processing_complete", False),
+        ):
             process_files()
+
+        # Show download section if processing is complete
+        if st.session_state.get("processing_complete"):
+            st.markdown("---")
+            show_download_section()
     else:
         st.info("Please upload both Excel and PDF files to continue.")
 
@@ -95,9 +105,6 @@ def show_single_file_processing():
     if st.session_state.get("status_messages"):
         st.markdown("---")
         st.session_state.ui_adapter.display_status_messages()
-
-    # Download section
-    show_download_section()
 
 
 def show_processing_options_sidebar():
@@ -114,7 +121,7 @@ def show_processing_options_sidebar():
         )
 
         # Reorder pages option (dependent on sort bookmarks)
-        reorder_pages = st.checkbox(
+        st.checkbox(
             "Reorder Pages to Match Bookmarks",
             value=st.session_state.get("reorder_pages_enabled", True)
             and sort_bookmarks,
@@ -161,7 +168,22 @@ def process_files():
             progress_bar.progress(100)
             status_container.text("Processing complete!")
 
+        # Store processed file data in session state before rerun
+        excel_path = st.session_state.get("excel_temp_path")
+        pdf_path = st.session_state.get("pdf_temp_path")
+
+        if excel_path and pdf_path:
+            try:
+                with open(excel_path, "rb") as f:
+                    st.session_state.processed_excel_data = f.read()
+                with open(pdf_path, "rb") as f:
+                    st.session_state.processed_pdf_data = f.read()
+            except Exception as e:
+                st.error(f"Failed to store processed files: {e}")
+                return
+
         st.session_state.processing_complete = True
+        st.rerun()
 
     except Exception as e:
         st.error(f"Processing failed: {str(e)}")
@@ -170,70 +192,109 @@ def process_files():
 
 def show_download_section():
     """Display download section for processed files."""
-    if st.session_state.get("processing_complete"):
+    st.markdown("### 📥 Download Processed Files")
+
+    # Get original filenames
+    excel_name = (
+        st.session_state.uploaded_excel_file.name
+        if st.session_state.get("uploaded_excel_file")
+        else "document"
+    )
+    pdf_name = (
+        st.session_state.uploaded_pdf_file.name
+        if st.session_state.get("uploaded_pdf_file")
+        else "document"
+    )
+
+    # Create processed filenames
+    excel_base = Path(excel_name).stem
+    pdf_base = Path(pdf_name).stem
+
+    processed_excel_name = f"{excel_base}_processed.xlsx"
+    processed_pdf_name = f"{pdf_base}_processed.pdf"
+
+    # Check if processed file data is available in session state
+    excel_data = st.session_state.get("processed_excel_data")
+    pdf_data = st.session_state.get("processed_pdf_data")
+
+    if excel_data and pdf_data:
+        # Create ZIP file with both processed files
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            try:
+                # Use processed data from session state
+                if len(excel_data) == 0:
+                    st.error("Excel file appears to be empty")
+                    return
+                zip_file.writestr(processed_excel_name, excel_data)
+
+                if len(pdf_data) == 0:
+                    st.error("PDF file appears to be empty")
+                    return
+                zip_file.writestr(processed_pdf_name, pdf_data)
+
+            except Exception as e:
+                st.error(f"Error creating ZIP file: {e}")
+                return
+
+        zip_buffer.seek(0)
+
+        # Create base name for ZIP file with timestamp to bust cache
+        import time
+
+        timestamp = int(time.time())
+        base_name = Path(excel_name).stem
+        zip_filename = f"{base_name}_processed_{timestamp}.zip"
+
+        # Use a unique key for the download button to prevent caching
+        download_key = f"download_zip_{timestamp}"
+
+        st.download_button(
+            label="📦 Download Processed Files (ZIP)",
+            data=zip_buffer.getvalue(),
+            file_name=zip_filename,
+            mime="application/zip",
+            use_container_width=True,
+            help=f"Downloads both {processed_excel_name} and {processed_pdf_name} in a ZIP archive",
+            key=download_key,
+        )
+
+        # Show what's included
+        st.info(
+            f"📁 **{zip_filename}** contains:\n- 📊 {processed_excel_name}\n- 📄 {processed_pdf_name}"
+        )
+
+        # Add button to process new files
         st.markdown("---")
-        st.markdown("### 📥 Download Processed Files")
+        if st.button("🔄 Process New Files", use_container_width=True):
+            # Reset processing state and clear processed data
+            st.session_state.processing_complete = False
+            if "processed_excel_data" in st.session_state:
+                del st.session_state.processed_excel_data
+            if "processed_pdf_data" in st.session_state:
+                del st.session_state.processed_pdf_data
 
-        # Get original filenames
-        excel_name = (
-            st.session_state.uploaded_excel_file.name
-            if st.session_state.get("uploaded_excel_file")
-            else "document"
-        )
-        pdf_name = (
-            st.session_state.uploaded_pdf_file.name
-            if st.session_state.get("uploaded_pdf_file")
-            else "document"
-        )
+            # Clear uploaded files from session state
+            if "uploaded_excel_file" in st.session_state:
+                del st.session_state.uploaded_excel_file
+            if "uploaded_pdf_file" in st.session_state:
+                del st.session_state.uploaded_pdf_file
+            if "excel_temp_path" in st.session_state:
+                del st.session_state.excel_temp_path
+            if "pdf_temp_path" in st.session_state:
+                del st.session_state.pdf_temp_path
 
-        # Create processed filenames
-        excel_base = Path(excel_name).stem
-        pdf_base = Path(pdf_name).stem
+            # Clear file uploader widget states
+            if "excel_uploader" in st.session_state:
+                del st.session_state.excel_uploader
+            if "pdf_uploader" in st.session_state:
+                del st.session_state.pdf_uploader
 
-        processed_excel_name = f"{excel_base}_processed.xlsx"
-        processed_pdf_name = f"{pdf_base}_processed.pdf"
+            st.session_state.ui_adapter.reset_gui()
+            st.rerun()
 
-        # Check if files are available (reset_gui disabled for debugging)
-        excel_path = st.session_state.get("excel_temp_path")
-        pdf_path = st.session_state.get("pdf_temp_path")
-
-        excel_available = excel_path and Path(excel_path).exists()
-        pdf_available = pdf_path and Path(pdf_path).exists()
-
-        if excel_available and pdf_available:
-            # Create ZIP file with both processed files
-            zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-                # Add Excel file from file path
-                with open(excel_path, "rb") as excel_file:
-                    zip_file.writestr(processed_excel_name, excel_file.read())
-
-                # Add PDF file from file path
-                with open(pdf_path, "rb") as pdf_file:
-                    zip_file.writestr(processed_pdf_name, pdf_file.read())
-
-            zip_buffer.seek(0)
-
-            # Create base name for ZIP file
-            base_name = Path(excel_name).stem
-            zip_filename = f"{base_name}_processed.zip"
-
-            st.download_button(
-                label="📦 Download Processed Files (ZIP)",
-                data=zip_buffer.getvalue(),
-                file_name=zip_filename,
-                mime="application/zip",
-                use_container_width=True,
-                help=f"Downloads both {processed_excel_name} and {processed_pdf_name} in a ZIP archive",
-            )
-
-            # Show what's included
-            st.info(
-                f"📁 **{zip_filename}** contains:\n- 📊 {processed_excel_name}\n- 📄 {processed_pdf_name}"
-            )
-
-        else:
-            st.error("Processed files not available for download")
+    else:
+        st.error("Processed files not available for download")
 
 
 if __name__ == "__main__":
