@@ -37,15 +37,35 @@ class StreamlitUIAdapter:
         """Get processing options from Streamlit widgets in session state."""
         # Get options from session state (will be set by UI widgets)
         # Handle both single file and multi-file merge keys
-        sort_bookmarks = st.session_state.get(
-            "sort_bookmarks_enabled", True
-        ) or st.session_state.get("sort_bookmarks_enabled_merge", True)
-        reorder_pages = st.session_state.get(
-            "reorder_pages_enabled", True
-        ) or st.session_state.get("reorder_pages_enabled_merge", True)
-        check_document_images = st.session_state.get(
-            "check_document_images_enabled", True
-        ) or st.session_state.get("check_document_images_enabled_merge", True)
+        # Check single file keys first, then merge keys as fallback
+        if "sort_bookmarks_enabled" in st.session_state:
+            sort_bookmarks = st.session_state.get("sort_bookmarks_enabled")
+        else:
+            sort_bookmarks = st.session_state.get("sort_bookmarks_enabled_merge", True)
+
+        if "reorder_pages_enabled" in st.session_state:
+            reorder_pages = st.session_state.get("reorder_pages_enabled")
+        else:
+            reorder_pages = st.session_state.get("reorder_pages_enabled_merge", True)
+
+        if "check_document_images_enabled" in st.session_state:
+            check_document_images = st.session_state.get(
+                "check_document_images_enabled"
+            )
+        else:
+            check_document_images = st.session_state.get(
+                "check_document_images_enabled_merge", True
+            )
+
+        # Debug: Print what we're getting
+        print(
+            f"DEBUG get_options(): sort_bookmarks_enabled = {st.session_state.get('sort_bookmarks_enabled')}"
+        )
+        print(f"DEBUG get_options(): final sort_bookmarks = {sort_bookmarks}")
+        print(
+            f"DEBUG get_options(): reorder_pages_enabled = {st.session_state.get('reorder_pages_enabled')}"
+        )
+        print(f"DEBUG get_options(): final reorder_pages = {reorder_pages}")
         filter_enabled = st.session_state.get(
             "filter_enabled", False
         ) or st.session_state.get("filter_enabled_merge", False)

@@ -238,15 +238,17 @@ def show_file_upload_tab():
             # Save to temp file using UI adapter
             st.session_state.ui_adapter.save_uploaded_file(uploaded_excel, "excel")
 
-    if uploaded_pdf:
-        # Validate file size
-        file_size_mb = len(uploaded_pdf.getvalue()) / (1024 * 1024)
-        if file_size_mb > 400:
-            st.error(f"File too large: {file_size_mb:.1f}MB. Maximum allowed: 400MB")
-        else:
-            st.session_state.uploaded_pdf = uploaded_pdf
-            # Save to temp file using UI adapter
-            st.session_state.ui_adapter.save_uploaded_file(uploaded_pdf, "pdf")
+        if uploaded_pdf:
+            # Validate file size
+            file_size_mb = len(uploaded_pdf.getvalue()) / (1024 * 1024)
+            if file_size_mb > 400:
+                st.error(
+                    f"File too large: {file_size_mb:.1f}MB. Maximum allowed: 400MB"
+                )
+            else:
+                st.session_state.uploaded_pdf = uploaded_pdf
+                # Save to temp file using UI adapter
+                st.session_state.ui_adapter.save_uploaded_file(uploaded_pdf, "pdf")
 
     # Show upload status
     if uploaded_excel and uploaded_pdf:
@@ -319,7 +321,7 @@ def show_options_tab():
         st.warning("⚠️ Please upload files in the **Files** tab first.")
         return
 
-        st.markdown("### ⚙️ Processing Options")
+    st.markdown("### ⚙️ Processing Options")
     st.markdown("Configure how your files will be processed.")
 
     # Processing options
@@ -354,6 +356,16 @@ def show_options_tab():
     st.session_state.sort_bookmarks_enabled = sort_bookmarks
     st.session_state.reorder_pages_enabled = reorder_pages
     st.session_state.check_document_images_enabled = check_images
+
+    # Debug: Show what's actually stored
+    st.write("DEBUG - Session state values:")
+    st.write(
+        f"sort_bookmarks_enabled: {st.session_state.get('sort_bookmarks_enabled')}"
+    )
+    st.write(f"reorder_pages_enabled: {st.session_state.get('reorder_pages_enabled')}")
+    st.write(
+        f"check_document_images_enabled: {st.session_state.get('check_document_images_enabled')}"
+    )
 
     # Show summary
     st.markdown("#### Current Settings")
@@ -837,8 +849,8 @@ def handle_post_processing():
 
     try:
         # Get filenames
-        excel_name = get_filename_or_default("uploaded_excel_file")
-        pdf_name = get_filename_or_default("uploaded_pdf_file")
+        excel_name = get_filename_or_default("uploaded_excel")
+        pdf_name = get_filename_or_default("uploaded_pdf")
 
         # Create processed filenames
         processed_excel_name = create_processed_filename(excel_name, "xlsx")
