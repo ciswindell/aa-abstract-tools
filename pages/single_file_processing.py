@@ -133,6 +133,10 @@ def show_single_file_processing():
     if "pdf_uploader_key" not in st.session_state:
         st.session_state.pdf_uploader_key = "pdf_uploader_0"
 
+    # Initialize only essential workflow state variables (don't override existing values)
+    # These will be set by user interactions or reset function
+    pass
+
     # Back to mode selection button
     if st.button("← Back to Mode Selection", key="back_to_mode"):
         st.session_state.current_page = "mode_selection"
@@ -233,7 +237,7 @@ def show_progressive_workflow():
     st.markdown("---")
 
     # Step 1: Filter Decision Point
-    if "filter_decision_made" not in st.session_state:
+    if not st.session_state.get("filter_decision_made"):
         show_filter_decision_point()
         return
 
@@ -241,12 +245,12 @@ def show_progressive_workflow():
     if st.session_state.get("filter_decision_made") and st.session_state.get(
         "wants_filtering"
     ):
-        if "filter_configured" not in st.session_state:
+        if not st.session_state.get("filter_configured"):
             show_filter_configuration()
             return
 
     # Step 3: Processing Options Decision Point
-    if "processing_options_decided" not in st.session_state:
+    if not st.session_state.get("processing_options_decided"):
         show_processing_options_decision()
         return
 
@@ -511,22 +515,43 @@ def show_download_ui(
     )
 
 
+def reset_workflow_state():
+    """Reset all workflow state for a fresh start."""
+    # Clear file uploaders
+    clear_file_uploaders()
+    st.session_state.show_downloads = False
+
+    # Reset workflow state to initial values (don't delete, just reset)
+    st.session_state.filter_decision_made = False
+    st.session_state.wants_filtering = False
+    st.session_state.filter_configured = False
+    st.session_state.processing_options_decided = False
+    st.session_state.filter_enabled = False
+    st.session_state.filter_column = None
+    st.session_state.filter_values = []
+
+    # Reset processing option states to defaults
+    st.session_state.sort_bookmarks_enabled = True
+    st.session_state.reorder_pages_enabled = True
+    st.session_state.check_document_images_enabled = True
+
+    # Reset widget states
+    st.session_state.filter_column_widget = None
+    st.session_state.filter_values_widget = []
+
+    # Reset UI adapter
+    st.session_state.ui_adapter.reset_gui()
+
+
 def show_reset_ui():
     """Display reset UI and handle reset functionality."""
     st.markdown("---")
-    if st.button("🔄 Process New Files", use_container_width=True, type="secondary"):
-        clear_file_uploaders()
-        st.session_state.show_downloads = False
-        # Clear all workflow state
-        st.session_state.filter_decision_made = False
-        st.session_state.wants_filtering = False
-        st.session_state.filter_configured = False
-        st.session_state.processing_options_decided = False
-        st.session_state.filter_enabled = False
-        st.session_state.filter_column = None
-        st.session_state.filter_values = []
-        st.session_state.ui_adapter.reset_gui()
-        st.rerun()
+    st.button(
+        "🔄 Process New Files",
+        use_container_width=True,
+        type="secondary",
+        on_click=reset_workflow_state,
+    )
 
 
 def handle_post_processing():

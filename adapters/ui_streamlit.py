@@ -97,13 +97,11 @@ class StreamlitUIAdapter:
         # Note: We intentionally preserve processed_excel_data and processed_pdf_data
         # so users can download the processed files even after reset
 
-        # Clear processing options (but keep user preferences)
-        if "filter_column" in st.session_state:
-            del st.session_state.filter_column
-        if "filter_values" in st.session_state:
-            del st.session_state.filter_values
-        if "merge_pairs" in st.session_state:
-            del st.session_state.merge_pairs
+        # Reset processing options to default values (don't delete keys)
+        st.session_state.filter_enabled = False
+        st.session_state.filter_column = None
+        st.session_state.filter_values = []
+        st.session_state.merge_pairs = None
 
         # Keep status messages for user reference
         self.log_status("GUI reset - ready for new files!")
