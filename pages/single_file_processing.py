@@ -16,6 +16,97 @@ from adapters.ui_streamlit import StreamlitUIAdapter
 from core.app_controller import AppController
 
 
+# Custom CSS for button styling
+def inject_custom_css():
+    """Inject custom CSS for button styling."""
+    st.markdown(
+        """
+        <style>
+        /* Download button - Green primary style */
+        .stDownloadButton > button {
+            background-color: #28a745 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 6px !important;
+            font-weight: 600 !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .stDownloadButton > button:hover {
+            background-color: #218838 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3) !important;
+        }
+        
+        /* Alternative selector for download button */
+        button[kind="primary"] {
+            background-color: #28a745 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 6px !important;
+            font-weight: 600 !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        button[kind="primary"]:hover {
+            background-color: #218838 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3) !important;
+        }
+        
+        /* Process button - Red primary style - Multiple selectors to ensure it works */
+        .stButton > button[kind="primary"]:not([data-testid*="download"]) {
+            background-color: #dc3545 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 6px !important;
+            font-weight: 600 !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .stButton > button[kind="primary"]:not([data-testid*="download"]):hover {
+            background-color: #c82333 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3) !important;
+        }
+        
+        /* Alternative selector for process button */
+        button[data-testid="baseButton-primary"] {
+            background-color: #dc3545 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 6px !important;
+            font-weight: 600 !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        button[data-testid="baseButton-primary"]:hover {
+            background-color: #c82333 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3) !important;
+        }
+
+        /* Reset button - Orange secondary style */
+        .stButton > button[kind="secondary"] {
+            background-color: #fd7e14 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 6px !important;
+            font-weight: 500 !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .stButton > button[kind="secondary"]:hover {
+            background-color: #e8690b !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(253, 126, 20, 0.3) !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def clear_file_uploaders():
     """Clear file uploaders by rotating their keys."""
     # Generate new unique keys to force uploader reset
@@ -26,6 +117,9 @@ def clear_file_uploaders():
 
 def show_single_file_processing():
     """Display the single file processing page."""
+    # Inject custom CSS for button styling
+    inject_custom_css()
+
     st.title("📄 Single File Processing")
     st.markdown("---")
 
@@ -105,9 +199,9 @@ def show_single_file_processing():
             process_files()
             st.session_state.show_downloads = True
 
-        # Show download section if processing completed
+        # Handle post-processing workflow if processing completed
         if st.session_state.get("show_downloads"):
-            show_download_section()
+            handle_post_processing()
     else:
         st.info("Please upload both Excel and PDF files to continue.")
 
@@ -163,122 +257,128 @@ def process_files():
         # Create controller with UI adapter
         controller = AppController(st.session_state.ui_adapter)
 
-        # Show processing status
+        # Show simple processing status
         with st.spinner("Processing files..."):
-            progress_bar = st.progress(0)
-            status_container = st.empty()
-
-            # Update progress
-            progress_bar.progress(25)
-            status_container.text("Validating files...")
-
             # Process files
             controller.process_files()
 
-            progress_bar.progress(100)
-            status_container.text("Processing complete!")
-
-        st.success("✅ Processing completed successfully!")
+        st.success("✅ Files processed successfully!")
 
     except Exception as e:
         st.error(f"Processing failed: {str(e)}")
         st.session_state.ui_adapter.log_status(f"ERROR: {str(e)}")
 
 
-def show_download_section():
-    """Display download section for processed files."""
+def get_filename_or_default(session_key: str, default: str = "document") -> str:
+    """Get filename from session state or return default."""
+    file_obj = st.session_state.get(session_key)
+    return file_obj.name if file_obj else default
+
+
+def create_processed_filename(original_name: str, extension: str) -> str:
+    """Create processed filename from original name."""
+    base_name = Path(original_name).stem
+    return f"{base_name}.{extension}"
+
+
+def read_file_safely(file_path: str) -> bytes:
+    """Read file and return data, raise exception if fails."""
+    with open(file_path, "rb") as f:
+        data = f.read()
+    if len(data) == 0:
+        raise ValueError(f"File appears to be empty: {file_path}")
+    return data
+
+
+def create_download_zip(
+    excel_data: bytes, pdf_data: bytes, excel_name: str, pdf_name: str
+) -> io.BytesIO:
+    """Create ZIP file with processed files."""
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        zip_file.writestr(excel_name, excel_data)
+        zip_file.writestr(pdf_name, pdf_data)
+    zip_buffer.seek(0)
+    return zip_buffer
+
+
+def show_download_ui(
+    zip_data: bytes, zip_filename: str, excel_name: str, pdf_name: str
+):
+    """Display download UI components."""
+    timestamp = int(time.time())
+    download_key = f"download_zip_{timestamp}"
+
+    st.download_button(
+        label="📦 Download Processed Files (ZIP)",
+        data=zip_data,
+        file_name=zip_filename,
+        mime="application/zip",
+        use_container_width=True,
+        help=f"Downloads both {excel_name} and {pdf_name} in a ZIP archive",
+        key=download_key,
+        type="primary",
+    )
+
+
+def show_reset_ui():
+    """Display reset UI and handle reset functionality."""
+    st.markdown("---")
+    if st.button("🔄 Process New Files", use_container_width=True, type="secondary"):
+        clear_file_uploaders()
+        st.session_state.show_downloads = False
+        st.session_state.ui_adapter.reset_gui()
+        st.rerun()
+
+
+def handle_post_processing():
+    """Handle post-processing workflow: downloads and reset functionality."""
     st.markdown("### 📥 Download Processed Files")
-
-    # Get original filenames
-    excel_name = (
-        st.session_state.uploaded_excel_file.name
-        if st.session_state.get("uploaded_excel_file")
-        else "document"
-    )
-    pdf_name = (
-        st.session_state.uploaded_pdf_file.name
-        if st.session_state.get("uploaded_pdf_file")
-        else "document"
-    )
-
-    # Create processed filenames
-    excel_base = Path(excel_name).stem
-    pdf_base = Path(pdf_name).stem
-
-    processed_excel_name = f"{excel_base}_processed.xlsx"
-    processed_pdf_name = f"{pdf_base}_processed.pdf"
 
     # Get file paths
     excel_path = st.session_state.get("excel_temp_path")
     pdf_path = st.session_state.get("pdf_temp_path")
 
-    if excel_path and pdf_path:
-        # Read processed files directly
-        try:
-            with open(excel_path, "rb") as f:
-                excel_data = f.read()
-            with open(pdf_path, "rb") as f:
-                pdf_data = f.read()
-        except Exception as e:
-            st.error(f"Error reading processed files: {e}")
-            return
-        # Create ZIP file with both processed files
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-            try:
-                # Use processed data from session state
-                if len(excel_data) == 0:
-                    st.error("Excel file appears to be empty")
-                    return
-                zip_file.writestr(processed_excel_name, excel_data)
+    if not excel_path or not pdf_path:
+        st.error("Processed files not available for download")
+        return
 
-                if len(pdf_data) == 0:
-                    st.error("PDF file appears to be empty")
-                    return
-                zip_file.writestr(processed_pdf_name, pdf_data)
+    try:
+        # Get filenames
+        excel_name = get_filename_or_default("uploaded_excel_file")
+        pdf_name = get_filename_or_default("uploaded_pdf_file")
 
-            except Exception as e:
-                st.error(f"Error creating ZIP file: {e}")
-                return
+        # Create processed filenames
+        processed_excel_name = create_processed_filename(excel_name, "xlsx")
+        processed_pdf_name = create_processed_filename(pdf_name, "pdf")
 
-        zip_buffer.seek(0)
+        # Read processed files
+        excel_data = read_file_safely(excel_path)
+        pdf_data = read_file_safely(pdf_path)
 
-        # Create base name for ZIP file with timestamp to bust cache
-        import time
+        # Create ZIP
+        zip_buffer = create_download_zip(
+            excel_data, pdf_data, processed_excel_name, processed_pdf_name
+        )
 
+        # Create ZIP filename with timestamp
         timestamp = int(time.time())
         base_name = Path(excel_name).stem
         zip_filename = f"{base_name}_processed_{timestamp}.zip"
 
-        # Use a unique key for the download button to prevent caching
-        download_key = f"download_zip_{timestamp}"
-
-        st.download_button(
-            label="📦 Download Processed Files (ZIP)",
-            data=zip_buffer.getvalue(),
-            file_name=zip_filename,
-            mime="application/zip",
-            use_container_width=True,
-            help=f"Downloads both {processed_excel_name} and {processed_pdf_name} in a ZIP archive",
-            key=download_key,
+        # Show download UI
+        show_download_ui(
+            zip_buffer.getvalue(),
+            zip_filename,
+            processed_excel_name,
+            processed_pdf_name,
         )
 
-        # Show what's included
-        st.info(
-            f"📁 **{zip_filename}** contains:\n- 📊 {processed_excel_name}\n- 📄 {processed_pdf_name}"
-        )
+        # Show reset UI
+        show_reset_ui()
 
-        # Add button to process new files
-        st.markdown("---")
-        if st.button("🔄 Process New Files", use_container_width=True):
-            # Clear file uploaders and download section
-            clear_file_uploaders()
-            st.session_state.show_downloads = False
-            st.session_state.ui_adapter.reset_gui()
-            st.rerun()
-
-    else:
-        st.error("Processed files not available for download")
+    except Exception as e:
+        st.error(f"Error preparing download: {e}")
 
 
 if __name__ == "__main__":
