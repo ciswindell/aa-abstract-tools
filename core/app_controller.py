@@ -100,8 +100,8 @@ class AppController:
             message = f"Files processed successfully!\n\nSaved to: {os.path.dirname(excel_file)}"
             self.ui.show_success(message)
 
-            # Reset GUI for next processing
-            self.ui.reset_gui()
+            # Reset GUI for next processing - TEMPORARILY DISABLED FOR DEBUGGING
+            # self.ui.reset_gui()
 
         except (ValueError, OSError, RuntimeError) as e:
             self.ui.show_error("Processing Error", str(e))
