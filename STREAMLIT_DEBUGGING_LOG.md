@@ -44,6 +44,24 @@ The filtering and options dialogs work on the first run but don't appear on subs
   - `if "filter_configured" not in st.session_state:` → `if not st.session_state.get("filter_configured"):`
   - `if "processing_options_decided" not in st.session_state:` → `if not st.session_state.get("processing_options_decided"):`
 
+### ✅ **ADDITIONAL FIX: Processing Options Widget Cleanup**
+- **Problem**: Processing options (reorder pages, etc.) not being respected even when unchecked
+- **Root Cause**: Same widget cleanup issue - when processing options section disappears, widget values get lost
+- **Initial Solution**: Added explicit storage of processing option values before moving to next step
+- **Secondary Problem**: Streamlit session state conflict error: `st.session_state.sort_bookmarks_enabled cannot be modified after the widget with key sort_bookmarks_enabled is instantiated`
+- **Final Solution**: Changed widget keys to avoid conflicts and use local variables:
+  ```python
+  # Use different keys for widgets vs stored values
+  sort_bookmarks = st.checkbox("Sort PDF Bookmarks", key="sort_bookmarks_widget")
+  reorder_pages = st.checkbox("Reorder Pages", key="reorder_pages_widget") 
+  check_images = st.checkbox("Check Images", key="check_document_images_widget")
+  
+  # Store using local variables, not widget keys
+  st.session_state.sort_bookmarks_enabled = sort_bookmarks
+  st.session_state.reorder_pages_enabled = reorder_pages
+  st.session_state.check_document_images_enabled = check_images
+  ```
+
 ## Key Learnings
 
 1. **Streamlit Session State**: Use `st.session_state.get("key")` for value checks, not `"key" not in st.session_state` for existence checks

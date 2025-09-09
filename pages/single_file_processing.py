@@ -375,22 +375,22 @@ def show_processing_options_decision():
     sort_bookmarks = st.checkbox(
         "Sort PDF Bookmarks",
         value=default_sort,
-        key="sort_bookmarks_enabled",
+        key="sort_bookmarks_widget",
         help="Sort PDF bookmarks naturally",
     )
 
-    st.checkbox(
+    reorder_pages = st.checkbox(
         "Reorder Pages to Match Bookmarks",
         value=default_reorder and sort_bookmarks,
-        key="reorder_pages_enabled",
+        key="reorder_pages_widget",
         disabled=not sort_bookmarks,
         help="Physically reorder pages to match sorted bookmarks",
     )
 
-    st.checkbox(
+    check_images = st.checkbox(
         "Check Document Images",
         value=default_check_images,
-        key="check_document_images_enabled",
+        key="check_document_images_widget",
         help="Verify document images during processing",
     )
 
@@ -398,6 +398,11 @@ def show_processing_options_decision():
     if st.button(
         "✅ Continue with These Settings", type="primary", use_container_width=True
     ):
+        # Explicitly store the processing option values before moving to next step
+        st.session_state.sort_bookmarks_enabled = sort_bookmarks
+        st.session_state.reorder_pages_enabled = reorder_pages
+        st.session_state.check_document_images_enabled = check_images
+
         st.session_state.processing_options_decided = True
         st.rerun()
 
