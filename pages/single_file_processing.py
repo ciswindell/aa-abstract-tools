@@ -6,6 +6,7 @@ Handles the workflow for processing one Excel file and one PDF file.
 """
 
 import io
+import time
 import zipfile
 from pathlib import Path
 
@@ -13,6 +14,14 @@ import streamlit as st
 
 from adapters.ui_streamlit import StreamlitUIAdapter
 from core.app_controller import AppController
+
+
+def clear_file_uploaders():
+    """Clear file uploaders by rotating their keys."""
+    # Generate new unique keys to force uploader reset
+    timestamp = int(time.time() * 1000)  # Use milliseconds for uniqueness
+    st.session_state.excel_uploader_key = f"excel_uploader_{timestamp}"
+    st.session_state.pdf_uploader_key = f"pdf_uploader_{timestamp + 1}"
 
 
 def show_single_file_processing():
@@ -23,6 +32,12 @@ def show_single_file_processing():
     # Initialize UI adapter
     if "ui_adapter" not in st.session_state:
         st.session_state.ui_adapter = StreamlitUIAdapter()
+
+    # Initialize uploader keys for clearing functionality
+    if "excel_uploader_key" not in st.session_state:
+        st.session_state.excel_uploader_key = "excel_uploader_0"
+    if "pdf_uploader_key" not in st.session_state:
+        st.session_state.pdf_uploader_key = "pdf_uploader_0"
 
     # Back to mode selection button
     if st.button("← Back to Mode Selection", key="back_to_mode"):
@@ -39,7 +54,7 @@ def show_single_file_processing():
         uploaded_excel = st.file_uploader(
             "Choose Excel file",
             type=["xlsx", "xls"],
-            key="excel_uploader",
+            key=st.session_state.excel_uploader_key,
             help="Maximum file size: 400MB",
         )
 
@@ -61,7 +76,7 @@ def show_single_file_processing():
         uploaded_pdf = st.file_uploader(
             "Choose PDF file",
             type=["pdf"],
-            key="pdf_uploader",
+            key=st.session_state.pdf_uploader_key,
             help="Maximum file size: 400MB",
         )
 
@@ -81,22 +96,17 @@ def show_single_file_processing():
     # Processing options sidebar
     show_processing_options_sidebar()
 
-    # Processing/Download section
+    # Processing section
     if uploaded_excel and uploaded_pdf:
         st.markdown("---")
 
-        # Check if we should process files
-        if st.button(
-            "🚀 Process Files",
-            type="primary",
-            use_container_width=True,
-            disabled=st.session_state.get("processing_complete", False),
-        ):
+        # Simple process button
+        if st.button("🚀 Process Files", type="primary", use_container_width=True):
             process_files()
+            st.session_state.show_downloads = True
 
-        # Show download section if processing is complete
-        if st.session_state.get("processing_complete"):
-            st.markdown("---")
+        # Show download section if processing completed
+        if st.session_state.get("show_downloads"):
             show_download_section()
     else:
         st.info("Please upload both Excel and PDF files to continue.")
@@ -168,22 +178,7 @@ def process_files():
             progress_bar.progress(100)
             status_container.text("Processing complete!")
 
-        # Store processed file data in session state before rerun
-        excel_path = st.session_state.get("excel_temp_path")
-        pdf_path = st.session_state.get("pdf_temp_path")
-
-        if excel_path and pdf_path:
-            try:
-                with open(excel_path, "rb") as f:
-                    st.session_state.processed_excel_data = f.read()
-                with open(pdf_path, "rb") as f:
-                    st.session_state.processed_pdf_data = f.read()
-            except Exception as e:
-                st.error(f"Failed to store processed files: {e}")
-                return
-
-        st.session_state.processing_complete = True
-        st.rerun()
+        st.success("✅ Processing completed successfully!")
 
     except Exception as e:
         st.error(f"Processing failed: {str(e)}")
@@ -213,11 +208,20 @@ def show_download_section():
     processed_excel_name = f"{excel_base}_processed.xlsx"
     processed_pdf_name = f"{pdf_base}_processed.pdf"
 
-    # Check if processed file data is available in session state
-    excel_data = st.session_state.get("processed_excel_data")
-    pdf_data = st.session_state.get("processed_pdf_data")
+    # Get file paths
+    excel_path = st.session_state.get("excel_temp_path")
+    pdf_path = st.session_state.get("pdf_temp_path")
 
-    if excel_data and pdf_data:
+    if excel_path and pdf_path:
+        # Read processed files directly
+        try:
+            with open(excel_path, "rb") as f:
+                excel_data = f.read()
+            with open(pdf_path, "rb") as f:
+                pdf_data = f.read()
+        except Exception as e:
+            st.error(f"Error reading processed files: {e}")
+            return
         # Create ZIP file with both processed files
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
@@ -267,29 +271,9 @@ def show_download_section():
         # Add button to process new files
         st.markdown("---")
         if st.button("🔄 Process New Files", use_container_width=True):
-            # Reset processing state and clear processed data
-            st.session_state.processing_complete = False
-            if "processed_excel_data" in st.session_state:
-                del st.session_state.processed_excel_data
-            if "processed_pdf_data" in st.session_state:
-                del st.session_state.processed_pdf_data
-
-            # Clear uploaded files from session state
-            if "uploaded_excel_file" in st.session_state:
-                del st.session_state.uploaded_excel_file
-            if "uploaded_pdf_file" in st.session_state:
-                del st.session_state.uploaded_pdf_file
-            if "excel_temp_path" in st.session_state:
-                del st.session_state.excel_temp_path
-            if "pdf_temp_path" in st.session_state:
-                del st.session_state.pdf_temp_path
-
-            # Clear file uploader widget states
-            if "excel_uploader" in st.session_state:
-                del st.session_state.excel_uploader
-            if "pdf_uploader" in st.session_state:
-                del st.session_state.pdf_uploader
-
+            # Clear file uploaders and download section
+            clear_file_uploaders()
+            st.session_state.show_downloads = False
             st.session_state.ui_adapter.reset_gui()
             st.rerun()
 
