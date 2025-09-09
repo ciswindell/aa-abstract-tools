@@ -73,5 +73,26 @@ The filtering and options dialogs work on the first run but don't appear on subs
 - `pages/single_file_processing.py`: Fixed progressive workflow logic
 - `adapters/ui_streamlit.py`: Enhanced reset functionality (supporting change)
 
-## Status: ✅ RESOLVED
+## Status: ✅ RESOLVED → ✅ ENHANCED
 The filtering and options dialogs now appear correctly on both first and subsequent runs.
+
+### ✅ **MAJOR UPDATE: Tabbed Interface Implementation (2025-09-09)**
+- **Problem**: Users couldn't go back to edit filter/options after configuring them in progressive workflow
+- **Root Cause**: Progressive workflow hid previous steps once completed, creating one-way flow
+- **Solution**: Replaced progressive workflow with `st.tabs()` interface
+- **Implementation**:
+  - **Tab 1 (📁 Files)**: Shows upload status and guides to next step
+  - **Tab 2 (🔍 Filtering)**: Radio button for filter decision + configuration
+  - **Tab 3 (⚙️ Options)**: Processing options with real-time summary
+  - **Tab 4 (🚀 Process)**: Comprehensive summary + process button
+- **Benefits**:
+  - Users can freely navigate between all steps
+  - All choices remain visible and editable
+  - Clear progress indication with helpful "Next" guidance
+  - Follows modern UI patterns (like checkout flows)
+  - Native Streamlit component - no custom state management needed
+- **Code Changes**:
+  - Replaced `show_progressive_workflow()` with `show_tabbed_workflow()`
+  - Created dedicated tab functions: `show_file_upload_tab()`, `show_filtering_tab()`, `show_options_tab()`, `show_processing_tab()`
+  - Simplified reset function (removed progressive workflow state variables)
+  - Used unique widget keys per tab to avoid conflicts
