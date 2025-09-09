@@ -36,12 +36,19 @@ class StreamlitUIAdapter:
     def get_options(self) -> Options:
         """Get processing options from Streamlit widgets in session state."""
         # Get options from session state (will be set by UI widgets)
-        sort_bookmarks = st.session_state.get("sort_bookmarks_enabled", True)
-        reorder_pages = st.session_state.get("reorder_pages_enabled", True)
+        # Handle both single file and multi-file merge keys
+        sort_bookmarks = st.session_state.get(
+            "sort_bookmarks_enabled", True
+        ) or st.session_state.get("sort_bookmarks_enabled_merge", True)
+        reorder_pages = st.session_state.get(
+            "reorder_pages_enabled", True
+        ) or st.session_state.get("reorder_pages_enabled_merge", True)
         check_document_images = st.session_state.get(
             "check_document_images_enabled", True
-        )
-        filter_enabled = st.session_state.get("filter_enabled", False)
+        ) or st.session_state.get("check_document_images_enabled_merge", True)
+        filter_enabled = st.session_state.get(
+            "filter_enabled", False
+        ) or st.session_state.get("filter_enabled_merge", False)
         filter_column = st.session_state.get("filter_column", None)
         filter_values = st.session_state.get("filter_values", None)
         merge_pairs = st.session_state.get("merge_pairs", None)
@@ -198,7 +205,7 @@ class StreamlitUIAdapter:
     def display_status_messages(self):
         """Display accumulated status messages."""
         if st.session_state.get("status_messages"):
-            with st.expander("Processing Status", expanded=True):
+            with st.expander("Processing Status", expanded=False):
                 for message in st.session_state.status_messages[
                     -10:
                 ]:  # Show last 10 messages

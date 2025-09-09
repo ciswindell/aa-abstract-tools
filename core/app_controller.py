@@ -3,7 +3,6 @@
 Application controller that orchestrates processing using UI abstraction.
 """
 
-import os
 from typing import Optional
 
 from openpyxl import load_workbook
@@ -96,9 +95,7 @@ class AppController:
             if not result.success:
                 raise RuntimeError(result.message or "Unknown error")
 
-            # Show success
-            message = f"Files processed successfully!\n\nSaved to: {os.path.dirname(excel_file)}"
-            self.ui.show_success(message)
+            # Success handled by UI layer
 
             # Reset GUI for next processing - TEMPORARILY DISABLED FOR DEBUGGING
             # self.ui.reset_gui()
