@@ -57,15 +57,6 @@ class StreamlitUIAdapter:
                 "check_document_images_enabled_merge", True
             )
 
-        # Debug: Print what we're getting
-        print(
-            f"DEBUG get_options(): sort_bookmarks_enabled = {st.session_state.get('sort_bookmarks_enabled')}"
-        )
-        print(f"DEBUG get_options(): final sort_bookmarks = {sort_bookmarks}")
-        print(
-            f"DEBUG get_options(): reorder_pages_enabled = {st.session_state.get('reorder_pages_enabled')}"
-        )
-        print(f"DEBUG get_options(): final reorder_pages = {reorder_pages}")
         filter_enabled = st.session_state.get(
             "filter_enabled", False
         ) or st.session_state.get("filter_enabled_merge", False)
@@ -196,15 +187,6 @@ class StreamlitUIAdapter:
             return None, []
 
         return filter_column, selected_values
-
-    def prompt_merge_pairs(self) -> Optional[List[Tuple[str, str]]]:
-        """Prompt user to select one or more (Excel, PDF) pairs for merge."""
-        st.info(
-            "Multi-file merge pair selection will be implemented in the workflow pages."
-        )
-        # This will be implemented in the multi-file merge page
-        # For now, return None to indicate no merge pairs
-        return None
 
     def save_uploaded_file(self, uploaded_file, file_type: str) -> str:
         """Save uploaded file to temporary location and return path."""

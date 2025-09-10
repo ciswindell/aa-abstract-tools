@@ -5,8 +5,6 @@ Single file processing page for Abstract Renumber Tool.
 Handles the workflow for processing one Excel file and one PDF file.
 """
 
-import time
-
 import streamlit as st
 
 from adapters.excel_repo import ExcelOpenpyxlRepo
@@ -17,14 +15,6 @@ from .components.downloads import DownloadManager
 from .components.file_upload import FileUploadManager
 from .components.processing_options import ProcessingOptionsManager
 from .components.tabbed_workflow import TabbedWorkflowManager
-
-
-def clear_file_uploaders():
-    """Clear file uploaders by rotating their keys."""
-    # Generate new unique keys to force uploader reset
-    timestamp = int(time.time() * 1000)  # Use milliseconds for uniqueness
-    st.session_state.excel_uploader_key = f"excel_uploader_{timestamp}"
-    st.session_state.pdf_uploader_key = f"pdf_uploader_{timestamp + 1}"
 
 
 class SingleFileProcessingPage(BaseStreamlitPage):
