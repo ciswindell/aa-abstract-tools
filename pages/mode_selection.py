@@ -36,7 +36,7 @@ def show_mode_selection():
         if st.button(
             "Start Single File Processing",
             type="primary",
-            use_container_width=True,
+            width="stretch",
             key="single_file_btn",
         ):
             st.session_state.current_page = "single_file"
@@ -55,7 +55,7 @@ def show_mode_selection():
         if st.button(
             "Start Multi-File Merge",
             type="primary",
-            use_container_width=True,
+            width="stretch",
             key="multi_file_btn",
         ):
             st.session_state.current_page = "multi_file"

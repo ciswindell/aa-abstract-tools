@@ -188,7 +188,7 @@ class SingleFileProcessingPage(BaseStreamlitPage):
         self.show_processing_summary()
 
         # Process button
-        if st.button("🚀 Process Files", type="primary", use_container_width=True):
+        if st.button("🚀 Process Files", type="primary", width="stretch"):
             self.process_files()
             st.session_state.show_downloads = True
 
@@ -290,7 +290,7 @@ class SingleFileProcessingPage(BaseStreamlitPage):
         st.markdown("---")
         st.button(
             "🔄 Process New Files",
-            use_container_width=True,
+            width="stretch",
             type="secondary",
             on_click=self.reset_workflow_state,
         )

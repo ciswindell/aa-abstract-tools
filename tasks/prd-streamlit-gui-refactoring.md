@@ -97,6 +97,21 @@ The current Streamlit GUI codebase suffers from massive code duplication, unused
    - Work correctly with the existing `StreamlitUIAdapter` and processing pipeline
    - Handle all existing session state management correctly
 
+### Phase 8: Streamlit Deprecation Updates
+8. The system must address Streamlit deprecation warnings:
+   - Replace all instances of `use_container_width` parameter with the new `width` parameter
+   - Update `use_container_width=True` to `width='stretch'`
+   - Update `use_container_width=False` to `width='content'`
+   - Ensure compatibility with Streamlit versions beyond 2025-12-31
+
+### Phase 9: Single File Download Naming Fix
+9. The system must fix file naming in single file workflow downloads:
+   - ZIP filename should remain: `original_name_processed.zip`
+   - Files inside ZIP should use original names without suffix:
+     - `original_name.xlsx` (not `original_name_processed.xlsx`)
+     - `original_name.pdf` (not `original_name_processed.pdf`)
+   - This provides cleaner file names for end users while maintaining clear ZIP identification
+
 ## Non-Goals (Out of Scope)
 
 1. **Processing Logic Changes:** No modifications to core processing logic, pipeline, or business rules
@@ -205,7 +220,13 @@ pages/
 - Integrate filtering and processing options into merge workflow
 - Ensure UX parity with single file processing
 
-### Phase 5 (Final): Integration
+### Phase 5 (High Priority): Streamlit Deprecation Updates
+- Identify all uses of `use_container_width` parameter across the codebase
+- Replace `use_container_width=True` with `width='stretch'`
+- Replace `use_container_width=False` with `width='content'`
+- Test all affected UI components to ensure visual consistency
+
+### Phase 6 (Final): Integration
 - Complete integration testing
 - Performance verification
 - Documentation updates

@@ -380,7 +380,7 @@ class MultiFileMergePage(BaseStreamlitPage):
             with st.expander("📊 Merged Data Preview", expanded=False):
                 st.markdown(f"**Total rows:** {len(merged_df)}")
                 st.markdown(f"**Columns:** {', '.join(merged_df.columns)}")
-                st.dataframe(merged_df.head(10), use_container_width=True)
+                st.dataframe(merged_df.head(10), width="stretch")
 
             # Get filterable columns (exclude system columns)
             system_columns = {"_include", "Index#", "Document_ID"}
@@ -433,7 +433,7 @@ class MultiFileMergePage(BaseStreamlitPage):
                         filtered_df = merged_df[
                             merged_df[filter_column].isin(filter_values)
                         ]
-                        st.dataframe(filtered_df.head(10), use_container_width=True)
+                        st.dataframe(filtered_df.head(10), width="stretch")
                 else:
                     st.info("Select values to see filtering preview.")
             else:
@@ -564,9 +564,7 @@ class MultiFileMergePage(BaseStreamlitPage):
         self.show_processing_summary()
 
         # Process button
-        if st.button(
-            "🚀 Process All File Pairs", type="primary", use_container_width=True
-        ):
+        if st.button("🚀 Process All File Pairs", type="primary", width="stretch"):
             self.process_merge_files()
             st.session_state.show_downloads = True
 
@@ -740,9 +738,7 @@ class MultiFileMergePage(BaseStreamlitPage):
     def show_reset_ui(self):
         """Display reset UI and handle reset functionality."""
         st.markdown("---")
-        if st.button(
-            "🔄 Process New Files", use_container_width=True, type="secondary"
-        ):
+        if st.button("🔄 Process New Files", width="stretch", type="secondary"):
             self.reset_workflow()
             st.session_state.show_downloads = False
             st.session_state.primary_pair = None

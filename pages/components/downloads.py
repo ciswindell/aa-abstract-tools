@@ -112,7 +112,7 @@ class DownloadManager:
             data=zip_data,
             file_name=zip_filename,
             mime="application/zip",
-            use_container_width=True,
+            width="stretch",
             help=f"Downloads both {excel_name} and {pdf_name} in a ZIP archive",
             key=download_key,
             type="primary",
@@ -157,14 +157,16 @@ class DownloadManager:
         excel_name = self.get_filename_or_default(excel_session_key)
         pdf_name = self.get_filename_or_default(pdf_session_key)
 
-        # Create processed filenames
+        # Create filenames for ZIP and files inside ZIP
         if is_merge:
-            processed_excel_name = self.create_merged_filename(excel_name, "xlsx")
-            processed_pdf_name = self.create_merged_filename(pdf_name, "pdf")
+            # For merge workflow: use _merged suffix for both ZIP and files inside
+            excel_zip_name = self.create_merged_filename(excel_name, "xlsx")
+            pdf_zip_name = self.create_merged_filename(pdf_name, "pdf")
             zip_filename = self.create_merged_filename(excel_name, "zip")
         else:
-            processed_excel_name = self.create_processed_filename(excel_name, "xlsx")
-            processed_pdf_name = self.create_processed_filename(pdf_name, "pdf")
+            # For single file workflow: use original names inside ZIP, _processed for ZIP filename
+            excel_zip_name = f"{Path(excel_name).stem}.xlsx"
+            pdf_zip_name = f"{Path(pdf_name).stem}.pdf"
             zip_filename = self.create_processed_filename(excel_name, "zip")
 
         # Read processed files
@@ -173,12 +175,12 @@ class DownloadManager:
 
         # Create ZIP
         zip_buffer = self.create_download_zip(
-            excel_data, pdf_data, processed_excel_name, processed_pdf_name
+            excel_data, pdf_data, excel_zip_name, pdf_zip_name
         )
 
         return (
             zip_buffer.getvalue(),
             zip_filename,
-            processed_excel_name,
-            processed_pdf_name,
+            excel_zip_name,
+            pdf_zip_name,
         )

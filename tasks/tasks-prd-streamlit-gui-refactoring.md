@@ -70,14 +70,26 @@
   - [x] 5.7 Ensure filtering and processing options apply to all selected file pairs
   - [x] 5.8 Implement progress tracking and status updates during multi-file processing
   - [x] 5.9 Update sidebar information to show current step progress like single file processing
-- [ ] 6.0 Integration Testing and Validation
-  - [ ] 6.1 Test single file processing workflow end-to-end to ensure 100% functionality preservation
-  - [ ] 6.2 Test multi-file merge workflow end-to-end to ensure all existing functionality works
-  - [ ] 6.3 Test tabbed interface navigation and state persistence across both workflows
-  - [ ] 6.4 Test file upload, validation, and temporary file management across all components
-  - [ ] 6.5 Test processing options configuration and application across both workflows
-  - [ ] 6.6 Test download functionality and ZIP file creation across both workflows
-  - [ ] 6.7 Test session state management and reset functionality across all scenarios
-  - [ ] 6.8 Verify UI adapter integration works correctly with refactored components
-  - [ ] 6.9 Test error handling and edge cases to ensure robustness
-  - [ ] 6.10 Perform code review to ensure SOLID principles are followed and no regressions introduced
+- [x] 6.0 Integration Testing and Validation
+  - [x] 6.1 Test single file processing workflow end-to-end to ensure 100% functionality preservation
+  - [x] 6.2 Test multi-file merge workflow end-to-end to ensure all existing functionality works
+  - [x] 6.3 Test tabbed interface navigation and state persistence across both workflows
+  - [x] 6.4 Test file upload, validation, and temporary file management across all components
+  - [x] 6.5 Test processing options configuration and application across both workflows
+  - [x] 6.6 Test download functionality and ZIP file creation across both workflows
+  - [x] 6.7 Test session state management and reset functionality across all scenarios
+  - [x] 6.8 Verify UI adapter integration works correctly with refactored components
+  - [x] 6.9 Test error handling and edge cases to ensure robustness
+  - [x] 6.10 Perform code review to ensure SOLID principles are followed and no regressions introduced
+- [x] 7.0 Streamlit Deprecation Updates
+  - [x] 7.1 Identify all instances of `use_container_width` parameter across the codebase
+  - [x] 7.2 Replace `use_container_width=True` with `width='stretch'` in all components
+  - [x] 7.3 Replace `use_container_width=False` with `width='content'` where applicable
+  - [x] 7.4 Test all affected UI components to ensure visual consistency is maintained
+  - [x] 7.5 Verify no deprecation warnings appear in Streamlit logs after updates
+- [x] 8.0 Single File Download Naming Fix
+  - [x] 8.1 Analyze current file naming logic in DownloadManager.prepare_download_files()
+  - [x] 8.2 Modify prepare_download_files() to use original filenames inside ZIP for single file workflow
+  - [x] 8.3 Ensure ZIP filename retains the _processed suffix for clear identification
+  - [x] 8.4 Test single file workflow to verify correct file naming in downloaded ZIP
+  - [x] 8.5 Verify merge workflow file naming remains unchanged (should still use _merged suffix)
