@@ -1,0 +1,83 @@
+## Relevant Files
+
+- `pages/single_file_processing.py` - Main single file processing page (reduced from 890 to 376 lines, 58% reduction!)
+- `pages/multi_file_merge.py` - Multi-file merge page (reduced from 611 to 531 lines, now with tabbed interface!)
+- `pages/components/__init__.py` - Component package initialization (created)
+- `pages/base_page.py` - Base class for all Streamlit pages (BaseStreamlitPage class created)
+- `pages/components/styling.py` - Shared CSS injection functionality (StyleManager class)
+- `pages/components/file_upload.py` - File upload widgets and validation (FileUploadManager class)
+- `pages/components/processing_options.py` - Processing options UI components (ProcessingOptionsManager class)
+- `pages/components/downloads.py` - Download UI and ZIP creation (DownloadManager class)
+- `pages/components/state_management.py` - Session state utilities (SessionStateManager class)
+- `pages/components/tabbed_workflow.py` - Shared tabbed interface components (TabbedWorkflowManager class)
+- `pages/base_page.py` - Base class for all Streamlit pages (BaseStreamlitPage class)
+- `pages/mode_selection.py` - Mode selection page (minimal changes for consistency)
+- `adapters/ui_streamlit.py` - UI adapter (no changes, but integration testing required)
+
+### Notes
+
+- This refactoring focuses only on GUI components and maintains 100% compatibility with existing processing logic
+- No new external dependencies will be added - using only existing Streamlit and Python standard library
+- All existing functionality must be preserved while dramatically reducing code duplication
+- The multi-file merge workflow will be enhanced to match the polished single file processing experience
+
+## Tasks
+
+- [x] 1.0 Clean Up Dead Code and Prepare Foundation
+  - [x] 1.1 Remove unused function `show_filter_decision_point()` (lines 522-546) from `pages/single_file_processing.py`
+  - [x] 1.2 Remove unused function `show_filter_configuration()` (lines 548-641) from `pages/single_file_processing.py`
+  - [x] 1.3 Remove unused function `show_processing_options_decision()` (lines 643-687) from `pages/single_file_processing.py`
+  - [x] 1.4 Remove unused function `show_final_processing_section()` (lines 689-730) from `pages/single_file_processing.py`
+  - [x] 1.5 Remove unused function `show_download_ui()` (lines 783-800) from `pages/single_file_processing.py`
+  - [x] 1.6 Verify no hidden dependencies on removed functions by searching codebase for function calls
+  - [x] 1.7 Create `pages/components/` directory structure
+  - [x] 1.8 Create empty `__init__.py` file in `pages/components/` directory
+- [x] 2.0 Create Shared Component Architecture
+  - [x] 2.1 Create `pages/components/styling.py` module with basic structure and imports
+  - [x] 2.2 Create `pages/components/file_upload.py` module with basic structure and imports
+  - [x] 2.3 Create `pages/components/processing_options.py` module with basic structure and imports
+  - [x] 2.4 Create `pages/components/downloads.py` module with basic structure and imports
+  - [x] 2.5 Create `pages/components/state_management.py` module with basic structure and imports
+  - [x] 2.6 Create `pages/components/tabbed_workflow.py` module with basic structure and imports
+  - [x] 2.7 Add proper docstrings and type hints to all component module files
+- [x] 3.0 Implement Component Classes and Base Page
+  - [x] 3.1 Implement `StyleManager` class in `styling.py` with `inject_custom_css()` method extracted from existing pages
+  - [x] 3.2 Implement `FileUploadManager` class in `file_upload.py` with upload widget creation and validation methods
+  - [x] 3.3 Implement `ProcessingOptionsManager` class in `processing_options.py` with sidebar and tab rendering methods
+  - [x] 3.4 Implement `DownloadManager` class in `downloads.py` with ZIP creation and download UI methods
+  - [x] 3.5 Implement `SessionStateManager` class in `state_management.py` with initialization and reset utilities
+  - [x] 3.6 Implement `TabbedWorkflowManager` class in `tabbed_workflow.py` with tab creation and content management
+  - [x] 3.7 Create `BaseStreamlitPage` class in `pages/base_page.py` with common initialization and utility methods
+  - [x] 3.8 Add comprehensive type hints and docstrings to all classes and methods
+- [x] 4.0 Refactor Existing Pages to Use Shared Components
+  - [x] 4.1 Refactor `pages/single_file_processing.py` to inherit from `BaseStreamlitPage`
+  - [x] 4.2 Replace `inject_custom_css()` calls in `single_file_processing.py` with `StyleManager` usage
+  - [x] 4.3 Replace file upload logic in `single_file_processing.py` with `FileUploadManager` usage
+  - [x] 4.4 Replace processing options logic in `single_file_processing.py` with `ProcessingOptionsManager` usage
+  - [x] 4.5 Replace download logic in `single_file_processing.py` with `DownloadManager` usage
+  - [x] 4.6 Replace session state management in `single_file_processing.py` with `SessionStateManager` usage
+  - [x] 4.7 Replace tabbed interface in `single_file_processing.py` with `TabbedWorkflowManager` usage
+  - [x] 4.8 Refactor `pages/multi_file_merge.py` to inherit from `BaseStreamlitPage`
+  - [x] 4.9 Replace duplicated functions in `multi_file_merge.py` with shared component usage
+  - [x] 4.10 Verify both pages are reduced to target size (single: 376 lines, merge: 757 lines - merge will be further reduced in Phase 5.0)
+- [x] 5.0 Enhance Multi-File Merge Workflow with Tabbed Interface
+  - [x] 5.1 Implement 4-tab interface in `multi_file_merge.py`: ["📁 Files", "🔍 Filtering", "⚙️ Options", "🚀 Process"]
+  - [x] 5.2 Move existing multi-file pair selection functionality into the "Files" tab
+  - [x] 5.3 Implement filtering tab for multi-file merge using same patterns as single file processing
+  - [x] 5.4 Implement options tab for multi-file merge using `ProcessingOptionsManager`
+  - [x] 5.5 Implement process tab for multi-file merge with processing summary and execution
+  - [x] 5.6 Apply consistent session state management patterns across all tabs in merge workflow
+  - [x] 5.7 Ensure filtering and processing options apply to all selected file pairs
+  - [x] 5.8 Implement progress tracking and status updates during multi-file processing
+  - [x] 5.9 Update sidebar information to show current step progress like single file processing
+- [ ] 6.0 Integration Testing and Validation
+  - [ ] 6.1 Test single file processing workflow end-to-end to ensure 100% functionality preservation
+  - [ ] 6.2 Test multi-file merge workflow end-to-end to ensure all existing functionality works
+  - [ ] 6.3 Test tabbed interface navigation and state persistence across both workflows
+  - [ ] 6.4 Test file upload, validation, and temporary file management across all components
+  - [ ] 6.5 Test processing options configuration and application across both workflows
+  - [ ] 6.6 Test download functionality and ZIP file creation across both workflows
+  - [ ] 6.7 Test session state management and reset functionality across all scenarios
+  - [ ] 6.8 Verify UI adapter integration works correctly with refactored components
+  - [ ] 6.9 Test error handling and edge cases to ensure robustness
+  - [ ] 6.10 Perform code review to ensure SOLID principles are followed and no regressions introduced

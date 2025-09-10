@@ -5,275 +5,263 @@ Multi-file merge page for Abstract Renumber Tool.
 Handles the workflow for merging multiple Excel/PDF file pairs.
 """
 
-import io
-import time
-import zipfile
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
-from adapters.ui_streamlit import StreamlitUIAdapter
 from core.app_controller import AppController
 
-
-# Custom CSS for button styling
-def inject_custom_css():
-    """Inject custom CSS for button styling."""
-    st.markdown(
-        """
-        <style>
-        /* Download button - Green primary style */
-        .stDownloadButton > button {
-            background-color: #28a745 !important;
-            color: white !important;
-            border: none !important;
-            border-radius: 6px !important;
-            font-weight: 600 !important;
-            transition: all 0.3s ease !important;
-        }
-        
-        .stDownloadButton > button:hover {
-            background-color: #218838 !important;
-            transform: translateY(-1px) !important;
-            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3) !important;
-        }
-        
-        /* Alternative selector for download button */
-        button[kind="primary"] {
-            background-color: #28a745 !important;
-            color: white !important;
-            border: none !important;
-            border-radius: 6px !important;
-            font-weight: 600 !important;
-            transition: all 0.3s ease !important;
-        }
-        
-        button[kind="primary"]:hover {
-            background-color: #218838 !important;
-            transform: translateY(-1px) !important;
-            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3) !important;
-        }
-        
-        /* Process button - Red primary style - Multiple selectors to ensure it works */
-        .stButton > button[kind="primary"]:not([data-testid*="download"]) {
-            background-color: #dc3545 !important;
-            color: white !important;
-            border: none !important;
-            border-radius: 6px !important;
-            font-weight: 600 !important;
-            transition: all 0.3s ease !important;
-        }
-        
-        .stButton > button[kind="primary"]:not([data-testid*="download"]):hover {
-            background-color: #c82333 !important;
-            transform: translateY(-1px) !important;
-            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3) !important;
-        }
-        
-        /* Alternative selector for process button */
-        button[data-testid="baseButton-primary"] {
-            background-color: #dc3545 !important;
-            color: white !important;
-            border: none !important;
-            border-radius: 6px !important;
-            font-weight: 600 !important;
-            transition: all 0.3s ease !important;
-        }
-        
-        button[data-testid="baseButton-primary"]:hover {
-            background-color: #c82333 !important;
-            transform: translateY(-1px) !important;
-            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3) !important;
-        }
-
-        /* Reset button - Orange secondary style */
-        .stButton > button[kind="secondary"] {
-            background-color: #fd7e14 !important;
-            color: white !important;
-            border: none !important;
-            border-radius: 6px !important;
-            font-weight: 500 !important;
-            transition: all 0.3s ease !important;
-        }
-        
-        .stButton > button[kind="secondary"]:hover {
-            background-color: #e8690b !important;
-            transform: translateY(-1px) !important;
-            box-shadow: 0 4px 8px rgba(253, 126, 20, 0.3) !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+from .base_page import BaseStreamlitPage
+from .components.downloads import DownloadManager
+from .components.file_upload import FileUploadManager
+from .components.processing_options import ProcessingOptionsManager
+from .components.tabbed_workflow import TabbedWorkflowManager
 
 
-def clear_file_uploaders():
-    """Clear file uploaders by rotating their keys."""
-    # Generate new unique keys to force uploader reset
-    timestamp = int(time.time() * 1000)  # Use milliseconds for uniqueness
-    st.session_state.primary_excel_uploader_key = f"primary_excel_{timestamp}"
-    st.session_state.primary_pdf_uploader_key = f"primary_pdf_{timestamp + 1}"
-    st.session_state.additional_excel_uploader_key = f"additional_excel_{timestamp + 2}"
-    st.session_state.additional_pdf_uploader_key = f"additional_pdf_{timestamp + 3}"
+class MultiFileMergePage(BaseStreamlitPage):
+    """Multi-file merge page using shared components."""
 
+    def __init__(self):
+        """Initialize the multi-file merge page."""
+        super().__init__(page_type="merge")
+        self.file_manager = FileUploadManager()
+        self.options_manager = ProcessingOptionsManager()
+        self.download_manager = DownloadManager()
+        self.workflow_manager = TabbedWorkflowManager()
 
-def show_multi_file_merge():
-    """Display the multi-file merge page."""
-    # Inject custom CSS for button styling
-    inject_custom_css()
+    def show(self):
+        """Display the multi-file merge page."""
+        # Show page title and back button
+        self.show_page_title("📚 Multi-File Merge")
+        self.show_back_to_mode_button("back_to_mode_merge")
 
-    st.title("📚 Multi-File Merge")
-    st.markdown("---")
+        # Show workflow progress in sidebar
+        self.workflow_manager.show_workflow_progress_sidebar("merge")
 
-    # Initialize UI adapter
-    if "ui_adapter" not in st.session_state:
-        st.session_state.ui_adapter = StreamlitUIAdapter()
+        # Show tabbed workflow interface
+        self.show_tabbed_workflow()
 
-    # Initialize primary pair and additional pairs in session state
-    if "primary_pair" not in st.session_state:
-        st.session_state.primary_pair = None
-    if "additional_pairs" not in st.session_state:
-        st.session_state.additional_pairs = []
+        # Handle post-processing workflow if processing completed
+        if st.session_state.get("show_downloads"):
+            self.handle_post_processing()
 
-    # Initialize uploader keys for clearing functionality
-    if "primary_excel_uploader_key" not in st.session_state:
-        st.session_state.primary_excel_uploader_key = "primary_excel_0"
-    if "primary_pdf_uploader_key" not in st.session_state:
-        st.session_state.primary_pdf_uploader_key = "primary_pdf_0"
-    if "additional_excel_uploader_key" not in st.session_state:
-        st.session_state.additional_excel_uploader_key = "additional_excel_0"
-    if "additional_pdf_uploader_key" not in st.session_state:
-        st.session_state.additional_pdf_uploader_key = "additional_pdf_0"
+        # Show status messages
+        self.show_status_messages()
 
-    # Back to mode selection button
-    if st.button("← Back to Mode Selection", key="back_to_mode_merge"):
-        st.session_state.current_page = "mode_selection"
-        st.rerun()
+    def show_tabbed_workflow(self):
+        """Show the tabbed workflow interface for multi-file merge."""
+        tab_labels = ["📁 Files", "🔍 Filtering", "⚙️ Options", "🚀 Process"]
+        tab_functions = [
+            self.show_files_tab,
+            self.show_filtering_tab,
+            self.show_options_tab,
+            self.show_processing_tab,
+        ]
 
-    # Primary pair selection section
-    st.markdown("### 🎯 Primary File Pair")
-    st.info(
-        "Select the main Excel and PDF files that will serve as the base for merging."
-    )
+        self.workflow_manager.create_workflow_tabs(tab_labels, tab_functions, "merge")
 
-    show_primary_pair_interface()
+    def show_files_tab(self):
+        """Show the files tab with multi-file pair selection."""
+        st.markdown("### 📁 File Pairs")
+        st.markdown("Select your Excel and PDF file pairs for merging.")
 
-    # Additional pairs section (only show if primary pair is selected)
-    if st.session_state.primary_pair:
-        st.markdown("---")
-        st.markdown("### ➕ Additional File Pairs")
-        st.info("Add more Excel-PDF pairs to merge with the primary pair.")
-
-        show_additional_pairs_interface()
-    else:
+        # Primary pair selection section
+        st.markdown("#### 🎯 Primary File Pair")
         st.info(
-            "👆 Please select a primary file pair first, then you can add additional pairs to merge."
+            "Select the main Excel and PDF files that will serve as the base for merging."
         )
 
-    # Processing options sidebar
-    show_processing_options_sidebar()
+        self.show_primary_pair_interface()
 
-    # Processing section
-    if st.session_state.primary_pair:
-        st.markdown("---")
-        st.markdown("### ⚙️ Processing")
+        # Additional pairs section (only show if primary pair is selected)
+        if st.session_state.get("primary_pair"):
+            st.markdown("---")
+            st.markdown("#### ➕ Additional File Pairs")
+            st.info("Add more Excel-PDF pairs to merge with the primary pair.")
 
-        # Show summary of what will be processed
-        total_pairs = 1 + len(st.session_state.additional_pairs)
-        if total_pairs == 1:
-            st.info("📊 Ready to process: **1 file pair** (primary only)")
+            self.show_additional_pairs_interface()
+
+            # Show summary
+            total_pairs = 1 + len(st.session_state.get("additional_pairs", []))
+            if total_pairs == 1:
+                st.success("📊 **File Pairs:** 1 (primary only)")
+            else:
+                additional_count = len(st.session_state.get("additional_pairs", []))
+                st.success(
+                    f"📊 **File Pairs:** {total_pairs} (1 primary + {additional_count} additional)"
+                )
+
+            st.markdown("---")
+            self.workflow_manager.show_tab_navigation_help("files")
         else:
             st.info(
-                f"📊 Ready to process: **{total_pairs} file pairs** (1 primary + {len(st.session_state.additional_pairs)} additional)"
+                "👆 Please select a primary file pair first, then you can add additional pairs to merge."
             )
 
-        if st.button(
-            "🚀 Process All File Pairs", type="primary", use_container_width=True
-        ):
-            process_merge_files()
-            st.session_state.show_downloads = True
+    def show_primary_pair_interface(self):
+        """Interface for selecting the primary file pair."""
+        if st.session_state.get("primary_pair"):
+            # Show current primary pair
+            pair = st.session_state.primary_pair
 
-    # Download section - only show if processing completed
-    if st.session_state.get("show_downloads"):
-        handle_post_processing()
+            with st.container():
+                col1, col2, col3 = st.columns([3, 3, 1])
 
-    # Status messages - exactly like single file processing
-    if st.session_state.get("status_messages"):
-        st.markdown("---")
-        st.session_state.ui_adapter.display_status_messages()
+                with col1:
+                    st.success(f"📊 **{pair['excel_name']}**")
+                    st.caption(f"Size: {pair['excel_size']:.1f}MB")
 
+                with col2:
+                    st.success(f"📄 **{pair['pdf_name']}**")
+                    st.caption(f"Size: {pair['pdf_size']:.1f}MB")
 
-def show_primary_pair_interface():
-    """Interface for selecting the primary file pair."""
-    if st.session_state.primary_pair:
-        # Show current primary pair
-        pair = st.session_state.primary_pair
-
-        with st.container():
-            col1, col2, col3 = st.columns([3, 3, 1])
+                with col3:
+                    if st.button(
+                        "🔄", key="change_primary", help="Change primary pair"
+                    ):
+                        st.session_state.primary_pair = None
+                        # Clear merge preview cache when primary pair is removed
+                        self._clear_merge_cache()
+                        st.rerun()
+        else:
+            # Interface for selecting primary pair
+            col1, col2 = st.columns(2)
 
             with col1:
-                st.success(f"📊 **{pair['excel_name']}**")
-                st.caption(f"Size: {pair['excel_size']:.1f}MB")
+                st.markdown("**Excel File (.xlsx, .xls)**")
+                excel_file = self.file_manager.create_excel_uploader(
+                    key=st.session_state.get(
+                        "primary_excel_uploader_key", "primary_excel_0"
+                    ),
+                    label="Choose primary Excel file",
+                    help_text="Maximum file size: 400MB",
+                )
 
             with col2:
-                st.success(f"📄 **{pair['pdf_name']}**")
-                st.caption(f"Size: {pair['pdf_size']:.1f}MB")
+                st.markdown("**PDF File (.pdf)**")
+                pdf_file = self.file_manager.create_pdf_uploader(
+                    key=st.session_state.get(
+                        "primary_pdf_uploader_key", "primary_pdf_0"
+                    ),
+                    label="Choose primary PDF file",
+                    help_text="Maximum file size: 400MB",
+                )
 
-            with col3:
-                if st.button("🔄", key="change_primary", help="Change primary pair"):
-                    st.session_state.primary_pair = None
+            if excel_file and pdf_file:
+                # Validate file sizes
+                excel_valid, excel_error = self.file_manager.validate_file_size(
+                    excel_file
+                )
+                pdf_valid, pdf_error = self.file_manager.validate_file_size(pdf_file)
+
+                if not excel_valid:
+                    st.error(excel_error)
+                    return
+
+                if not pdf_valid:
+                    st.error(pdf_error)
+                    return
+
+                # Show file info and set button
+                self.file_manager.display_file_info(excel_file, "excel")
+                self.file_manager.display_file_info(pdf_file, "pdf")
+
+                if st.button("🎯 Set as Primary Pair", type="primary"):
+                    # Save files to temporary locations
+                    excel_temp_path = self.file_manager.save_to_temp(
+                        excel_file, "excel"
+                    )
+                    pdf_temp_path = self.file_manager.save_to_temp(pdf_file, "pdf")
+
+                    # Set as primary pair
+                    excel_size_mb = len(excel_file.getvalue()) / (1024 * 1024)
+                    pdf_size_mb = len(pdf_file.getvalue()) / (1024 * 1024)
+
+                    st.session_state.primary_pair = {
+                        "excel_name": excel_file.name,
+                        "pdf_name": pdf_file.name,
+                        "excel_path": excel_temp_path,
+                        "pdf_path": pdf_temp_path,
+                        "excel_size": excel_size_mb,
+                        "pdf_size": pdf_size_mb,
+                    }
+                    # Clear merge preview cache when primary pair changes
+                    self._clear_merge_cache()
+                    st.success(
+                        f"✅ Primary pair set: {excel_file.name} + {pdf_file.name}"
+                    )
                     st.rerun()
-    else:
-        # Interface for selecting primary pair
+
+    def show_additional_pairs_interface(self):
+        """Interface for managing additional file pairs."""
+        # Add new additional pair section
+        with st.expander(
+            "➕ Add Additional File Pair",
+            expanded=len(st.session_state.get("additional_pairs", [])) == 0,
+        ):
+            self.add_additional_pair_interface()
+
+        # Display existing additional pairs
+        if st.session_state.get("additional_pairs"):
+            st.markdown("#### 📋 Additional Pairs")
+            self.display_additional_pairs()
+        else:
+            st.info(
+                "No additional pairs added yet. The primary pair will be processed alone."
+            )
+
+    def add_additional_pair_interface(self):
+        """Interface for adding an additional file pair."""
         col1, col2 = st.columns(2)
 
         with col1:
             st.markdown("**Excel File (.xlsx, .xls)**")
-            excel_file = st.file_uploader(
-                "Choose primary Excel file",
-                type=["xlsx", "xls"],
-                key=st.session_state.primary_excel_uploader_key,
-                help="Maximum file size: 400MB",
+            excel_file = self.file_manager.create_excel_uploader(
+                key=st.session_state.get(
+                    "additional_excel_uploader_key", "additional_excel_0"
+                ),
+                label="Choose additional Excel file",
+                help_text="Maximum file size: 400MB",
             )
 
         with col2:
             st.markdown("**PDF File (.pdf)**")
-            pdf_file = st.file_uploader(
-                "Choose primary PDF file",
-                type=["pdf"],
-                key=st.session_state.primary_pdf_uploader_key,
-                help="Maximum file size: 400MB",
+            pdf_file = self.file_manager.create_pdf_uploader(
+                key=st.session_state.get(
+                    "additional_pdf_uploader_key", "additional_pdf_0"
+                ),
+                label="Choose additional PDF file",
+                help_text="Maximum file size: 400MB",
             )
 
         if excel_file and pdf_file:
             # Validate file sizes
-            excel_size_mb = len(excel_file.getvalue()) / (1024 * 1024)
-            pdf_size_mb = len(pdf_file.getvalue()) / (1024 * 1024)
+            excel_valid, excel_error = self.file_manager.validate_file_size(excel_file)
+            pdf_valid, pdf_error = self.file_manager.validate_file_size(pdf_file)
 
-            if excel_size_mb > 400:
-                st.error(
-                    f"Excel file too large: {excel_size_mb:.1f}MB. Maximum allowed: 400MB"
-                )
+            if not excel_valid:
+                st.error(excel_error)
                 return
 
-            if pdf_size_mb > 400:
-                st.error(
-                    f"PDF file too large: {pdf_size_mb:.1f}MB. Maximum allowed: 400MB"
-                )
+            if not pdf_valid:
+                st.error(pdf_error)
                 return
 
-            # Show file info and set button
-            st.success(f"✅ Excel: {excel_file.name} ({excel_size_mb:.1f}MB)")
-            st.success(f"✅ PDF: {pdf_file.name} ({pdf_size_mb:.1f}MB)")
+            # Show file info and add button
+            self.file_manager.display_file_info(excel_file, "excel")
+            self.file_manager.display_file_info(pdf_file, "pdf")
 
-            if st.button("🎯 Set as Primary Pair", type="primary"):
+            if st.button("➕ Add Additional Pair", type="secondary"):
                 # Save files to temporary locations
-                excel_temp_path = save_temp_file(excel_file, "excel")
-                pdf_temp_path = save_temp_file(pdf_file, "pdf")
+                excel_temp_path = self.file_manager.save_to_temp(excel_file, "excel")
+                pdf_temp_path = self.file_manager.save_to_temp(pdf_file, "pdf")
 
-                # Set as primary pair
-                st.session_state.primary_pair = {
+                # Add to additional pairs
+                excel_size_mb = len(excel_file.getvalue()) / (1024 * 1024)
+                pdf_size_mb = len(pdf_file.getvalue()) / (1024 * 1024)
+
+                pair_info = {
                     "excel_name": excel_file.name,
                     "pdf_name": pdf_file.name,
                     "excel_path": excel_temp_path,
@@ -281,329 +269,490 @@ def show_primary_pair_interface():
                     "excel_size": excel_size_mb,
                     "pdf_size": pdf_size_mb,
                 }
-                st.success(f"✅ Primary pair set: {excel_file.name} + {pdf_file.name}")
+
+                if "additional_pairs" not in st.session_state:
+                    st.session_state.additional_pairs = []
+                st.session_state.additional_pairs.append(pair_info)
+                # Clear merge preview cache when additional pairs change
+                self._clear_merge_cache()
+                st.success(
+                    f"✅ Added additional pair: {excel_file.name} + {pdf_file.name}"
+                )
                 st.rerun()
 
+    def display_additional_pairs(self):
+        """Display the list of additional file pairs."""
+        for i, pair in enumerate(st.session_state.get("additional_pairs", [])):
+            with st.container():
+                col1, col2, col3 = st.columns([3, 3, 1])
 
-def show_additional_pairs_interface():
-    """Interface for managing additional file pairs."""
-    # Add new additional pair section
-    with st.expander(
-        "➕ Add Additional File Pair",
-        expanded=len(st.session_state.additional_pairs) == 0,
-    ):
-        add_additional_pair_interface()
+                with col1:
+                    st.markdown(f"**📊 {pair['excel_name']}**")
+                    st.caption(f"Size: {pair['excel_size']:.1f}MB")
 
-    # Display existing additional pairs
-    if st.session_state.additional_pairs:
-        st.markdown("#### 📋 Additional Pairs")
-        display_additional_pairs()
-    else:
-        st.info(
-            "No additional pairs added yet. The primary pair will be processed alone."
-        )
+                with col2:
+                    st.markdown(f"**📄 {pair['pdf_name']}**")
+                    st.caption(f"Size: {pair['pdf_size']:.1f}MB")
 
+                with col3:
+                    if st.button(
+                        "🗑️", key=f"remove_additional_{i}", help="Remove this pair"
+                    ):
+                        st.session_state.additional_pairs.pop(i)
+                        # Clear merge preview cache when pairs are removed
+                        self._clear_merge_cache()
+                        st.rerun()
 
-def add_additional_pair_interface():
-    """Interface for adding an additional file pair."""
-    col1, col2 = st.columns(2)
+            if i < len(st.session_state.get("additional_pairs", [])) - 1:
+                st.markdown("---")
 
-    with col1:
-        st.markdown("**Excel File (.xlsx, .xls)**")
-        excel_file = st.file_uploader(
-            "Choose additional Excel file",
-            type=["xlsx", "xls"],
-            key=st.session_state.additional_excel_uploader_key,
-            help="Maximum file size: 400MB",
-        )
-
-    with col2:
-        st.markdown("**PDF File (.pdf)**")
-        pdf_file = st.file_uploader(
-            "Choose additional PDF file",
-            type=["pdf"],
-            key=st.session_state.additional_pdf_uploader_key,
-            help="Maximum file size: 400MB",
-        )
-
-    if excel_file and pdf_file:
-        # Validate file sizes
-        excel_size_mb = len(excel_file.getvalue()) / (1024 * 1024)
-        pdf_size_mb = len(pdf_file.getvalue()) / (1024 * 1024)
-
-        if excel_size_mb > 400:
-            st.error(
-                f"Excel file too large: {excel_size_mb:.1f}MB. Maximum allowed: 400MB"
+        # Summary and clear all button
+        if st.session_state.get("additional_pairs"):
+            total_additional = len(st.session_state.additional_pairs)
+            total_size = sum(
+                pair["excel_size"] + pair["pdf_size"]
+                for pair in st.session_state.additional_pairs
             )
+
+            st.markdown(
+                f"**Summary:** {total_additional} additional pairs, {total_size:.1f}MB total"
+            )
+
+            if st.button("🗑️ Clear All Additional Pairs", type="secondary"):
+                st.session_state.additional_pairs = []
+                # Clear merge preview cache when all pairs are cleared
+                self._clear_merge_cache()
+                st.rerun()
+
+    def show_filtering_tab(self):
+        """Show the filtering tab content for multi-file merge."""
+        if not self.workflow_manager.check_prerequisites_for_tab("filtering", "merge"):
             return
 
-        if pdf_size_mb > 400:
-            st.error(f"PDF file too large: {pdf_size_mb:.1f}MB. Maximum allowed: 400MB")
-            return
+        st.markdown("### 🔍 Data Filtering")
+        st.markdown("Configure filtering that will apply to all selected file pairs.")
 
-        # Show file info and add button
-        st.success(f"✅ Excel: {excel_file.name} ({excel_size_mb:.1f}MB)")
-        st.success(f"✅ PDF: {pdf_file.name} ({pdf_size_mb:.1f}MB)")
-
-        if st.button("➕ Add Additional Pair", type="secondary"):
-            # Save files to temporary locations
-            excel_temp_path = save_temp_file(excel_file, "excel")
-            pdf_temp_path = save_temp_file(pdf_file, "pdf")
-
-            # Add to additional pairs
-            pair_info = {
-                "excel_name": excel_file.name,
-                "pdf_name": pdf_file.name,
-                "excel_path": excel_temp_path,
-                "pdf_path": pdf_temp_path,
-                "excel_size": excel_size_mb,
-                "pdf_size": pdf_size_mb,
-            }
-
-            st.session_state.additional_pairs.append(pair_info)
-            st.success(f"✅ Added additional pair: {excel_file.name} + {pdf_file.name}")
-            st.rerun()
-
-
-def display_additional_pairs():
-    """Display the list of additional file pairs."""
-    for i, pair in enumerate(st.session_state.additional_pairs):
-        with st.container():
-            col1, col2, col3 = st.columns([3, 3, 1])
-
-            with col1:
-                st.markdown(f"**📊 {pair['excel_name']}**")
-                st.caption(f"Size: {pair['excel_size']:.1f}MB")
-
-            with col2:
-                st.markdown(f"**📄 {pair['pdf_name']}**")
-                st.caption(f"Size: {pair['pdf_size']:.1f}MB")
-
-            with col3:
-                if st.button(
-                    "🗑️", key=f"remove_additional_{i}", help="Remove this pair"
-                ):
-                    st.session_state.additional_pairs.pop(i)
-                    st.rerun()
-
-        if i < len(st.session_state.additional_pairs) - 1:
-            st.markdown("---")
-
-    # Summary
-    if st.session_state.additional_pairs:
-        total_additional = len(st.session_state.additional_pairs)
-        total_size = sum(
-            pair["excel_size"] + pair["pdf_size"]
-            for pair in st.session_state.additional_pairs
+        # Filter decision
+        wants_filtering = st.radio(
+            "Would you like to filter the merged data?",
+            options=[False, True],
+            format_func=lambda x: "📊 No, Process All Data"
+            if not x
+            else "🔍 Yes, Set Up Filtering",
+            key="wants_filtering_merge_radio",
+            horizontal=True,
         )
 
-        st.markdown(
-            f"**Summary:** {total_additional} additional pairs, {total_size:.1f}MB total"
-        )
+        # Store the decision
+        st.session_state.wants_filtering = wants_filtering
+        st.session_state.filter_enabled = wants_filtering
 
-        if st.button("🗑️ Clear All Additional Pairs", type="secondary"):
-            st.session_state.additional_pairs = []
-            st.rerun()
+        if wants_filtering:
+            st.markdown("#### Configure Filter Settings")
+            st.info(
+                "Filtering will be applied to the merged dataset from all file pairs."
+            )
 
+            # Preview merge and show filter configuration
+            self.show_merge_filter_configuration()
+        else:
+            # Clear filter settings if not filtering
+            st.session_state.filter_column = None
+            st.session_state.filter_values = []
+            st.info("✅ All merged data will be processed without filtering.")
 
-def show_processing_options_sidebar():
-    """Display processing options in the sidebar."""
-    with st.sidebar:
-        st.markdown("### ⚙️ Processing Options")
+        st.markdown("---")
+        self.workflow_manager.show_tab_navigation_help("filtering")
 
-        # Sort bookmarks option
-        sort_bookmarks = st.checkbox(
-            "Sort PDF Bookmarks",
-            value=st.session_state.get("sort_bookmarks_enabled", True),
-            key="sort_bookmarks_enabled_merge",
-            help="Sort PDF bookmarks naturally",
-        )
+    def show_merge_filter_configuration(self):
+        """Show filter configuration for merged data by previewing the merge."""
+        try:
+            # Get merged preview data
+            merged_df = self.get_merged_preview_data()
 
-        # Reorder pages option (dependent on sort bookmarks)
-        reorder_pages = st.checkbox(
-            "Reorder Pages to Match Bookmarks",
-            value=st.session_state.get("reorder_pages_enabled", True)
-            and sort_bookmarks,
-            key="reorder_pages_enabled_merge",
-            disabled=not sort_bookmarks,
-            help="Physically reorder pages to match sorted bookmarks",
-        )
+            if merged_df is None or merged_df.empty:
+                st.warning(
+                    "⚠️ Unable to preview merged data. Please check your file pairs."
+                )
+                return
 
-        # Check document images option
-        st.checkbox(
-            "Check for Document Images",
-            value=st.session_state.get("check_document_images_enabled", True),
-            key="check_document_images_enabled_merge",
-            help="Add/update Document_Found column in Excel output",
-        )
+            # Show data preview
+            with st.expander("📊 Merged Data Preview", expanded=False):
+                st.markdown(f"**Total rows:** {len(merged_df)}")
+                st.markdown(f"**Columns:** {', '.join(merged_df.columns)}")
+                st.dataframe(merged_df.head(10), use_container_width=True)
 
-        # Filter option
-        st.checkbox(
-            "Enable Data Filtering",
-            value=st.session_state.get("filter_enabled", False),
-            key="filter_enabled_merge",
-            help="Filter data by column values (will prompt during processing)",
-        )
+            # Get filterable columns (exclude system columns)
+            system_columns = {"_include", "Index#", "Document_ID"}
+            filterable_columns = [
+                col for col in merged_df.columns if col not in system_columns
+            ]
 
+            if not filterable_columns:
+                st.warning("No suitable columns found for filtering.")
+                return
 
-def save_temp_file(uploaded_file, file_type: str) -> str:
-    """Save uploaded file to temporary location."""
-    import tempfile
+            # Column selection
+            filter_column = st.selectbox(
+                "Select column to filter by:",
+                options=["None"] + filterable_columns,
+                key="filter_column_merge_tab",
+                help="Choose which column to use for filtering the merged data",
+            )
 
-    suffix = ".xlsx" if file_type == "excel" else ".pdf"
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-    temp_file.write(uploaded_file.getvalue())
-    temp_file.close()
+            if filter_column and filter_column != "None":
+                # Get unique values for the selected column
+                unique_values = sorted(
+                    merged_df[filter_column].dropna().unique().astype(str)
+                )
 
-    return temp_file.name
+                # Value selection
+                filter_values = st.multiselect(
+                    f"Select values to include from '{filter_column}':",
+                    options=unique_values,
+                    key="filter_values_merge_tab",
+                    help="Choose which values to include. Only rows with these values will be processed.",
+                )
 
+                # Store filter settings
+                st.session_state.filter_column = filter_column
+                st.session_state.filter_values = filter_values
 
-def process_merge_files():
-    """Process the primary pair and additional pairs using the existing controller."""
-    try:
-        if not st.session_state.primary_pair:
-            st.error("No primary pair selected")
-            return
+                if filter_values:
+                    # Show preview of filtered data
+                    filtered_count = merged_df[
+                        merged_df[filter_column].isin(filter_values)
+                    ].shape[0]
+                    total_count = merged_df.shape[0]
+                    st.success(
+                        f"✅ Filter configured: {filtered_count}/{total_count} rows will be processed"
+                    )
 
-        # Set primary files from primary pair
-        primary = st.session_state.primary_pair
-        st.session_state.excel_temp_path = primary["excel_path"]
-        st.session_state.pdf_temp_path = primary["pdf_path"]
-
-        # Set additional merge pairs
-        additional_merge_pairs = [
-            (pair["excel_path"], pair["pdf_path"])
-            for pair in st.session_state.additional_pairs
-        ]
-        st.session_state.merge_pairs = additional_merge_pairs
-
-        # Create controller with UI adapter
-        controller = AppController(st.session_state.ui_adapter)
-
-        # Show processing status
-        total_pairs = 1 + len(additional_merge_pairs)
-        with st.spinner(f"Processing {total_pairs} file pairs..."):
-            progress_bar = st.progress(0)
-            status_container = st.empty()
-
-            # Update progress
-            progress_bar.progress(25)
-            status_container.text("Validating file pairs...")
-
-            progress_bar.progress(50)
-            if total_pairs == 1:
-                status_container.text("Processing primary pair...")
+                    # Show filtered data preview
+                    with st.expander("🔍 Filtered Data Preview", expanded=False):
+                        filtered_df = merged_df[
+                            merged_df[filter_column].isin(filter_values)
+                        ]
+                        st.dataframe(filtered_df.head(10), use_container_width=True)
+                else:
+                    st.info("Select values to see filtering preview.")
             else:
-                status_container.text(f"Processing merge of {total_pairs} pairs...")
+                # Clear filter settings if no column selected
+                st.session_state.filter_column = None
+                st.session_state.filter_values = []
 
-            controller.process_files()
+        except Exception as e:
+            st.error(f"Error loading merged data preview: {str(e)}")
+            st.session_state.filter_column = None
+            st.session_state.filter_values = []
 
-            progress_bar.progress(100)
-            status_container.text("Processing complete!")
+    def get_merged_preview_data(self):
+        """Get a preview of the merged Excel data from all file pairs."""
+        try:
+            # Check if we have the required data
+            if not st.session_state.get("primary_pair"):
+                return None
 
-    except Exception as e:
-        st.error(f"Processing failed: {str(e)}")
-        st.session_state.ui_adapter.log_status(f"ERROR: {str(e)}")
+            # Use caching to avoid reloading data unnecessarily
+            cache_key = self._get_merge_cache_key()
+            if st.session_state.get("merged_preview_cache_key") == cache_key:
+                return st.session_state.get("merged_preview_data")
 
+            # Collect all Excel file paths
+            excel_files = []
 
-def show_reset_ui():
-    """Display reset UI and handle reset functionality."""
-    st.markdown("---")
-    if st.button("🔄 Process New Files", use_container_width=True, type="secondary"):
-        clear_file_uploaders()
-        st.session_state.show_downloads = False
-        st.session_state.primary_pair = None
-        st.session_state.additional_pairs = []
-        st.session_state.ui_adapter.reset_gui()
-        st.rerun()
+            # Add primary pair
+            primary = st.session_state.primary_pair
+            excel_files.append(primary["excel_path"])
 
+            # Add additional pairs
+            for pair in st.session_state.get("additional_pairs", []):
+                excel_files.append(pair["excel_path"])
 
-def handle_post_processing():
-    """Handle post-processing workflow: downloads and reset functionality."""
-    st.markdown("### 📥 Download Processed Files")
+            # Load and merge Excel files
+            merged_dfs = []
+            for excel_path in excel_files:
+                try:
+                    # Use the same Excel repo as the pipeline
+                    from adapters.excel_repo import ExcelOpenpyxlRepo
 
-    # Get the base paths from the primary pair
-    if not st.session_state.primary_pair:
-        st.error("No primary pair available for download")
-        return
+                    excel_repo = ExcelOpenpyxlRepo()
 
-    primary = st.session_state.primary_pair
-    excel_base_path = Path(primary["excel_path"])
-    pdf_base_path = Path(primary["pdf_path"])
+                    # Get available sheet names and use appropriate sheet
+                    available_sheets = excel_repo.get_sheet_names(excel_path)
+                    sheet_name = (
+                        "Sheet"
+                        if "Sheet" in available_sheets
+                        else available_sheets[0]
+                        if available_sheets
+                        else "Sheet"
+                    )
 
-    # Determine if this was a merge workflow or single file
-    is_merge = len(st.session_state.additional_pairs) > 0
+                    df = excel_repo.load(excel_path, sheet=sheet_name)
+                    if not df.empty:
+                        merged_dfs.append(df)
 
-    try:
-        if is_merge:
-            # For merge workflows, files are saved with "_merged" suffix
-            excel_output_path = excel_base_path.with_name(
-                f"{excel_base_path.stem}_merged{excel_base_path.suffix}"
-            )
-            pdf_output_path = pdf_base_path.with_name(
-                f"{pdf_base_path.stem}_merged{pdf_base_path.suffix}"
-            )
+                except Exception as e:
+                    st.warning(f"Could not load {excel_path}: {str(e)}")
+                    continue
 
-            # Get original filenames from primary pair for naming
-            primary_excel_name = primary["excel_name"]
-            primary_pdf_name = primary["pdf_name"]
-            excel_base_name = Path(primary_excel_name).stem
-            pdf_base_name = Path(primary_pdf_name).stem
+            if not merged_dfs:
+                return None
 
-            zip_filename = f"{excel_base_name}_merged.zip"
-            excel_zip_name = f"{excel_base_name}_merged.xlsx"
-            pdf_zip_name = f"{pdf_base_name}_merged.pdf"
+            # Merge all DataFrames
+            if len(merged_dfs) == 1:
+                merged_df = merged_dfs[0]
+            else:
+                # Concatenate all DataFrames
+                merged_df = pd.concat(merged_dfs, ignore_index=True, sort=False)
+
+            # Cache the result
+            st.session_state.merged_preview_cache_key = cache_key
+            st.session_state.merged_preview_data = merged_df
+
+            return merged_df
+
+        except Exception as e:
+            st.error(f"Error creating merged preview: {str(e)}")
+            return None
+
+    def _get_merge_cache_key(self):
+        """Generate a cache key based on current file pairs."""
+        key_parts = []
+
+        # Add primary pair
+        if st.session_state.get("primary_pair"):
+            primary = st.session_state.primary_pair
+            key_parts.append(f"{primary['excel_path']}:{primary['excel_size']}")
+
+        # Add additional pairs
+        for pair in st.session_state.get("additional_pairs", []):
+            key_parts.append(f"{pair['excel_path']}:{pair['excel_size']}")
+
+        return "|".join(key_parts)
+
+    def _clear_merge_cache(self):
+        """Clear the merged preview data cache."""
+        if "merged_preview_cache_key" in st.session_state:
+            del st.session_state.merged_preview_cache_key
+        if "merged_preview_data" in st.session_state:
+            del st.session_state.merged_preview_data
+
+    def show_options_tab(self):
+        """Show the processing options tab content for multi-file merge."""
+        if not self.workflow_manager.check_prerequisites_for_tab("options", "merge"):
+            return
+
+        # Use the options manager to render the tab content
+        options = self.options_manager.render_tab_options("merge")
+
+        # Show summary
+        self.options_manager.display_options_summary(options)
+
+        st.markdown("---")
+        self.workflow_manager.show_tab_navigation_help("options")
+
+    def show_processing_tab(self):
+        """Show the processing tab content for multi-file merge."""
+        if not self.workflow_manager.check_prerequisites_for_tab("process", "merge"):
+            return
+
+        st.markdown("### 🚀 Ready to Process")
+        st.markdown("Review your settings and start processing all file pairs.")
+
+        # Show comprehensive summary
+        self.show_processing_summary()
+
+        # Process button
+        if st.button(
+            "🚀 Process All File Pairs", type="primary", use_container_width=True
+        ):
+            self.process_merge_files()
+            st.session_state.show_downloads = True
+
+    def show_processing_summary(self):
+        """Show a comprehensive processing summary for merge workflow."""
+        summary_parts = []
+
+        # File pairs summary
+        total_pairs = 1 + len(st.session_state.get("additional_pairs", []))
+        if total_pairs == 1:
+            summary_parts.append("**File Pairs:** 1 (primary only)")
         else:
-            # For single file workflows, files are saved to original paths
-            excel_output_path = excel_base_path
-            pdf_output_path = pdf_base_path
-            zip_filename = f"{excel_base_path.stem}_processed.zip"
-            excel_zip_name = f"{excel_base_path.stem}_processed.xlsx"
-            pdf_zip_name = f"{pdf_base_path.stem}_processed.pdf"
-
-        # Check if both files are available
-        excel_available = excel_output_path.exists()
-        pdf_available = pdf_output_path.exists()
-
-        if excel_available and pdf_available:
-            # Create ZIP file with both processed files
-            zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-                # Add Excel file
-                with open(excel_output_path, "rb") as excel_file:
-                    zip_file.writestr(excel_zip_name, excel_file.read())
-
-                # Add PDF file
-                with open(pdf_output_path, "rb") as pdf_file:
-                    zip_file.writestr(pdf_zip_name, pdf_file.read())
-
-            zip_buffer.seek(0)
-
-            # Create download button with timestamp for uniqueness
-            timestamp = int(time.time())
-            download_key = f"download_merge_zip_{timestamp}"
-
-            st.download_button(
-                label="📦 Download Processed Files (ZIP)",
-                data=zip_buffer.getvalue(),
-                file_name=zip_filename,
-                mime="application/zip",
-                use_container_width=True,
-                help="Downloads both processed Excel and PDF files in a ZIP archive",
-                key=download_key,
-                type="primary",
+            additional_count = len(st.session_state.get("additional_pairs", []))
+            summary_parts.append(
+                f"**File Pairs:** {total_pairs} (1 primary + {additional_count} additional)"
             )
 
-            # Show reset UI
-            show_reset_ui()
-
+        # Filter summary
+        if st.session_state.get("wants_filtering"):
+            summary_parts.append("**Filtering:** Will be applied to merged data")
         else:
-            st.error(
-                f"Processed files not available for download. Expected files:\n- {excel_output_path}\n- {pdf_output_path}"
+            summary_parts.append("**Filtering:** Process all merged data")
+
+        # Processing options summary
+        sort_enabled = st.session_state.get("sort_bookmarks_enabled_merge", True)
+        reorder_enabled = st.session_state.get("reorder_pages_enabled_merge", True)
+        check_enabled = st.session_state.get(
+            "check_document_images_enabled_merge", True
+        )
+
+        options_summary = []
+        if sort_enabled:
+            options_summary.append("Sort Bookmarks")
+        if reorder_enabled:
+            options_summary.append("Reorder Pages")
+        if check_enabled:
+            options_summary.append("Check Images")
+
+        if options_summary:
+            summary_parts.append(f"**Options:** {', '.join(options_summary)}")
+        else:
+            summary_parts.append("**Options:** None selected")
+
+        # Display summary
+        if summary_parts:
+            st.info(
+                "📋 **Processing Summary:**\n"
+                + "\n".join(f"- {part}" for part in summary_parts)
             )
 
-    except Exception as e:
-        st.error(f"Error preparing download: {e}")
+    def process_merge_files(self):
+        """Process the primary pair and additional pairs using the existing controller."""
+        try:
+            if not st.session_state.get("primary_pair"):
+                st.error("No primary pair selected")
+                return
+
+            # Set primary files from primary pair
+            primary = st.session_state.primary_pair
+            st.session_state.excel_temp_path = primary["excel_path"]
+            st.session_state.pdf_temp_path = primary["pdf_path"]
+
+            # Set additional merge pairs
+            additional_merge_pairs = [
+                (pair["excel_path"], pair["pdf_path"])
+                for pair in st.session_state.get("additional_pairs", [])
+            ]
+            st.session_state.merge_pairs = additional_merge_pairs
+
+            # Create controller with UI adapter
+            controller = AppController(st.session_state.ui_adapter)
+
+            # Show processing status
+            total_pairs = 1 + len(additional_merge_pairs)
+            with st.spinner(f"Processing {total_pairs} file pairs..."):
+                progress_bar = st.progress(0)
+                status_container = st.empty()
+
+                # Update progress
+                progress_bar.progress(25)
+                status_container.text("Validating file pairs...")
+
+                progress_bar.progress(50)
+                if total_pairs == 1:
+                    status_container.text("Processing primary pair...")
+                else:
+                    status_container.text(f"Processing merge of {total_pairs} pairs...")
+
+                controller.process_files()
+
+                progress_bar.progress(100)
+                status_container.text("Processing complete!")
+
+            self.show_processing_complete_message()
+
+        except Exception as e:
+            self.show_processing_error(str(e))
+
+    def handle_post_processing(self):
+        """Handle post-processing workflow: downloads and reset functionality."""
+        st.markdown("### 📥 Download Processed Files")
+
+        # Get the base paths from the primary pair
+        if not st.session_state.primary_pair:
+            st.error("No primary pair available for download")
+            return
+
+        primary = st.session_state.primary_pair
+        excel_base_path = Path(primary["excel_path"])
+        pdf_base_path = Path(primary["pdf_path"])
+
+        # Determine if this was a merge workflow or single file
+        is_merge = len(st.session_state.get("additional_pairs", [])) > 0
+
+        try:
+            if is_merge:
+                # For merge workflows, files are saved with "_merged" suffix
+                excel_output_path = excel_base_path.with_name(
+                    f"{excel_base_path.stem}_merged{excel_base_path.suffix}"
+                )
+                pdf_output_path = pdf_base_path.with_name(
+                    f"{pdf_base_path.stem}_merged{pdf_base_path.suffix}"
+                )
+
+                # Get original filenames from primary pair for naming
+                primary_excel_name = primary["excel_name"]
+                primary_pdf_name = primary["pdf_name"]
+                excel_base_name = Path(primary_excel_name).stem
+                pdf_base_name = Path(primary_pdf_name).stem
+
+                zip_filename = f"{excel_base_name}_merged.zip"
+                excel_zip_name = f"{excel_base_name}_merged.xlsx"
+                pdf_zip_name = f"{pdf_base_name}_merged.pdf"
+            else:
+                # For single file workflows, files are saved to original paths
+                excel_output_path = excel_base_path
+                pdf_output_path = pdf_base_path
+                zip_filename = f"{excel_base_path.stem}_processed.zip"
+                excel_zip_name = f"{excel_base_path.stem}_processed.xlsx"
+                pdf_zip_name = f"{pdf_base_path.stem}_processed.pdf"
+
+            # Check if both files are available
+            excel_available = excel_output_path.exists()
+            pdf_available = pdf_output_path.exists()
+
+            if excel_available and pdf_available:
+                # Use download manager to create ZIP and show download button
+                excel_data = self.download_manager.read_file_safely(
+                    str(excel_output_path)
+                )
+                pdf_data = self.download_manager.read_file_safely(str(pdf_output_path))
+
+                zip_buffer = self.download_manager.create_download_zip(
+                    excel_data, pdf_data, excel_zip_name, pdf_zip_name
+                )
+
+                self.download_manager.show_download_button(
+                    zip_buffer.getvalue(), zip_filename, excel_zip_name, pdf_zip_name
+                )
+
+                # Show reset UI
+                self.show_reset_ui()
+            else:
+                st.error(
+                    f"Processed files not available for download. Expected files:\n- {excel_output_path}\n- {pdf_output_path}"
+                )
+
+        except Exception as e:
+            st.error(f"Error preparing download: {e}")
+
+    def show_reset_ui(self):
+        """Display reset UI and handle reset functionality."""
+        st.markdown("---")
+        if st.button(
+            "🔄 Process New Files", use_container_width=True, type="secondary"
+        ):
+            self.reset_workflow()
+            st.session_state.show_downloads = False
+            st.session_state.primary_pair = None
+            st.session_state.additional_pairs = []
+
+
+def show_multi_file_merge():
+    """Display the multi-file merge page."""
+    page = MultiFileMergePage()
+    page.show()
 
 
 if __name__ == "__main__":
