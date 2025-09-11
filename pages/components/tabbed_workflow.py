@@ -42,57 +42,6 @@ class TabbedWorkflowManager:
             with tab:
                 func()
 
-    def show_workflow_progress_sidebar(self, workflow_type: str = "single") -> None:
-        """Show workflow progress information in sidebar.
-
-        Args:
-            workflow_type: Type of workflow ('single' or 'merge')
-        """
-        with st.sidebar:
-            st.markdown("### ℹ️ Processing Info")
-
-            if workflow_type == "single":
-                self._show_single_file_progress()
-            elif workflow_type == "merge":
-                self._show_merge_workflow_progress()
-
-    def _show_single_file_progress(self) -> None:
-        """Show progress for single file workflow."""
-        # Check if files are uploaded
-        if not (
-            st.session_state.get("uploaded_excel")
-            and st.session_state.get("uploaded_pdf")
-        ):
-            st.info("Upload your files to begin the guided workflow.")
-            return
-
-        # Show current step based on workflow state
-        current_step = self._get_single_file_current_step()
-        if current_step:
-            st.info(current_step)
-        else:
-            st.info("📍 **Current Step:** Files Uploaded - Configure Filtering")
-
-    def _show_merge_workflow_progress(self) -> None:
-        """Show progress for merge workflow."""
-        # Check primary pair status
-        if not st.session_state.get("primary_pair"):
-            st.info("Select your primary file pair to begin the guided workflow.")
-            return
-
-        # Show file pair count
-        total_pairs = 1 + len(st.session_state.get("additional_pairs", []))
-        if total_pairs == 1:
-            st.info("📊 **File Pairs:** 1 (primary only)")
-        else:
-            additional_count = len(st.session_state.get("additional_pairs", []))
-            st.info(
-                f"📊 **File Pairs:** {total_pairs} (1 primary + {additional_count} additional)"
-            )
-
-        # Show current step
-        st.info("📍 **Current Step:** Configure Processing Options")
-
     def _get_single_file_current_step(self) -> Optional[str]:
         """Get current step for single file workflow.
 

@@ -15,7 +15,7 @@ from .components.styling import StyleManager
 
 
 class BaseStreamlitPage:
-    """Base class for all Streamlit pages in the Abstract Renumber Tool."""
+    """Base class for all Streamlit pages using native Streamlit layout patterns."""
 
     def __init__(self, page_type: str = "single") -> None:
         """Initialize the base page with common functionality.
@@ -56,13 +56,25 @@ class BaseStreamlitPage:
             st.rerun()
 
     def show_page_title(self, title: str) -> None:
-        """Show page title with consistent formatting.
+        """Show page title with native Streamlit layout.
 
         Args:
             title: Title text to display
         """
-        st.title(title)
-        st.markdown("---")
+        with self.create_responsive_layout():
+            st.title(title)
+            st.markdown("---")
+
+    def create_responsive_layout(self):
+        """Create responsive layout using native Streamlit columns for centering.
+
+        Returns:
+            Streamlit column object for centered content placement
+        """
+        # Use native Streamlit columns for responsive centering
+        # [1, 6, 1] ratio provides centered content with natural margins
+        col1, col2, col3 = st.columns([1, 6, 1])
+        return col2  # Return center column for content
 
     def show_status_messages(self) -> None:
         """Display status messages if they exist."""

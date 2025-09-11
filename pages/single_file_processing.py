@@ -29,23 +29,22 @@ class SingleFileProcessingPage(BaseStreamlitPage):
         self.workflow_manager = TabbedWorkflowManager()
 
     def show(self):
-        """Display the single file processing page."""
-        # Show page title and back button
-        self.show_page_title("📄 Single File Processing")
-        self.show_back_to_mode_button("back_to_mode")
+        """Display the single file processing page with native layout."""
+        # Use native responsive layout from BaseStreamlitPage
+        with self.create_responsive_layout():
+            # Show page title and back button
+            self.show_page_title("📄 Single File Processing")
+            self.show_back_to_mode_button("back_to_mode")
 
-        # Show workflow progress in sidebar
-        self.workflow_manager.show_workflow_progress_sidebar("single")
+            # Show tabbed workflow interface
+            self.show_tabbed_workflow()
 
-        # Show tabbed workflow interface
-        self.show_tabbed_workflow()
+            # Handle post-processing workflow if processing completed
+            if st.session_state.get("show_downloads"):
+                self.handle_post_processing()
 
-        # Handle post-processing workflow if processing completed
-        if st.session_state.get("show_downloads"):
-            self.handle_post_processing()
-
-        # Show status messages
-        self.show_status_messages()
+            # Show status messages
+            self.show_status_messages()
 
     def show_tabbed_workflow(self):
         """Show the tabbed workflow interface."""
