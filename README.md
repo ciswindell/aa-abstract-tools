@@ -1,89 +1,159 @@
 # Abstract Renumber Tool
 
-A class-based Python application that automates the process of sorting Excel data and renumbering corresponding PDF bookmarks. The tool maintains synchronized numbering between Excel worksheets and PDF bookmark references when documents need to be reordered based on multiple sorting criteria.
+A modern Python application that automates the process of sorting Excel data and renumbering corresponding PDF bookmarks while maintaining synchronized document relationships. Built with a clean architecture using dependency injection and pipeline processing.
 
-## Features
+## 🚀 Features
 
-- **Automated Sorting**: Sort Excel data by Legal Description, Grantee, Grantor, Document Type, Document Date, and Received Date
-- **Index Renumbering**: Automatically renumber the Index# column starting from 1
-- **Bookmark Synchronization**: Update PDF bookmarks to match the new Excel order
-- **User-Friendly GUI**: Intuitive tkinter interface for file selection
-- **Template-Preserving Excel Write**: Output workbook is created as a copy of the input to retain all sheets, widths, styles, filters, and layouts
-- **Safe Backup System**: Creates timestamped backup files before processing, preserving originals with automatic rollback on failure
+### Core Processing
+- **Multi-Criteria Sorting**: Sort Excel data by Legal Description, Grantee, Grantor, Document Type, Document Date, and Received Date
+- **Automatic Renumbering**: Renumber Index# column starting from 1 after sorting
+- **PDF Bookmark Synchronization**: Update PDF bookmarks to match new Excel order
+- **Document Unit Architecture**: Maintains immutable Excel row ↔ PDF page range relationships to prevent data corruption
 
-## Requirements
+### User Interfaces
+- **Streamlit Web App**: Modern, responsive web interface with multi-page workflow
+- **Tkinter Desktop App**: Traditional desktop GUI for local processing
+- **Dual Processing Modes**: Single file processing or multi-file merge operations
 
-- Python 3.7 or higher
-- tkinter (usually included with Python, but on some Linux systems install with: `sudo apt-get install python3-tk`)
-- Required packages (installed via requirements.txt):
-  - pandas >= 1.5.0
-  - pypdf == 4.2.0
-  - openpyxl >= 3.0.0 (for Excel file reading)
+### Advanced Features
+- **Multi-File Merge**: Combine multiple Excel/PDF pairs into consolidated documents
+- **Data Filtering**: Filter Excel data by column values before processing
+- **PDF Page Reordering**: Optionally reorder PDF pages to match bookmark order
+- **Document Image Checking**: Add/update Document_Found column in Excel output
+- **Safe Backup System**: Automatic timestamped backups with rollback on failure
+- **Template Preservation**: Maintains Excel formatting, styles, and layouts
 
-## Installation
+## 🏗️ Architecture
 
-1. Clone or download this repository
-2. Navigate to the project directory:
-   ```bash
-   cd aa-abstract-renumber
-   ```
-3. Create a virtual environment (recommended):
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
-4. Install dependencies:
-   ```bash
-   python3 -m pip install -r requirements.txt
-   ```
+The application follows clean architecture principles with clear separation of concerns:
 
-## Usage
-
-1. Activate the virtual environment (if not already active):
-   ```bash
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
-
-2. Run the application:
-   ```bash
-   python3 main.py
-### PDF Backend Selection
-
-By default, the app uses `pypdf`. You can set the backend name for future flexibility:
-
-```bash
-export PDF_BACKEND=pypdf  # current and only supported backend
 ```
-   ```
+├── core/                    # Business logic and domain models
+│   ├── models.py           # Data classes (Options, Result, DocumentUnit)
+│   ├── interfaces.py       # Protocol definitions for dependency injection
+│   ├── app_controller.py   # Main application orchestrator
+│   ├── services/           # Business services
+│   │   └── renumber.py     # Main renumbering service
+│   ├── pipeline/           # Processing pipeline
+│   │   ├── pipeline.py     # Pipeline orchestrator
+│   │   ├── context.py      # Pipeline execution context
+│   │   └── steps/          # Individual processing steps
+│   └── transform/          # Data transformation utilities
+├── adapters/               # External interface adapters
+│   ├── excel_repo.py       # Excel file operations
+│   ├── pdf_repo.py         # PDF file operations
+│   ├── ui_streamlit.py     # Streamlit UI adapter
+│   └── ui_tkinter.py       # Tkinter UI adapter
+├── pages/                  # Streamlit page components
+│   ├── mode_selection.py   # Landing page
+│   ├── single_file_processing.py
+│   ├── multi_file_merge.py
+│   └── components/         # Reusable UI components
+└── app/                    # Application entry points
+    └── tk_app.py           # Tkinter application
+```
 
-3. The GUI will open with the following steps:
-   - **Select Excel File**: Browse and select your Excel worksheet (.xlsx)
-   - **Select PDF File**: Browse and select your corresponding PDF document
-   - **Process Files**: Click "Process Files" to begin sorting and renumbering
+### Pipeline Processing
 
-4. The tool will:
-   - Validate that your Excel file has the required columns (case-insensitive)
-   - Use the 'Index' sheet (case-insensitive); if not found, a GUI prompts you to choose a sheet
-   - Create timestamped backup files of your original documents
-   - Sort the data according to the specified criteria
-   - Renumber the Index# column starting from 1
-   - Update PDF bookmarks to match the new order
-   - Save processed files with original filenames (originals are safely backed up)
+The application uses a 7-step pipeline with conditional execution:
 
-## Required Excel Columns
+1. **ValidateStep**: Comprehensive input validation
+2. **LoadStep**: File loading and DocumentUnit creation
+3. **FilterDfStep**: Optional data filtering
+4. **SortDfStep**: Multi-criteria sorting
+5. **RebuildPdfStep**: PDF reconstruction with updated bookmarks
+6. **SaveStep**: File output operations
+7. **FormatExcelStep**: Excel formatting and finalization
 
-Your Excel file must contain these columns (order doesn't matter; names are case-insensitive):
+## 📋 Requirements
+
+### System Requirements
+- Python 3.7 or higher
+- Linux/Windows/macOS support
+- For GUI: tkinter (usually included, on Linux: `sudo apt-get install python3-tk`)
+
+### Required Excel Columns
+Your Excel file must contain these columns (case-insensitive):
 - **Index#**: Sequential number for each record
 - **Document Type**: Type of document (Release, Decision, etc.)
 - **Legal Description**: Property legal description
 - **Grantee**: Party receiving rights
-- **Grantor**: Party granting rights  
+- **Grantor**: Party granting rights
 - **Document Date**: Date of the document
 - **Received Date**: Date document was received
 
-## Sorting Priority
+### File Format Support
+- **Excel**: .xlsx, .xls (max 400MB for web interface)
+- **PDF**: .pdf with bookmarks (max 400MB for web interface)
 
-Data is sorted in the following order:
+## 🛠️ Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd aa-abstract-renumber
+   ```
+
+2. **Create virtual environment** (recommended):
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   ```
+
+3. **Install dependencies**:
+   ```bash
+   python3 -m pip install -r requirements.txt
+   ```
+
+## 🚀 Usage
+
+### Web Interface (Streamlit)
+
+1. **Start the web application**:
+   ```bash
+   streamlit run streamlit_main.py
+   ```
+
+2. **Open your browser** to `http://localhost:8501`
+
+3. **Choose your workflow**:
+   - **Single File Processing**: Process one Excel/PDF pair
+   - **Multi-File Merge**: Combine multiple document sets
+
+4. **Upload files** and configure processing options
+
+5. **Download processed files** with `_processed` suffix
+
+### Desktop Interface (Tkinter)
+
+1. **Run the desktop application**:
+   ```bash
+   python3 main.py
+   ```
+
+2. **Use the GUI to**:
+   - Select Excel and PDF files
+   - Configure processing options
+   - Process files with automatic backup
+
+## ⚙️ Configuration
+
+### Environment Variables
+```bash
+export PDF_BACKEND=pypdf  # PDF processing backend (currently only pypdf supported)
+```
+
+### Processing Options
+- **Backup Creation**: Create timestamped backups before processing
+- **Sort Bookmarks**: Sort PDF bookmarks naturally
+- **Reorder Pages**: Reorder PDF pages to match bookmark order
+- **Data Filtering**: Filter by column values
+- **Document Image Check**: Add Document_Found column
+
+## 📊 Data Processing
+
+### Sorting Priority
+Data is sorted in this order:
 1. Legal Description (alphabetical)
 2. Grantee (alphabetical)
 3. Grantor (alphabetical)
@@ -91,39 +161,95 @@ Data is sorted in the following order:
 5. Document Date (chronological)
 6. Received Date (chronological)
 
-## Output Files
-
-The tool uses a safe backup approach for file processing:
-- **Original files** are backed up with datetime stamps before processing
-- **Processed files** keep the original filenames
-- **Backup files** are created with format: `filename_backup_YYYY-MM-DD_HH-MM-SS.ext`
-
-Example:
-- `Document.xlsx` → `Document_backup_2024-01-15_14-30-45.xlsx` (backup)
-- `Document.xlsx` → `Document.xlsx` (processed file with original name)
-- `Document.pdf` → `Document_backup_2024-01-15_14-30-45.pdf` (backup) 
-- `Document.pdf` → `Document.pdf` (processed file with original name)
-
-This approach ensures:
-- ✅ **No data loss** - Original files are safely backed up before processing
-- ✅ **User-friendly output** - Processed files maintain original names
-- ✅ **Easy reversion** - Original files can be restored from timestamped backups
-- ✅ **Automatic rollback** - If processing fails, originals are restored automatically
-
-## Bookmark Format
-
-PDF bookmarks are updated to follow the format:
-`Index#-Document Type-Received Date`
+### Bookmark Format
+PDF bookmarks are updated to: `Index#-Document Type-Received Date`
 
 Example: `1-Release-2/20/1961`
 
-## Troubleshooting
+### Output Files
+- **Single File Mode**: Files saved with `_processed` suffix
+- **Desktop Mode**: Original filenames with timestamped backups
+- **Multi-File Mode**: Consolidated files with merged data
 
-- **Missing Required Columns**: The app shows which required columns are missing and aborts. Add the missing headers and retry.
-- **Date Formatting**: Ensure dates in Excel are properly formatted as dates, not text
-- **PDF Permissions**: Ensure the PDF is not password-protected or has restrictions that prevent modification
-- **File Permissions**: Ensure you have write permissions in the directory where files are located
+## 🧪 Testing
 
-## Example Files
+Run the test suite:
+```bash
+python3 -m pytest
+```
 
-Sample files are available in the `example-reports/` directory for testing the application. 
+Run specific test categories:
+```bash
+python3 -m pytest tests/core/          # Core logic tests
+python3 -m pytest tests/adapters/      # Adapter tests
+python3 -m pytest tests/integration/   # Integration tests
+```
+
+## 🔧 Development
+
+### Project Structure
+- **Clean Architecture**: Clear separation between business logic and external concerns
+- **Dependency Injection**: Protocol-based interfaces for testability
+- **Pipeline Pattern**: Modular, testable processing steps
+- **Repository Pattern**: Abstracted file operations
+
+### Adding New Features
+1. Define interfaces in `core/interfaces.py`
+2. Implement business logic in `core/services/`
+3. Add pipeline steps in `core/pipeline/steps/`
+4. Create adapters in `adapters/`
+5. Add UI components in `pages/components/`
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**Missing Required Columns**
+- Ensure all required columns exist in Excel file
+- Column names are case-insensitive
+- Check for typos in column headers
+
+**Date Formatting**
+- Ensure dates are formatted as dates, not text in Excel
+- Use consistent date formats throughout the file
+
+**PDF Issues**
+- Ensure PDF is not password-protected
+- Verify PDF contains bookmarks
+- Check file permissions for modification
+
+**File Size Limits**
+- Web interface: 400MB per file
+- Desktop interface: No hard limits (system dependent)
+
+**Memory Issues**
+- Large files may require more system memory
+- Consider processing files in smaller batches
+
+### Error Messages
+The application provides detailed error messages with context. Check the logs for specific failure points in the pipeline.
+
+## 📄 License
+
+See LICENSE file for details.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Follow PEP 8 style guidelines
+4. Add tests for new functionality
+5. Submit a pull request
+
+## 📚 Dependencies
+
+- **pandas**: Data manipulation and analysis
+- **openpyxl**: Excel file operations
+- **pypdf**: PDF processing and bookmark manipulation
+- **streamlit**: Web interface framework
+- **natsort**: Natural sorting algorithms
+- **protobuf**: Protocol buffer support (version locked for compatibility)
+
+## Todo
+[ ] Fix handling of sheet names in Streamlit
+[ ] Fix handling of column names in Streamlit
