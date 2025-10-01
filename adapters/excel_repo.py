@@ -28,9 +28,15 @@ class ExcelOpenpyxlRepo:
         """Load a worksheet into a DataFrame preserving native Excel data types.
 
         Date columns remain as datetime objects, while Index# is converted to string
-        for consistent bookmark matching.
+        for consistent bookmark matching. Removes completely empty rows to prevent
+        processing errors.
         """
         df = pd.read_excel(path, sheet_name=sheet)
+
+        # Remove completely empty rows (all columns are NaN/empty)
+        # This prevents processing errors while preserving rows with any data
+        if not df.empty:
+            df = df.dropna(how="all").reset_index(drop=True)
 
         # Convert Index# column to string for consistent bookmark matching
         if "Index#" in df.columns:
