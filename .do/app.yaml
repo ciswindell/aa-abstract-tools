@@ -1,0 +1,19 @@
+name: abstract-renumber-tool
+services:
+- name: streamlit-app
+  source_dir: /
+  github:
+    repo: ciswindell/aa-abstract-tools
+    branch: main
+  run_command: streamlit run streamlit_main.py --server.port=8080 --server.address=0.0.0.0
+  environment_slug: python
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  http_port: 8080
+  envs:
+  - key: PDF_BACKEND
+    value: pypdf
+  - key: STREAMLIT_SERVER_PORT
+    value: "8080"
+  - key: STREAMLIT_SERVER_ADDRESS
+    value: "0.0.0.0"
