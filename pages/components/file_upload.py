@@ -107,7 +107,7 @@ class FileUploadManager:
             Path to the temporary file
         """
         suffix = ".xlsx" if file_type == "excel" else ".pdf"
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        temp_file = tempfile.NamedTemporaryFile(delete=True, suffix=suffix)
         temp_file.write(uploaded_file.getvalue())
         temp_file.close()
 

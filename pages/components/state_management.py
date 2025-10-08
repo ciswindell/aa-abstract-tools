@@ -6,6 +6,7 @@ Contains shared session state utility functions to eliminate duplication
 and provide consistent state management patterns across different pages.
 """
 
+import gc
 import time
 from typing import Any, Optional
 
@@ -149,6 +150,30 @@ class SessionStateManager:
             st.session_state.primary_pair = None
             st.session_state.additional_pairs = []
             st.session_state.merge_pairs = None
+
+        # Memory cleanup: Remove large objects from session state
+        try:
+            # Clear large DataFrames and cached data
+            large_objects_to_clear = [
+                "merged_preview_data",  # Multi-file merge preview cache
+                "processed_excel_data",  # Processed Excel data
+                "processed_pdf_data",  # Processed PDF data
+                "pipeline_context",  # Pipeline context with PDF objects
+                "final_pdf",  # Final PDF writer objects
+                "pdf_writer",  # Any PDF writer objects
+                "excel_dataframe",  # Large Excel DataFrames
+                "preview_dataframe",  # Preview DataFrames
+            ]
+
+            for obj_key in large_objects_to_clear:
+                if obj_key in st.session_state:
+                    del st.session_state[obj_key]
+                    print(f"Memory cleanup: Cleared {obj_key} from session state")
+        except Exception as e:
+            print(f"Memory cleanup warning: {e}")
+
+        # Trigger garbage collection after cleanup
+        gc.collect()
 
         # Reset UI adapter
         if hasattr(st.session_state, "ui_adapter"):

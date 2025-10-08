@@ -5,6 +5,8 @@ Single file processing page for Abstract Renumber Tool.
 Handles the workflow for processing one Excel file and one PDF file.
 """
 
+import gc
+
 import streamlit as st
 
 from adapters.excel_repo import ExcelOpenpyxlRepo
@@ -233,6 +235,9 @@ class SingleFileProcessingPage(BaseStreamlitPage):
             with st.spinner("Processing files..."):
                 # Process files
                 controller.process_files()
+
+            # Trigger garbage collection to free memory
+            gc.collect()
 
             self.show_processing_complete_message()
 

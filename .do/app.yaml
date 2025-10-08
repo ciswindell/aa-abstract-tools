@@ -10,10 +10,4 @@ services:
   instance_count: 1
   instance_size_slug: basic-xxs
   http_port: 8080
-  envs:
-  - key: PDF_BACKEND
-    value: pypdf
-  - key: STREAMLIT_SERVER_PORT
-    value: "8080"
-  - key: STREAMLIT_SERVER_ADDRESS
-    value: "0.0.0.0"
+  # No app-level environment variables needed

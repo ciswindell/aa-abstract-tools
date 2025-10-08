@@ -5,6 +5,7 @@ Multi-file merge page for Abstract Renumber Tool.
 Handles the workflow for merging multiple Excel/PDF file pairs.
 """
 
+import gc
 from pathlib import Path
 
 import pandas as pd
@@ -656,6 +657,9 @@ class MultiFileMergePage(BaseStreamlitPage):
 
                 progress_bar.progress(100)
                 status_container.text("Processing complete!")
+
+            # Trigger garbage collection to free memory
+            gc.collect()
 
             self.show_processing_complete_message()
 
