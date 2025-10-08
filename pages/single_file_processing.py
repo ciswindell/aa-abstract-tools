@@ -236,6 +236,11 @@ class SingleFileProcessingPage(BaseStreamlitPage):
                 # Process files
                 controller.process_files()
 
+                # Explicitly delete controller to release memory
+                # The controller holds references to the pipeline context which contains
+                # large PdfWriter objects and DataFrames
+                del controller
+
             # Trigger garbage collection to free memory
             gc.collect()
 

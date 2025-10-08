@@ -655,6 +655,11 @@ class MultiFileMergePage(BaseStreamlitPage):
 
                 controller.process_files()
 
+                # Explicitly delete controller to release memory
+                # The controller holds references to the pipeline context which contains
+                # large PdfWriter objects and DataFrames
+                del controller
+
                 progress_bar.progress(100)
                 status_container.text("Processing complete!")
 
