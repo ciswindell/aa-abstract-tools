@@ -241,8 +241,11 @@ class SingleFileProcessingPage(BaseStreamlitPage):
                 # large PdfWriter objects and DataFrames
                 del controller
 
-            # Trigger garbage collection to free memory
-            gc.collect()
+            # Aggressive memory cleanup
+            # Force multiple garbage collection cycles to ensure all objects are freed
+            # This is necessary because Python's GC may not immediately free large objects
+            for _ in range(3):
+                gc.collect()
 
             self.show_processing_complete_message()
 

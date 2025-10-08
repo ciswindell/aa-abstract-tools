@@ -72,6 +72,29 @@ class SaveStep(BaseStep):
         # Save PDF output with proper backup handling
         self._save_pdf_output(context, pdf_out_path, should_backup)
 
+        # Explicitly clear the PdfWriter to release memory immediately after saving
+        # The PdfWriter object can hold hundreds of MB of PDF data in memory
+        if context.final_pdf is not None:
+            # Clear internal pages list to release memory
+            if hasattr(context.final_pdf, "_pages"):
+                context.final_pdf._pages = []
+            if hasattr(context.final_pdf, "pages"):
+                context.final_pdf.pages.clear()
+            # Null out the reference
+            context.final_pdf = None
+            self.logger.info("Released PdfWriter memory after saving")
+
+        # Clear the DataFrame to release memory
+        if context.df is not None:
+            context.df = None
+            self.logger.info("Released DataFrame memory after saving")
+
+        # Clear document units
+        if context.document_units is not None:
+            context.document_units = None
+        if context.processed_document_units is not None:
+            context.processed_document_units = None
+
         self.logger.info(
             f"Output saved successfully to: {excel_out_path}, {pdf_out_path}"
         )
