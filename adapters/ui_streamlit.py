@@ -193,9 +193,9 @@ class StreamlitUIAdapter:
         if uploaded_file is None:
             return None
 
-        # Create temporary file
+        # Create temporary file - keep delete=False so file persists for processing
         suffix = ".xlsx" if file_type == "excel" else ".pdf"
-        temp_file = tempfile.NamedTemporaryFile(delete=True, suffix=suffix)
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
         temp_file.write(uploaded_file.getvalue())
         temp_file.close()
 

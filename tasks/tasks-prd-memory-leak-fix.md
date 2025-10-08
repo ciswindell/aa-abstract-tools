@@ -19,9 +19,9 @@
 ## Tasks
 
 - [x] 1.0 Fix Temporary File Creation
-  - [x] 1.1 Update `adapters/ui_streamlit.py` - Change `tempfile.NamedTemporaryFile(delete=False)` to `delete=True` in `save_uploaded_file()` method
-  - [x] 1.2 Update `pages/components/file_upload.py` - Change `tempfile.NamedTemporaryFile(delete=False)` to `delete=True` in `FileUploadManager.save_to_temp()` method
-  - [x] 1.3 Verify temporary files are automatically cleaned up when no longer referenced
+  - [x] 1.1 Keep `delete=False` in temporary file creation (files needed for processing)
+  - [x] 1.2 Add explicit cleanup of temporary files in `reset_workflow_state()` using `os.unlink()`
+  - [x] 1.3 Verify temporary files are cleaned up when user clicks reset button
 
 - [x] 2.0 Add Session State Cleanup  
   - [x] 2.1 Update `pages/components/state_management.py` - Add cleanup of large objects in `reset_workflow_state()` method

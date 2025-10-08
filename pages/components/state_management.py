@@ -169,6 +169,61 @@ class SessionStateManager:
                 if obj_key in st.session_state:
                     del st.session_state[obj_key]
                     print(f"Memory cleanup: Cleared {obj_key} from session state")
+
+            # Clean up temporary input files
+            import os
+
+            # Clean up single-file processing temp files
+            temp_paths_to_clean = ["excel_temp_path", "pdf_temp_path"]
+            for path_key in temp_paths_to_clean:
+                if path_key in st.session_state and st.session_state[path_key]:
+                    try:
+                        if os.path.exists(st.session_state[path_key]):
+                            os.unlink(st.session_state[path_key])
+                            print(
+                                f"Memory cleanup: Deleted temp file {st.session_state[path_key]}"
+                            )
+                    except Exception as file_err:
+                        print(
+                            f"Memory cleanup: Could not delete {st.session_state[path_key]}: {file_err}"
+                        )
+
+            # Clean up multi-file merge temp files
+            if "primary_pair" in st.session_state and st.session_state.primary_pair:
+                for path_key in ["excel_path", "pdf_path"]:
+                    if path_key in st.session_state.primary_pair:
+                        file_path = st.session_state.primary_pair[path_key]
+                        if file_path:
+                            try:
+                                if os.path.exists(file_path):
+                                    os.unlink(file_path)
+                                    print(
+                                        f"Memory cleanup: Deleted primary pair temp file {file_path}"
+                                    )
+                            except Exception as file_err:
+                                print(
+                                    f"Memory cleanup: Could not delete {file_path}: {file_err}"
+                                )
+
+            if (
+                "additional_pairs" in st.session_state
+                and st.session_state.additional_pairs
+            ):
+                for i, pair in enumerate(st.session_state.additional_pairs):
+                    for path_key in ["excel_path", "pdf_path"]:
+                        if path_key in pair:
+                            file_path = pair[path_key]
+                            if file_path:
+                                try:
+                                    if os.path.exists(file_path):
+                                        os.unlink(file_path)
+                                        print(
+                                            f"Memory cleanup: Deleted additional pair {i} temp file {file_path}"
+                                        )
+                                except Exception as file_err:
+                                    print(
+                                        f"Memory cleanup: Could not delete {file_path}: {file_err}"
+                                    )
         except Exception as e:
             print(f"Memory cleanup warning: {e}")
 
