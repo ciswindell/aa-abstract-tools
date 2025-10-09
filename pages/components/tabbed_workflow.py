@@ -109,11 +109,12 @@ class TabbedWorkflowManager:
         Returns:
             True if prerequisites are met
         """
-        uploaded_excel = st.session_state.get("uploaded_excel")
-        uploaded_pdf = st.session_state.get("uploaded_pdf")
+        # Check for temp file paths instead of UploadedFile objects
+        excel_temp_path = st.session_state.get("excel_temp_path")
+        pdf_temp_path = st.session_state.get("pdf_temp_path")
 
         if tab_name.lower() in ["filtering", "options", "process"]:
-            if not (uploaded_excel and uploaded_pdf):
+            if not (excel_temp_path and pdf_temp_path):
                 st.warning("⚠️ Please upload files in the **Files** tab first.")
                 return False
 

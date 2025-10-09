@@ -101,9 +101,10 @@ class BaseStreamlitPage:
             True if files are uploaded, False otherwise
         """
         if self.page_type == "single":
+            # Check for temp file paths instead of UploadedFile objects
             return bool(
-                st.session_state.get("uploaded_excel")
-                and st.session_state.get("uploaded_pdf")
+                st.session_state.get("excel_temp_path")
+                and st.session_state.get("pdf_temp_path")
             )
         elif self.page_type == "merge":
             return bool(st.session_state.get("primary_pair"))
@@ -117,8 +118,9 @@ class BaseStreamlitPage:
             Status string or None if no specific status
         """
         if self.page_type == "single":
-            excel = st.session_state.get("uploaded_excel")
-            pdf = st.session_state.get("uploaded_pdf")
+            # Check for temp file paths instead of UploadedFile objects
+            excel = st.session_state.get("excel_temp_path")
+            pdf = st.session_state.get("pdf_temp_path")
 
             if excel and pdf:
                 return "files_uploaded"
@@ -147,14 +149,8 @@ class BaseStreamlitPage:
         """
         return self.state_manager.get_current_step_info()
 
-    def store_uploaded_files(self, excel_file=None, pdf_file=None) -> None:
-        """Store uploaded files in session state.
-
-        Args:
-            excel_file: Uploaded Excel file object
-            pdf_file: Uploaded PDF file object
-        """
-        self.state_manager.store_uploaded_files(excel_file, pdf_file)
+    # REMOVED: store_uploaded_files() - we no longer store 500MB UploadedFile objects
+    # in session state. Files are written to /tmp immediately and we only store paths.
 
     def clear_file_uploaders(self) -> None:
         """Clear file uploaders by rotating their keys."""

@@ -7,9 +7,11 @@ and provide consistent state management patterns across different pages.
 """
 
 import gc
+import os
 import time
-from typing import Any, Optional
+from typing import Optional
 
+import psutil
 import streamlit as st
 
 
@@ -28,17 +30,12 @@ class SessionStateManager:
 
             st.session_state.ui_adapter = StreamlitUIAdapter()
 
-        # File paths
+        # File paths for single file processing (not UploadedFile objects!)
+        # We only store temp file paths, not the 500MB UploadedFile objects
         if "excel_temp_path" not in st.session_state:
             st.session_state.excel_temp_path = None
         if "pdf_temp_path" not in st.session_state:
             st.session_state.pdf_temp_path = None
-
-        # Uploaded files
-        if "uploaded_excel" not in st.session_state:
-            st.session_state.uploaded_excel = None
-        if "uploaded_pdf" not in st.session_state:
-            st.session_state.uploaded_pdf = None
 
         # Processing state
         if "show_downloads" not in st.session_state:
@@ -128,6 +125,13 @@ class SessionStateManager:
         Args:
             page_type: Type of page ('single' or 'merge') for appropriate reset
         """
+        # Get memory info helper
+        process = psutil.Process(os.getpid())
+        mem_before_reset = process.memory_info().rss / 1024 / 1024  # MB
+        print(f"\n{'=' * 60}")
+        print(f"MEMORY BEFORE RESET: {mem_before_reset:.2f} MB")
+        print(f"{'=' * 60}\n")
+
         # Clear file uploaders
         self.clear_file_uploaders(page_type)
 
@@ -151,6 +155,11 @@ class SessionStateManager:
             st.session_state.additional_pairs = []
             st.session_state.merge_pairs = None
 
+            # NOTE: File uploader keys regeneration doesn't work because Streamlit's
+            # MediaFileManager is per-session and holds ALL uploaded files.
+            # The only way to clear them is to end the session (close browser tab)
+            # or use a hack to clear all session state keys (which we do below)
+
         # Memory cleanup: Remove large objects from session state
         try:
             # Clear large DataFrames and cached data
@@ -163,6 +172,7 @@ class SessionStateManager:
                 "pdf_writer",  # Any PDF writer objects
                 "excel_dataframe",  # Large Excel DataFrames
                 "preview_dataframe",  # Preview DataFrames
+                "download_ui_rendered",  # Reset download UI flag
             ]
 
             for obj_key in large_objects_to_clear:
@@ -170,8 +180,7 @@ class SessionStateManager:
                     del st.session_state[obj_key]
                     print(f"Memory cleanup: Cleared {obj_key} from session state")
 
-            # Clean up temporary input files
-            import os
+            # Clean up temporary input files (os is already imported at top of file)
 
             # Clean up single-file processing temp files
             temp_paths_to_clean = ["excel_temp_path", "pdf_temp_path"]
@@ -227,12 +236,179 @@ class SessionStateManager:
         except Exception as e:
             print(f"Memory cleanup warning: {e}")
 
-        # Trigger garbage collection after cleanup
-        gc.collect()
+        # Clear ALL uploaded file objects AND download button caches from session state
+        print("\n[RESET] Scanning for uploaded file objects and download caches...")
+        keys_to_clear = []
+        for key in list(st.session_state.keys()):
+            obj = st.session_state.get(key)
+            # Check if it's an UploadedFile object
+            if hasattr(obj, "getvalue") and hasattr(obj, "name"):
+                keys_to_clear.append(key)
+            # Check if it's a download cache (keys starting with "download_")
+            elif key.startswith("download_"):
+                keys_to_clear.append(key)
+            # Check if it's a file uploader widget key
+            elif "uploader" in key.lower() or "uploaded" in key.lower():
+                keys_to_clear.append(key)
+            # Check if it's a FormSubmitter (download button internal state)
+            elif "FormSubmitter:" in str(type(obj)):
+                keys_to_clear.append(key)
 
-        # Reset UI adapter
-        if hasattr(st.session_state, "ui_adapter"):
-            st.session_state.ui_adapter.reset_gui()
+        for key in keys_to_clear:
+            if key in st.session_state:
+                try:
+                    obj = st.session_state[key]
+                    if hasattr(obj, "getvalue"):
+                        import sys
+
+                        size_mb = len(obj.getvalue()) / 1024 / 1024
+                        print(
+                            f"[RESET] Clearing uploaded file: {key} ({size_mb:.2f} MB)"
+                        )
+                    elif key.startswith("download_zip_"):
+                        # Download ZIP caches are stored as bytes
+                        import sys
+
+                        size_mb = sys.getsizeof(obj) / 1024 / 1024
+                        print(
+                            f"[RESET] Clearing download ZIP cache: {key} ({size_mb:.2f} MB)"
+                        )
+                    else:
+                        print(f"[RESET] Clearing: {key}")
+                    del st.session_state[key]
+                except:
+                    pass
+
+        # Clear Streamlit's cache to release cached ZIP files
+        # This is CRITICAL for releasing the ~1GB ZIP files created for downloads
+        print("\n[RESET] Clearing Streamlit cache (ZIP files)...")
+        try:
+            st.cache_data.clear()
+            print("[RESET] Streamlit cache cleared successfully")
+        except Exception as cache_err:
+            print(f"[RESET] Warning: Could not clear Streamlit cache: {cache_err}")
+
+        # Trigger garbage collection after cleanup
+        mem_before_gc = process.memory_info().rss / 1024 / 1024
+
+        # Force clear Python module caches that might hold references
+        try:
+            import sys
+
+            import pypdf
+
+            # Clear any module-level caches
+            if hasattr(pypdf, "_cache"):
+                del pypdf._cache
+            if hasattr(pypdf.PdfReader, "_cache"):
+                pypdf.PdfReader._cache = {}
+            if hasattr(pypdf.PdfWriter, "_cache"):
+                pypdf.PdfWriter._cache = {}
+            print("[RESET] Cleared pypdf module caches")
+        except Exception as e:
+            print(f"[RESET] Could not clear pypdf caches: {e}")
+
+        for _ in range(5):  # Increased from 3 to 5
+            gc.collect()
+        mem_after_gc = process.memory_info().rss / 1024 / 1024
+
+        print(
+            f"\n[RESET] MEMORY AFTER gc.collect(): {mem_after_gc:.2f} MB (change: {mem_after_gc - mem_before_gc:+.2f} MB)"
+        )
+
+        # Force Python to release memory back to OS (Linux only)
+        # This is necessary because Python's allocator holds freed memory in its heap
+        # malloc_trim(0) forces glibc to release unused memory back to the kernel
+        try:
+            import ctypes
+
+            libc = ctypes.CDLL("libc.so.6")
+            libc.malloc_trim(0)
+            mem_after_trim = process.memory_info().rss / 1024 / 1024
+            print(
+                f"[RESET] MEMORY AFTER malloc_trim(): {mem_after_trim:.2f} MB (freed: {mem_after_gc - mem_after_trim:.2f} MB)"
+            )
+        except Exception as trim_err:
+            print(f"[RESET] malloc_trim not available (non-Linux?): {trim_err}")
+
+        # Analyze what's still in session state
+        print(f"\n[RESET] SESSION STATE KEYS: {list(st.session_state.keys())}")
+        print("\n[RESET] ANALYZING ALL SESSION STATE OBJECTS:")
+        import sys
+
+        for key in st.session_state.keys():
+            try:
+                obj = st.session_state[key]
+                obj_type = type(obj).__name__
+                size_mb = sys.getsizeof(obj) / 1024 / 1024
+
+                # For UploadedFile objects, check actual data size
+                if hasattr(obj, "getvalue"):
+                    try:
+                        actual_size_mb = len(obj.getvalue()) / 1024 / 1024
+                        print(
+                            f"  - {key}: {obj_type}, sys.getsizeof={size_mb:.2f} MB, ACTUAL DATA={actual_size_mb:.2f} MB ⚠️"
+                        )
+                    except:
+                        print(f"  - {key}: {obj_type}, sys.getsizeof={size_mb:.2f} MB")
+                elif size_mb > 0.1:  # Show objects > 100KB
+                    print(f"  - {key}: {obj_type}, {size_mb:.2f} MB")
+            except Exception:
+                pass  # Silently skip errors
+
+        print(f"\n{'=' * 60}")
+        print(
+            f"[RESET] TOTAL MEMORY FREED BY RESET: {mem_before_reset - mem_after_gc:.2f} MB"
+        )
+        print(f"[RESET] FINAL MEMORY AFTER RESET: {mem_after_gc:.2f} MB")
+        print(f"{'=' * 60}\n")
+
+        # CRITICAL FIX: Force file uploaders to release memory by changing their keys
+        # Per Streamlit docs: uploaded files stay in RAM until tab closes OR uploader key changes
+        # Changing keys forces Streamlit to drop the old uploader's cached files
+        print("[RESET] Regenerating file uploader keys to force file cache clear...")
+        import uuid
+
+        uploader_keys = [
+            "primary_excel_uploader_key",
+            "primary_pdf_uploader_key",
+            "additional_excel_uploader_key",
+            "additional_pdf_uploader_key",
+        ]
+        for key in uploader_keys:
+            new_key_value = str(uuid.uuid4())
+            st.session_state[key] = new_key_value
+            print(f"[RESET] Regenerated {key} = {new_key_value}")
+
+        # CRITICAL: Completely wipe session state to force Streamlit to clear MediaFileManager
+        # This is the ONLY way to clear uploaded file data from Streamlit's internal cache
+        # We must preserve ui_adapter as it's needed for the next run
+        print("[RESET] Performing complete session state wipe to clear file cache...")
+        ui_adapter_backup = st.session_state.get("ui_adapter")
+
+        # Backup the new uploader keys we just generated
+        uploader_keys_backup = {key: st.session_state.get(key) for key in uploader_keys}
+
+        # Delete ALL keys (this triggers Streamlit's internal cleanup)
+        keys_to_delete = list(st.session_state.keys())
+        for key in keys_to_delete:
+            try:
+                del st.session_state[key]
+            except:
+                pass
+
+        # Restore essential state
+        if ui_adapter_backup is not None:
+            st.session_state.ui_adapter = ui_adapter_backup
+
+        # Restore the new uploader keys
+        for key, value in uploader_keys_backup.items():
+            if value is not None:
+                st.session_state[key] = value
+
+        print(f"[RESET] Wiped {len(keys_to_delete)} session state keys")
+        print("[RESET] Restored uploader keys with new UUIDs for fresh file uploaders")
+        print("[RESET] Session state wipe complete - ready for fresh run")
 
     def get_current_step_info(self) -> Optional[str]:
         """Get information about the current workflow step.
@@ -256,16 +432,5 @@ class SessionStateManager:
 
         return None
 
-    def store_uploaded_files(
-        self, excel_file: Optional[Any], pdf_file: Optional[Any]
-    ) -> None:
-        """Store uploaded files in session state.
-
-        Args:
-            excel_file: Uploaded Excel file object
-            pdf_file: Uploaded PDF file object
-        """
-        if excel_file:
-            st.session_state.uploaded_excel = excel_file
-        if pdf_file:
-            st.session_state.uploaded_pdf = pdf_file
+    # REMOVED: store_uploaded_files() - we no longer store 500MB UploadedFile objects
+    # in session state. Files are written to /tmp immediately and we only store paths.

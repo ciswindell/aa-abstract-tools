@@ -76,11 +76,13 @@ class SaveStep(BaseStep):
         # The PdfWriter object can hold hundreds of MB of PDF data in memory
         if context.final_pdf is not None:
             # Clear internal pages list to release memory
-            if hasattr(context.final_pdf, "_pages"):
-                context.final_pdf._pages = []
-            if hasattr(context.final_pdf, "pages"):
-                context.final_pdf.pages.clear()
-            # Null out the reference
+            # Note: pypdf uses _VirtualList which doesn't have clear(), so just null the reference
+            try:
+                if hasattr(context.final_pdf, "_pages"):
+                    context.final_pdf._pages = []
+            except Exception:
+                pass  # Ignore if we can't clear pages
+            # Null out the reference to release memory
             context.final_pdf = None
             self.logger.info("Released PdfWriter memory after saving")
 

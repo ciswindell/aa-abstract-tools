@@ -6,7 +6,9 @@ Handles the workflow for processing one Excel file and one PDF file.
 """
 
 import gc
+import os
 
+import psutil
 import streamlit as st
 
 from adapters.excel_repo import ExcelOpenpyxlRepo
@@ -88,8 +90,9 @@ class SingleFileProcessingPage(BaseStreamlitPage):
             if not is_valid:
                 st.error(error_msg)
             else:
-                self.store_uploaded_files(excel_file=uploaded_excel)
-                # Save to temp file using UI adapter
+                # Save to temp file using UI adapter (writes to /tmp)
+                # NO LONGER storing UploadedFile in session state - it's 253MB+ of wasted RAM!
+                # The file is on disk at /tmp, we only need the path
                 st.session_state.ui_adapter.save_uploaded_file(uploaded_excel, "excel")
 
         if uploaded_pdf:
@@ -97,8 +100,9 @@ class SingleFileProcessingPage(BaseStreamlitPage):
             if not is_valid:
                 st.error(error_msg)
             else:
-                self.store_uploaded_files(pdf_file=uploaded_pdf)
-                # Save to temp file using UI adapter
+                # Save to temp file using UI adapter (writes to /tmp)
+                # NO LONGER storing UploadedFile in session state - it's 253MB+ of wasted RAM!
+                # The file is on disk at /tmp, we only need the path
                 st.session_state.ui_adapter.save_uploaded_file(uploaded_pdf, "pdf")
 
         # Show upload status
@@ -228,6 +232,15 @@ class SingleFileProcessingPage(BaseStreamlitPage):
     def process_files(self):
         """Process the uploaded files using the existing controller."""
         try:
+            # Get memory info helper
+            process = psutil.Process(os.getpid())
+
+            # Log memory BEFORE processing
+            mem_before = process.memory_info().rss / 1024 / 1024  # MB
+            print(f"\n{'=' * 60}")
+            print(f"MEMORY BEFORE PROCESSING: {mem_before:.2f} MB")
+            print(f"{'=' * 60}\n")
+
             # Create controller with UI adapter
             controller = AppController(st.session_state.ui_adapter)
 
@@ -236,16 +249,94 @@ class SingleFileProcessingPage(BaseStreamlitPage):
                 # Process files
                 controller.process_files()
 
+                # Log memory AFTER processing, BEFORE cleanup
+                mem_after_processing = process.memory_info().rss / 1024 / 1024
+                print(f"\n{'=' * 60}")
+                print(f"MEMORY AFTER PROCESSING: {mem_after_processing:.2f} MB")
+                print(f"MEMORY INCREASE: +{mem_after_processing - mem_before:.2f} MB")
+                print(f"{'=' * 60}\n")
+
                 # Explicitly delete controller to release memory
-                # The controller holds references to the pipeline context which contains
-                # large PdfWriter objects and DataFrames
                 del controller
 
+                # Log memory after deleting controller
+                mem_after_del = process.memory_info().rss / 1024 / 1024
+                print(
+                    f"MEMORY AFTER del controller: {mem_after_del:.2f} MB (change: {mem_after_del - mem_after_processing:+.2f} MB)"
+                )
+
+            # Clear ALL uploaded file objects from session state
+            # Streamlit stores uploaded files under multiple keys:
+            # 1. Widget keys (e.g., "excel_uploader_0", "pdf_uploader_0")
+            # 2. Custom keys (e.g., "uploaded_excel", "uploaded_pdf")
+            keys_to_clear = []
+            for key in list(st.session_state.keys()):
+                obj = st.session_state.get(key)
+                # Check if it's an UploadedFile object
+                if hasattr(obj, "getvalue") and hasattr(obj, "name"):
+                    keys_to_clear.append(key)
+                # Also clear known uploaded file keys
+                elif "uploaded" in key.lower() and (
+                    "_file" in key or key in ["uploaded_excel", "uploaded_pdf"]
+                ):
+                    keys_to_clear.append(key)
+
+            for key in keys_to_clear:
+                if key in st.session_state:
+                    try:
+                        # Log the size if possible
+                        obj = st.session_state[key]
+                        if hasattr(obj, "getvalue"):
+                            size_mb = len(obj.getvalue()) / 1024 / 1024
+                            print(f"Clearing uploaded file: {key} ({size_mb:.2f} MB)")
+                        else:
+                            print(f"Clearing uploaded file: {key}")
+                        del st.session_state[key]
+                    except:
+                        pass
+
             # Aggressive memory cleanup
-            # Force multiple garbage collection cycles to ensure all objects are freed
-            # This is necessary because Python's GC may not immediately free large objects
             for _ in range(3):
                 gc.collect()
+
+            # Log memory after garbage collection
+            mem_after_gc = process.memory_info().rss / 1024 / 1024
+            print(
+                f"MEMORY AFTER gc.collect(): {mem_after_gc:.2f} MB (change: {mem_after_gc - mem_after_del:+.2f} MB)"
+            )
+
+            # Check what's in session state
+            print(f"\nSESSION STATE KEYS: {list(st.session_state.keys())}")
+
+            # Analyze ALL objects in session state for memory usage
+            print("\nANALYZING ALL SESSION STATE OBJECTS:")
+            for key in st.session_state.keys():
+                try:
+                    obj = st.session_state[key]
+                    obj_type = type(obj).__name__
+                    size_mb = sys.getsizeof(obj) / 1024 / 1024
+
+                    # For UploadedFile objects, check actual data size
+                    if hasattr(obj, "getvalue"):
+                        try:
+                            actual_size_mb = len(obj.getvalue()) / 1024 / 1024
+                            print(
+                                f"  - {key}: {obj_type}, sys.getsizeof={size_mb:.2f} MB, ACTUAL DATA={actual_size_mb:.2f} MB ⚠️"
+                            )
+                        except:
+                            print(
+                                f"  - {key}: {obj_type}, sys.getsizeof={size_mb:.2f} MB"
+                            )
+                    elif size_mb > 0.1:  # Show objects > 100KB
+                        print(f"  - {key}: {obj_type}, {size_mb:.2f} MB")
+                except Exception:
+                    pass  # Silently skip errors
+
+            print(f"\n{'=' * 60}")
+            print(f"TOTAL MEMORY FREED: {mem_after_processing - mem_after_gc:.2f} MB")
+            print(f"MEMORY STILL LEAKED: {mem_after_gc - mem_before:.2f} MB")
+            print(f"FINAL MEMORY: {mem_after_gc:.2f} MB")
+            print(f"{'=' * 60}\n")
 
             self.show_processing_complete_message()
 
@@ -289,13 +380,35 @@ class SingleFileProcessingPage(BaseStreamlitPage):
 
     def show_reset_ui(self):
         """Display reset UI and handle reset functionality."""
+        import os
+
+        import psutil
+
         st.markdown("---")
-        st.button(
+        if st.button(
             "🔄 Process New Files",
-            width="stretch",
+            key="reset_single_workflow",
             type="secondary",
-            on_click=self.reset_workflow_state,
-        )
+        ):
+            process = psutil.Process(os.getpid())
+            mem_before_reset_click = process.memory_info().rss / 1024 / 1024
+            print(f"\n{'=' * 60}")
+            print("[RESET BUTTON] ✓ User clicked Reset button!")
+            print(
+                f"[RESET BUTTON] Memory at button click: {mem_before_reset_click:.2f} MB"
+            )
+            print(f"{'=' * 60}\n")
+
+            self.reset_workflow_state()
+
+            mem_after_workflow_reset = process.memory_info().rss / 1024 / 1024
+            print(
+                f"[RESET BUTTON] Memory after reset_workflow_state(): {mem_after_workflow_reset:.2f} MB"
+            )
+
+            # Force complete page reload to clear Streamlit's internal file cache
+            print("[RESET BUTTON] Calling st.rerun() to force page reload...")
+            st.rerun()
 
     def reset_workflow_state(self):
         """Reset all workflow state for a fresh start."""

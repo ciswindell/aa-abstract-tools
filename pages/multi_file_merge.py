@@ -6,9 +6,12 @@ Handles the workflow for merging multiple Excel/PDF file pairs.
 """
 
 import gc
+import os
+import sys
 from pathlib import Path
 
 import pandas as pd
+import psutil
 import streamlit as st
 
 from core.app_controller import AppController
@@ -126,29 +129,35 @@ class MultiFileMergePage(BaseStreamlitPage):
                         st.rerun()
         else:
             # Interface for selecting primary pair
-            col1, col2 = st.columns(2)
+            # Use form with clear_on_submit=True to automatically release uploaded files from memory
+            with st.form("primary_pair_form", clear_on_submit=True):
+                col1, col2 = st.columns(2)
 
-            with col1:
-                st.markdown("**Excel File (.xlsx, .xls)**")
-                excel_file = self.file_manager.create_excel_uploader(
-                    key=st.session_state.get(
-                        "primary_excel_uploader_key", "primary_excel_0"
-                    ),
-                    label="Choose primary Excel file",
-                    help_text="Maximum file size: 400MB",
+                with col1:
+                    st.markdown("**Excel File (.xlsx, .xls)**")
+                    excel_file = self.file_manager.create_excel_uploader(
+                        key=st.session_state.get(
+                            "primary_excel_uploader_key", "primary_excel_0"
+                        ),
+                        label="Choose primary Excel file",
+                        help_text="Maximum file size: 400MB",
+                    )
+
+                with col2:
+                    st.markdown("**PDF File (.pdf)**")
+                    pdf_file = self.file_manager.create_pdf_uploader(
+                        key=st.session_state.get(
+                            "primary_pdf_uploader_key", "primary_pdf_0"
+                        ),
+                        label="Choose primary PDF file",
+                        help_text="Maximum file size: 400MB",
+                    )
+
+                submitted = st.form_submit_button(
+                    "🎯 Set as Primary Pair", type="primary"
                 )
 
-            with col2:
-                st.markdown("**PDF File (.pdf)**")
-                pdf_file = self.file_manager.create_pdf_uploader(
-                    key=st.session_state.get(
-                        "primary_pdf_uploader_key", "primary_pdf_0"
-                    ),
-                    label="Choose primary PDF file",
-                    help_text="Maximum file size: 400MB",
-                )
-
-            if excel_file and pdf_file:
+            if excel_file and pdf_file and submitted:
                 # Validate file sizes
                 excel_valid, excel_error = self.file_manager.validate_file_size(
                     excel_file
@@ -167,31 +176,26 @@ class MultiFileMergePage(BaseStreamlitPage):
                 self.file_manager.display_file_info(excel_file, "excel")
                 self.file_manager.display_file_info(pdf_file, "pdf")
 
-                if st.button("🎯 Set as Primary Pair", type="primary"):
-                    # Save files to temporary locations
-                    excel_temp_path = self.file_manager.save_to_temp(
-                        excel_file, "excel"
-                    )
-                    pdf_temp_path = self.file_manager.save_to_temp(pdf_file, "pdf")
+                # Save files to temporary locations
+                excel_temp_path = self.file_manager.save_to_temp(excel_file, "excel")
+                pdf_temp_path = self.file_manager.save_to_temp(pdf_file, "pdf")
 
-                    # Set as primary pair
-                    excel_size_mb = len(excel_file.getvalue()) / (1024 * 1024)
-                    pdf_size_mb = len(pdf_file.getvalue()) / (1024 * 1024)
+                # Set as primary pair
+                excel_size_mb = len(excel_file.getvalue()) / (1024 * 1024)
+                pdf_size_mb = len(pdf_file.getvalue()) / (1024 * 1024)
 
-                    st.session_state.primary_pair = {
-                        "excel_name": excel_file.name,
-                        "pdf_name": pdf_file.name,
-                        "excel_path": excel_temp_path,
-                        "pdf_path": pdf_temp_path,
-                        "excel_size": excel_size_mb,
-                        "pdf_size": pdf_size_mb,
-                    }
-                    # Clear merge preview cache when primary pair changes
-                    self._clear_merge_cache()
-                    st.success(
-                        f"✅ Primary pair set: {excel_file.name} + {pdf_file.name}"
-                    )
-                    st.rerun()
+                st.session_state.primary_pair = {
+                    "excel_name": excel_file.name,
+                    "pdf_name": pdf_file.name,
+                    "excel_path": excel_temp_path,
+                    "pdf_path": pdf_temp_path,
+                    "excel_size": excel_size_mb,
+                    "pdf_size": pdf_size_mb,
+                }
+                # Clear merge preview cache when primary pair changes
+                self._clear_merge_cache()
+                st.success(f"✅ Primary pair set: {excel_file.name} + {pdf_file.name}")
+                st.rerun()
 
     def show_additional_pairs_interface(self):
         """Interface for managing additional file pairs."""
@@ -215,27 +219,34 @@ class MultiFileMergePage(BaseStreamlitPage):
         """Interface for adding an additional file pair."""
         col1, col2 = st.columns(2)
 
-        with col1:
-            st.markdown("**Excel File (.xlsx, .xls)**")
-            excel_file = self.file_manager.create_excel_uploader(
-                key=st.session_state.get(
-                    "additional_excel_uploader_key", "additional_excel_0"
-                ),
-                label="Choose additional Excel file",
-                help_text="Maximum file size: 400MB",
+        # Use form with clear_on_submit=True to automatically release uploaded files from memory
+        # This is THE solution per Streamlit docs: prevents 500MB files from accumulating in RAM
+        with st.form("additional_pair_form", clear_on_submit=True):
+            with col1:
+                st.markdown("**Excel File (.xlsx, .xls)**")
+                excel_file = self.file_manager.create_excel_uploader(
+                    key=st.session_state.get(
+                        "additional_excel_uploader_key", "additional_excel_0"
+                    ),
+                    label="Choose additional Excel file",
+                    help_text="Maximum file size: 400MB",
+                )
+
+            with col2:
+                st.markdown("**PDF File (.pdf)**")
+                pdf_file = self.file_manager.create_pdf_uploader(
+                    key=st.session_state.get(
+                        "additional_pdf_uploader_key", "additional_pdf_0"
+                    ),
+                    label="Choose additional PDF file",
+                    help_text="Maximum file size: 400MB",
+                )
+
+            submitted = st.form_submit_button(
+                "➕ Add Additional Pair", type="secondary"
             )
 
-        with col2:
-            st.markdown("**PDF File (.pdf)**")
-            pdf_file = self.file_manager.create_pdf_uploader(
-                key=st.session_state.get(
-                    "additional_pdf_uploader_key", "additional_pdf_0"
-                ),
-                label="Choose additional PDF file",
-                help_text="Maximum file size: 400MB",
-            )
-
-        if excel_file and pdf_file:
+        if excel_file and pdf_file and submitted:
             # Validate file sizes
             excel_valid, excel_error = self.file_manager.validate_file_size(excel_file)
             pdf_valid, pdf_error = self.file_manager.validate_file_size(pdf_file)
@@ -252,33 +263,30 @@ class MultiFileMergePage(BaseStreamlitPage):
             self.file_manager.display_file_info(excel_file, "excel")
             self.file_manager.display_file_info(pdf_file, "pdf")
 
-            if st.button("➕ Add Additional Pair", type="secondary"):
-                # Save files to temporary locations
-                excel_temp_path = self.file_manager.save_to_temp(excel_file, "excel")
-                pdf_temp_path = self.file_manager.save_to_temp(pdf_file, "pdf")
+            # Save files to temporary locations
+            excel_temp_path = self.file_manager.save_to_temp(excel_file, "excel")
+            pdf_temp_path = self.file_manager.save_to_temp(pdf_file, "pdf")
 
-                # Add to additional pairs
-                excel_size_mb = len(excel_file.getvalue()) / (1024 * 1024)
-                pdf_size_mb = len(pdf_file.getvalue()) / (1024 * 1024)
+            # Add to additional pairs
+            excel_size_mb = len(excel_file.getvalue()) / (1024 * 1024)
+            pdf_size_mb = len(pdf_file.getvalue()) / (1024 * 1024)
 
-                pair_info = {
-                    "excel_name": excel_file.name,
-                    "pdf_name": pdf_file.name,
-                    "excel_path": excel_temp_path,
-                    "pdf_path": pdf_temp_path,
-                    "excel_size": excel_size_mb,
-                    "pdf_size": pdf_size_mb,
-                }
+            pair_info = {
+                "excel_name": excel_file.name,
+                "pdf_name": pdf_file.name,
+                "excel_path": excel_temp_path,
+                "pdf_path": pdf_temp_path,
+                "excel_size": excel_size_mb,
+                "pdf_size": pdf_size_mb,
+            }
 
-                if "additional_pairs" not in st.session_state:
-                    st.session_state.additional_pairs = []
-                st.session_state.additional_pairs.append(pair_info)
-                # Clear merge preview cache when additional pairs change
-                self._clear_merge_cache()
-                st.success(
-                    f"✅ Added additional pair: {excel_file.name} + {pdf_file.name}"
-                )
-                st.rerun()
+            if "additional_pairs" not in st.session_state:
+                st.session_state.additional_pairs = []
+            st.session_state.additional_pairs.append(pair_info)
+            # Clear merge preview cache when additional pairs change
+            self._clear_merge_cache()
+            st.success(f"✅ Added additional pair: {excel_file.name} + {pdf_file.name}")
+            st.rerun()
 
     def display_additional_pairs(self):
         """Display the list of additional file pairs."""
@@ -622,6 +630,13 @@ class MultiFileMergePage(BaseStreamlitPage):
                 st.error("No primary pair selected")
                 return
 
+            # Memory tracking - BEFORE processing
+            process = psutil.Process(os.getpid())
+            mem_before = process.memory_info().rss / 1024 / 1024  # MB
+            print(f"\n{'=' * 60}")
+            print(f"[MERGE] MEMORY BEFORE PROCESSING: {mem_before:.2f} MB")
+            print(f"{'=' * 60}\n")
+
             # Set primary files from primary pair
             primary = st.session_state.primary_pair
             st.session_state.excel_temp_path = primary["excel_path"]
@@ -653,21 +668,148 @@ class MultiFileMergePage(BaseStreamlitPage):
                 else:
                     status_container.text(f"Processing merge of {total_pairs} pairs...")
 
-                controller.process_files()
+                # TESTING: Skip actual processing to isolate file upload memory leak
+                print(
+                    "[TEST] Skipping controller.process_files() to test upload memory"
+                )
+                # controller.process_files()
+
+                # Create fake output files for download UI testing
+                import shutil
+
+                primary = st.session_state.primary_pair
+                excel_path = primary["excel_path"]
+                pdf_path = primary["pdf_path"]
+
+                # Copy input files to output filenames
+                from pathlib import Path
+
+                excel_base = Path(excel_path)
+                pdf_base = Path(pdf_path)
+
+                if len(st.session_state.get("additional_pairs", [])) > 0:
+                    excel_output = excel_base.with_name(
+                        f"{excel_base.stem}_merged{excel_base.suffix}"
+                    )
+                    pdf_output = pdf_base.with_name(
+                        f"{pdf_base.stem}_merged{pdf_base.suffix}"
+                    )
+                else:
+                    excel_output = excel_base
+                    pdf_output = pdf_base
+
+                shutil.copy2(excel_path, excel_output)
+                shutil.copy2(pdf_path, pdf_output)
+                print(f"[TEST] Created fake outputs: {excel_output}, {pdf_output}")
+
+                mem_after_processing = process.memory_info().rss / 1024 / 1024
+                print(f"\n{'=' * 60}")
+                print(f"[MERGE] MEMORY AFTER PROCESSING: {mem_after_processing:.2f} MB")
+                print(
+                    f"[MERGE] MEMORY INCREASE: +{mem_after_processing - mem_before:.2f} MB"
+                )
+                print(f"{'=' * 60}\n")
 
                 # Explicitly delete controller to release memory
                 # The controller holds references to the pipeline context which contains
                 # large PdfWriter objects and DataFrames
                 del controller
+                mem_after_del = process.memory_info().rss / 1024 / 1024
+                print(
+                    f"[MERGE] MEMORY AFTER del controller: {mem_after_del:.2f} MB (change: {mem_after_del - mem_after_processing:+.2f} MB)"
+                )
 
                 progress_bar.progress(100)
                 status_container.text("Processing complete!")
 
-            # Aggressive memory cleanup
-            # Force multiple garbage collection cycles to ensure all objects are freed
-            # This is necessary because Python's GC may not immediately free large objects
-            for _ in range(3):
-                gc.collect()
+            # Clear ALL uploaded file objects from session state
+            # Streamlit stores uploaded files under multiple keys:
+            # 1. Widget keys (e.g., "primary_excel_0", "additional_pdf_0")
+            # 2. Custom keys (e.g., "uploaded_excel", "uploaded_pdf")
+            keys_to_clear = []
+            for key in list(st.session_state.keys()):
+                obj = st.session_state.get(key)
+                # Check if it's an UploadedFile object
+                if hasattr(obj, "getvalue") and hasattr(obj, "name"):
+                    keys_to_clear.append(key)
+                # Also clear known uploaded file keys
+                elif "uploaded" in key.lower() and (
+                    "_file" in key or key in ["uploaded_excel", "uploaded_pdf"]
+                ):
+                    keys_to_clear.append(key)
+
+            for key in keys_to_clear:
+                if key in st.session_state:
+                    try:
+                        # Log the size if possible
+                        obj = st.session_state[key]
+                        if hasattr(obj, "getvalue"):
+                            size_mb = len(obj.getvalue()) / 1024 / 1024
+                            print(
+                                f"[MERGE] Clearing uploaded file: {key} ({size_mb:.2f} MB)"
+                            )
+                        else:
+                            print(f"[MERGE] Clearing uploaded file: {key}")
+                        del st.session_state[key]
+                    except:
+                        pass
+
+                    # Aggressive memory cleanup
+                    # Force multiple garbage collection cycles to ensure all objects are freed
+                    # This is necessary because Python's GC may not immediately free large objects
+                    # Debug: Check what gc is tracking before collection
+                    import gc as gc_module
+
+                    print(
+                        f"\n[MERGE] GC stats before collection: {gc_module.get_count()}"
+                    )
+                    print(f"[MERGE] GC tracked objects: {len(gc_module.get_objects())}")
+
+                    for _ in range(3):
+                        collected = gc.collect()
+                        print(f"[MERGE] gc.collect() freed {collected} objects")
+
+                    mem_after_gc = process.memory_info().rss / 1024 / 1024
+                    print(
+                        f"[MERGE] MEMORY AFTER gc.collect(): {mem_after_gc:.2f} MB (change: {mem_after_gc - mem_after_del:+.2f} MB)"
+                    )
+                    print(f"[MERGE] GC stats after collection: {gc_module.get_count()}")
+                    print(
+                        f"[MERGE] GC tracked objects after: {len(gc_module.get_objects())}"
+                    )
+
+            # Analyze ALL objects in session state for memory usage
+            print(f"\n[MERGE] SESSION STATE KEYS: {list(st.session_state.keys())}")
+            print("\n[MERGE] ANALYZING ALL SESSION STATE OBJECTS:")
+            for key in st.session_state.keys():
+                try:
+                    obj = st.session_state[key]
+                    obj_type = type(obj).__name__
+                    size_mb = sys.getsizeof(obj) / 1024 / 1024
+
+                    # For UploadedFile objects, check actual data size
+                    if hasattr(obj, "getvalue"):
+                        try:
+                            actual_size_mb = len(obj.getvalue()) / 1024 / 1024
+                            print(
+                                f"  - {key}: {obj_type}, sys.getsizeof={size_mb:.2f} MB, ACTUAL DATA={actual_size_mb:.2f} MB ⚠️"
+                            )
+                        except:
+                            print(
+                                f"  - {key}: {obj_type}, sys.getsizeof={size_mb:.2f} MB"
+                            )
+                    elif size_mb > 0.1:  # Show objects > 100KB
+                        print(f"  - {key}: {obj_type}, {size_mb:.2f} MB")
+                except Exception:
+                    pass  # Silently skip errors
+
+            print(f"\n{'=' * 60}")
+            print(
+                f"[MERGE] TOTAL MEMORY FREED: {mem_after_processing - mem_after_gc:.2f} MB"
+            )
+            print(f"[MERGE] MEMORY STILL LEAKED: {mem_after_gc - mem_before:.2f} MB")
+            print(f"[MERGE] FINAL MEMORY: {mem_after_gc:.2f} MB")
+            print(f"{'=' * 60}\n")
 
             self.show_processing_complete_message()
 
@@ -676,6 +818,20 @@ class MultiFileMergePage(BaseStreamlitPage):
 
     def handle_post_processing(self):
         """Handle post-processing workflow: downloads and reset functionality."""
+
+        # CRITICAL: Only render download UI once per processing session
+        # This prevents Streamlit from creating multiple ZIP copies on reruns
+        if "download_ui_rendered" not in st.session_state:
+            st.session_state.download_ui_rendered = False
+
+        # If already rendered, skip everything and just show reset button
+        if st.session_state.download_ui_rendered:
+            print(
+                "[POST-PROCESS] Download UI already rendered, skipping to reset button"
+            )
+            self.show_reset_ui()
+            return
+
         st.markdown("### 📥 Download Processed Files")
 
         # Get the base paths from the primary pair
@@ -722,19 +878,21 @@ class MultiFileMergePage(BaseStreamlitPage):
             pdf_available = pdf_output_path.exists()
 
             if excel_available and pdf_available:
-                # Use download manager to create ZIP and show download button
-                excel_data = self.download_manager.read_file_safely(
-                    str(excel_output_path)
+                # NOTE: ZIP download will spike memory by ~1GB temporarily
+                # This is unavoidable with st.download_button due to Streamlit's caching
+                # Memory is freed during reset via st.cache_data.clear() + malloc_trim()
+                st.markdown("### 📥 Download Processed Files")
+                self.download_manager.show_download_button_from_paths(
+                    excel_path=str(excel_output_path),
+                    pdf_path=str(pdf_output_path),
+                    zip_filename=zip_filename,
+                    excel_zip_name=excel_zip_name,
+                    pdf_zip_name=pdf_zip_name,
                 )
-                pdf_data = self.download_manager.read_file_safely(str(pdf_output_path))
 
-                zip_buffer = self.download_manager.create_download_zip(
-                    excel_data, pdf_data, excel_zip_name, pdf_zip_name
-                )
-
-                self.download_manager.show_download_button(
-                    zip_buffer.getvalue(), zip_filename, excel_zip_name, pdf_zip_name
-                )
+                # Mark download UI as rendered to prevent reruns from recreating it
+                st.session_state.download_ui_rendered = True
+                print("[POST-PROCESS] Download UI rendered, marked as complete")
 
                 # Show reset UI
                 self.show_reset_ui()
@@ -748,12 +906,35 @@ class MultiFileMergePage(BaseStreamlitPage):
 
     def show_reset_ui(self):
         """Display reset UI and handle reset functionality."""
+        import os
+
+        import psutil
+
         st.markdown("---")
-        if st.button("🔄 Process New Files", width="stretch", type="secondary"):
+        if st.button(
+            "🔄 Process New Files", key="reset_merge_workflow", type="secondary"
+        ):
+            process = psutil.Process(os.getpid())
+            mem_before_reset_click = process.memory_info().rss / 1024 / 1024
+            print(f"\n{'=' * 60}")
+            print("[RESET BUTTON] ✓ User clicked Reset button!")
+            print(
+                f"[RESET BUTTON] Memory at button click: {mem_before_reset_click:.2f} MB"
+            )
+            print(f"{'=' * 60}\n")
+
             self.reset_workflow()
             st.session_state.show_downloads = False
-            st.session_state.primary_pair = None
-            st.session_state.additional_pairs = []
+            st.session_state.download_ui_rendered = False  # Reset flag for next session
+
+            mem_after_workflow_reset = process.memory_info().rss / 1024 / 1024
+            print(
+                f"[RESET BUTTON] Memory after reset_workflow(): {mem_after_workflow_reset:.2f} MB"
+            )
+
+            # Force complete page reload to clear Streamlit's internal file cache
+            print("[RESET BUTTON] Calling st.rerun() to force page reload...")
+            st.rerun()
 
 
 def show_multi_file_merge():

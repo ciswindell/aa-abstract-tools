@@ -109,6 +109,11 @@ class RebuildPdfStep(BaseStep):
             context.final_pdf = final_writer
             context.processed_document_units = sorted_units
 
+            # Explicitly release the intermediate reader to free memory
+            # The pages have been copied to final_writer, so we don't need this anymore
+            if intermediate_reader is not None:
+                intermediate_reader = None
+
             self.logger.info(
                 f"PDF reconstruction complete: {len(sorted_units)} DocumentUnits processed"
             )

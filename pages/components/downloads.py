@@ -15,6 +15,37 @@ from typing import Tuple
 import streamlit as st
 
 
+# Use @st.cache_data to ensure ZIP is only created once per unique set of files
+# This prevents memory spikes from recreating the same ZIP on every rerun
+@st.cache_data(show_spinner=False)
+def _create_zip_from_paths(
+    excel_path: str, pdf_path: str, excel_name: str, pdf_name: str
+) -> bytes:
+    """Create ZIP file directly from file paths (cached to avoid recreating).
+
+    This function is cached by Streamlit to ensure we only create the ZIP once
+    per unique set of input files, preventing memory spikes from multiple reruns.
+
+    Args:
+        excel_path: Path to Excel file on disk
+        pdf_path: Path to PDF file on disk
+        excel_name: Name for Excel file inside ZIP
+        pdf_name: Name for PDF file inside ZIP
+
+    Returns:
+        ZIP file data as bytes
+    """
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        # Read and write files directly to ZIP without holding in memory
+        with open(excel_path, "rb") as excel_file:
+            zip_file.writestr(excel_name, excel_file.read())
+        with open(pdf_path, "rb") as pdf_file:
+            zip_file.writestr(pdf_name, pdf_file.read())
+    zip_buffer.seek(0)
+    return zip_buffer.getvalue()
+
+
 class DownloadManager:
     """Manages download UI and file preparation."""
 
@@ -116,6 +147,70 @@ class DownloadManager:
             help=f"Downloads both {excel_name} and {pdf_name} in a ZIP archive",
             key=download_key,
             type="primary",
+        )
+
+    def show_download_button_from_paths(
+        self,
+        excel_path: str,
+        pdf_path: str,
+        zip_filename: str,
+        excel_zip_name: str,
+        pdf_zip_name: str,
+        button_label: str = "📦 Download Processed Files (ZIP)",
+    ) -> None:
+        """Display download button using cached ZIP creation from file paths.
+
+        This is the MEMORY-EFFICIENT version that uses Streamlit's caching to ensure
+        the ZIP is only created once, preventing memory spikes from multiple reruns.
+
+        Args:
+            excel_path: Path to Excel file on disk
+            pdf_path: Path to PDF file on disk
+            zip_filename: Name for the ZIP file
+            excel_zip_name: Name for Excel file inside ZIP
+            pdf_zip_name: Name for PDF file inside ZIP
+            button_label: Label for the download button
+        """
+        import os
+
+        import psutil
+
+        process = psutil.Process(os.getpid())
+        mem_before = process.memory_info().rss / 1024 / 1024
+        print(f"\n[DOWNLOAD] Memory before ZIP creation: {mem_before:.2f} MB")
+
+        # Use the cached function to create ZIP - only created once per unique files
+        zip_data = _create_zip_from_paths(
+            excel_path, pdf_path, excel_zip_name, pdf_zip_name
+        )
+
+        mem_after_zip = process.memory_info().rss / 1024 / 1024
+        print(
+            f"[DOWNLOAD] Memory after ZIP creation: {mem_after_zip:.2f} MB (+{mem_after_zip - mem_before:.2f} MB)"
+        )
+        print(f"[DOWNLOAD] ZIP size: {len(zip_data) / 1024 / 1024:.2f} MB")
+
+        # Use a fixed key for the download button to avoid creating multiple cached copies
+        download_key = "download_processed_files"
+
+        if st.download_button(
+            label=button_label,
+            data=zip_data,
+            file_name=zip_filename,
+            mime="application/zip",
+            width="stretch",
+            help=f"Downloads both {excel_zip_name} and {pdf_zip_name} in a ZIP archive",
+            key=download_key,
+            type="primary",
+        ):
+            print("[DOWNLOAD] ✓ User clicked download button!")
+
+        mem_after_button = process.memory_info().rss / 1024 / 1024
+        print(
+            f"[DOWNLOAD] Memory after button render: {mem_after_button:.2f} MB (+{mem_after_button - mem_after_zip:.2f} MB)"
+        )
+        print(
+            f"[DOWNLOAD] Total memory from download UI: +{mem_after_button - mem_before:.2f} MB\n"
         )
 
     def get_filename_or_default(

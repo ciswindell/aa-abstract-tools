@@ -108,7 +108,15 @@ class FileUploadManager:
         """
         suffix = ".xlsx" if file_type == "excel" else ".pdf"
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-        temp_file.write(uploaded_file.getvalue())
+
+        # Stream file in chunks instead of loading entire file into RAM
+        uploaded_file.seek(0)
+        while True:
+            chunk = uploaded_file.read(8192)  # 8KB chunks
+            if not chunk:
+                break
+            temp_file.write(chunk)
+
         temp_file.close()
 
         return temp_file.name
