@@ -668,39 +668,7 @@ class MultiFileMergePage(BaseStreamlitPage):
                 else:
                     status_container.text(f"Processing merge of {total_pairs} pairs...")
 
-                # TESTING: Skip actual processing to isolate file upload memory leak
-                print(
-                    "[TEST] Skipping controller.process_files() to test upload memory"
-                )
-                # controller.process_files()
-
-                # Create fake output files for download UI testing
-                import shutil
-
-                primary = st.session_state.primary_pair
-                excel_path = primary["excel_path"]
-                pdf_path = primary["pdf_path"]
-
-                # Copy input files to output filenames
-                from pathlib import Path
-
-                excel_base = Path(excel_path)
-                pdf_base = Path(pdf_path)
-
-                if len(st.session_state.get("additional_pairs", [])) > 0:
-                    excel_output = excel_base.with_name(
-                        f"{excel_base.stem}_merged{excel_base.suffix}"
-                    )
-                    pdf_output = pdf_base.with_name(
-                        f"{pdf_base.stem}_merged{pdf_base.suffix}"
-                    )
-                else:
-                    excel_output = excel_base
-                    pdf_output = pdf_base
-
-                shutil.copy2(excel_path, excel_output)
-                shutil.copy2(pdf_path, pdf_output)
-                print(f"[TEST] Created fake outputs: {excel_output}, {pdf_output}")
+                controller.process_files()
 
                 mem_after_processing = process.memory_info().rss / 1024 / 1024
                 print(f"\n{'=' * 60}")
