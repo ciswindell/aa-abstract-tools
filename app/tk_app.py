@@ -67,9 +67,6 @@ class AbstractRenumberGUI:
         self.root.geometry("900x700")
         self.root.resizable(True, True)
 
-        # Center window
-        self._center_window()
-
         # Configure grid weights
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
@@ -117,6 +114,9 @@ class AbstractRenumberGUI:
 
         # Initial status
         self.log_status("Ready. Please select Excel and PDF files.")
+
+        # Center window after all widgets are created
+        self._center_window()
 
     def _create_file_selection(self, parent: ttk.Frame) -> None:
         """Create file selection components."""
