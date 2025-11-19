@@ -1,6 +1,5 @@
 pandas>=2.0.0
-openpyxl>=3.0.0 
-natsort>=8.0.0 
+openpyxl>=3.0.0
+natsort>=8.0.0
 pypdf==4.2.0
-protobuf<=3.20.3
-psutil
+python-dateutil>=2.8.0

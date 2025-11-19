@@ -226,7 +226,7 @@ See LICENSE file for details.
 - **pypdf**: PDF processing and bookmark manipulation
 - **tkinter**: Desktop GUI framework (system package)
 - **natsort**: Natural sorting algorithms
-- **protobuf**: Protocol buffer support (version locked for compatibility)
+- **python-dateutil**: Date parsing utilities
 
 ## Todo
 > Note: Streamlit-related TODOs removed as Streamlit interface was deprecated 2025-11-19
