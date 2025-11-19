@@ -307,7 +307,7 @@ class RebuildPdfStep(BaseStep):
                 intermediate_path.unlink()
                 # Clear the path from context to prevent reuse
                 context.intermediate_pdf_path = None
-        except Exception as e:
-            # Log warning but don't fail the pipeline for cleanup issues
-            self.logger.warning(f"Failed to clean up intermediate PDF: {e}")
-            # Don't raise - cleanup failure shouldn't break the pipeline
+        except Exception:
+            # Silently ignore cleanup failures (common on Windows due to file locking)
+            # The temp file will be cleaned up by the OS eventually
+            pass
