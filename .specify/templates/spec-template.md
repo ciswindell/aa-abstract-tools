@@ -95,14 +95,6 @@
 - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
 - **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
 
-### Architecture Requirements (per Constitution v2.0.0)
-
-- **AR-001**: Business logic MUST reside in `core/` directory (Clean Architecture principle)
-- **AR-002**: Memory usage MUST be monitored and documented for large file operations (Memory Efficiency principle)
-- **AR-003**: Code MUST follow PEP 8 style guidelines (Code Quality principle)
-- **AR-004**: UI implementation MUST use Tkinter adapter in `adapters/ui_tkinter.py` (Local Desktop Interface principle)
-- **AR-005**: Tests are RECOMMENDED but not mandatory (optional testing approach)
-
 ### Key Entities *(include if feature involves data)*
 
 - **[Entity 1]**: [What it represents, key attributes without implementation]

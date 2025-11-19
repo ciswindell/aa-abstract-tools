@@ -31,14 +31,18 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-Verify compliance with Abstract Renumber Tool Constitution (v2.0.0):
+Verify compliance with `.specify/memory/constitution.md` principles:
 
-- [ ] **Clean Architecture**: Business logic in `core/`, external concerns in `adapters/`, protocols in `core/interfaces.py`
-- [ ] **Pipeline Processing**: Complex workflows decomposed into `PipelineStep` implementations in `core/pipeline/steps/`
-- [ ] **Memory Efficiency**: Large objects explicitly cleared, `gc.collect()` and `malloc_trim()` used where appropriate
-- [ ] **Immutable Data**: DocumentUnit relationships never mutated, transformations create new instances
-- [ ] **PEP 8 & SOLID/DRY**: Code follows style guide, no duplication, only necessary code written
-- [ ] **Local Desktop Interface**: Tkinter-only UI in `adapters/ui_tkinter.py`, entry point `main.py`
+- [ ] **Protocol-Based Interfaces**: New components use Protocol definitions from `core/interfaces.py`?
+- [ ] **Repository Pattern**: File I/O goes through `ExcelRepo` or `PdfRepo` abstractions?
+- [ ] **Pipeline Pattern**: Complex workflows implemented as discrete pipeline steps?
+- [ ] **DocumentUnit Immutability**: Excel ↔ PDF relationships preserved throughout?
+- [ ] **Code Quality**: PEP 8 compliant, follows SOLID/DRY, no speculative code?
+- [ ] **Testing**: Pytest tests planned for new functionality?
+- [ ] **Error Handling**: User-facing errors use Logger protocol?
+- [ ] **Documentation**: Docstrings and comments included?
+
+*If any principle is violated, document justification in Complexity Tracking section.*
 
 ## Project Structure
 
