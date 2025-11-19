@@ -67,6 +67,9 @@ class UIController(Protocol):
     def log_status(self, message: str) -> None:
         """Log a status message to the UI."""
 
+    def start_new_operation(self) -> None:
+        """Mark the start of a new operation with visual separator."""
+
     def show_error(self, title: str, message: str) -> None:
         """Show an error message to the user."""
 

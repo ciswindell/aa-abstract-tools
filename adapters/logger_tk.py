@@ -8,6 +8,7 @@ Bridges core Logger Protocol to a UI text/log function (e.g., Tk status area).
 from typing import Callable
 
 from core.interfaces import Logger
+from core.message_types import MSG_ERROR, MSG_INFO
 
 
 class TkLogger(Logger):
@@ -30,20 +31,30 @@ class TkLogger(Logger):
 
 
 class TkinterLogger(Logger):
-    """Logger that writes to both console and UI for better debugging."""
+    """Logger that writes to both console and UI with color-coded message types.
+    
+    Uses MSG_INFO for informational messages (black text) and MSG_ERROR for
+    error messages (red bold text) to provide visual distinction in the UI.
+    """
 
     def __init__(self, gui) -> None:
         """Initialize with GUI for UI logging."""
         self.gui = gui
 
     def info(self, message: str) -> None:
-        """Log an informational message to both console and UI."""
+        """Log an informational message to both console and UI.
+        
+        Displays in black text (MSG_INFO) in the status area.
+        """
         print(f"INFO: {message}")  # Console output
         if hasattr(self.gui, 'log_status'):
-            self.gui.log_status(message)  # UI output
+            self.gui.log_status(message, MSG_INFO)  # UI output with info styling
 
     def error(self, message: str) -> None:
-        """Log an error message to both console and UI."""
+        """Log an error message to both console and UI.
+        
+        Displays in red bold text (MSG_ERROR) in the status area for high visibility.
+        """
         print(f"ERROR: {message}")  # Console output
         if hasattr(self.gui, 'log_status'):
-            self.gui.log_status(f"ERROR: {message}")  # UI output
+            self.gui.log_status(f"ERROR: {message}", MSG_ERROR)  # UI output with error styling

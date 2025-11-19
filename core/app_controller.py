@@ -10,9 +10,11 @@ from openpyxl import load_workbook
 from adapters.excel_repo import ExcelOpenpyxlRepo
 from adapters.logger_tk import TkinterLogger
 from adapters.pdf_repo import PdfRepo
+from adapters.ui_tkinter import simplify_error
 from core.config import DEFAULT_REQUIRED_COLUMNS, DEFAULT_SHEET_NAME
 from core.interfaces import ExcelRepo, Logger, UIController
 from core.interfaces import PdfRepo as PdfRepoInterface
+from core.message_types import MSG_ERROR, MSG_INFO, MSG_SUCCESS
 from core.services.renumber import RenumberService
 
 
@@ -37,12 +39,18 @@ class AppController:
     def process_files(self) -> None:
         """Main processing function."""
         try:
+            # Mark start of new operation with visual separator
+            self.ui.start_new_operation()
+            self.ui.log_status("Starting processing...", MSG_INFO)
+            
             excel_file, pdf_file = self.ui.get_file_paths()
             if not excel_file or not pdf_file:
                 self.ui.show_error(
                     "Missing Files", "Please select both Excel and PDF files."
                 )
                 return
+            
+            self.ui.log_status("Files selected - preparing to process...", MSG_INFO)
 
             # Resolve processing sheet name
             target_sheet = self._resolve_processing_sheet_name(excel_file)
@@ -90,18 +98,23 @@ class AppController:
                 options.merge_pairs_with_sheets = pairs_with_sheets
 
             # Run processing
+            self.ui.log_status("Processing documents...", MSG_INFO)
             service = RenumberService(excel_repo, pdf_repo, logger, self.ui)
             result = service.run(excel_file, pdf_file, options)
             if not result.success:
+                self.ui.log_status(f"Processing failed: {result.message}", MSG_ERROR)
                 raise RuntimeError(result.message or "Unknown error")
 
             # Success handled by UI layer
+            self.ui.log_status("Processing complete!", MSG_SUCCESS)
 
             # Reset GUI for next processing - TEMPORARILY DISABLED FOR DEBUGGING
             # self.ui.reset_gui()
 
         except (ValueError, OSError, RuntimeError) as e:
-            self.ui.show_error("Processing Error", str(e))
+            user_friendly_msg = simplify_error(e)
+            self.ui.log_status(f"Error: {user_friendly_msg}", MSG_ERROR)
+            self.ui.show_error("Processing Error", user_friendly_msg)
 
     def _resolve_processing_sheet_name(self, file_path: str) -> Optional[str]:
         """Resolve the processing sheet name, case-insensitively."""
@@ -136,7 +149,8 @@ class AppController:
             )
 
         except (OSError, ValueError, PermissionError) as e:
-            self.ui.show_error("Sheet Selection Error", str(e))
+            user_friendly_msg = simplify_error(e)
+            self.ui.show_error("Sheet Selection Error", user_friendly_msg)
             return None
 
     # Backup helpers are provided by fileops.files; no local duplicates.
