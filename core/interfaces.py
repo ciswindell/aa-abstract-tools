@@ -20,6 +20,9 @@ class Logger(Protocol):
 
     def error(self, message: str) -> None:
         """Log an error message."""
+    
+    def warning(self, message: str) -> None:
+        """Log a warning message."""
 
 
 class ExcelRepo(Protocol):

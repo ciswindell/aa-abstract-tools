@@ -8,7 +8,7 @@ Bridges core Logger Protocol to a UI text/log function (e.g., Tk status area).
 from typing import Callable
 
 from core.interfaces import Logger
-from core.message_types import MSG_ERROR, MSG_INFO
+from core.message_types import MSG_ERROR, MSG_INFO, MSG_WARNING
 
 
 class TkLogger(Logger):
@@ -28,13 +28,19 @@ class TkLogger(Logger):
         """Log an error message to the UI."""
 
         self._write(message)
+    
+    def warning(self, message: str) -> None:
+        """Log a warning message to the UI."""
+
+        self._write(message)
 
 
 class TkinterLogger(Logger):
     """Logger that writes to both console and UI with color-coded message types.
     
-    Uses MSG_INFO for informational messages (black text) and MSG_ERROR for
-    error messages (red bold text) to provide visual distinction in the UI.
+    Uses MSG_INFO for informational messages (black text), MSG_ERROR for
+    error messages (red bold text), and MSG_WARNING for warning messages
+    (orange text) to provide visual distinction in the UI.
     """
 
     def __init__(self, gui) -> None:
@@ -58,3 +64,12 @@ class TkinterLogger(Logger):
         print(f"ERROR: {message}")  # Console output
         if hasattr(self.gui, 'log_status'):
             self.gui.log_status(f"ERROR: {message}", MSG_ERROR)  # UI output with error styling
+    
+    def warning(self, message: str) -> None:
+        """Log a warning message to both console and UI.
+        
+        Displays in orange text (MSG_WARNING) in the status area.
+        """
+        print(f"WARNING: {message}")  # Console output
+        if hasattr(self.gui, 'log_status'):
+            self.gui.log_status(f"WARNING: {message}", MSG_WARNING)  # UI output with warning styling
