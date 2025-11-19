@@ -189,12 +189,6 @@ class BuildOrchestrator:
             str(self.spec_file),
         ]
         
-        # Add mode-specific flags
-        if self.mode == 'onefile':
-            cmd.append('--onefile')
-        elif self.mode == 'onedir':
-            cmd.append('--onedir')
-        
         # Add optimization flags
         if self.optimize == 'medium':
             # Medium optimization requires UPX

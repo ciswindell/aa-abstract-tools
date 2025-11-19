@@ -65,11 +65,19 @@ EXCLUDES = [
 # PYINSTALLER CONFIGURATION - Typically not modified by users
 # =============================================================================
 
+import os
+from pathlib import Path
+
+# Get the repository root (parent of build directory)
+# SPECPATH is provided by PyInstaller and points to the directory containing the spec file
+REPO_ROOT = Path(SPECPATH).parent
+ENTRY_POINT_PATH = str(REPO_ROOT / ENTRY_POINT)
+
 block_cipher = None
 
 a = Analysis(
-    [ENTRY_POINT],
-    pathex=[],
+    [ENTRY_POINT_PATH],
+    pathex=[str(REPO_ROOT)],
     binaries=[],
     datas=[],
     hiddenimports=HIDDEN_IMPORTS,
