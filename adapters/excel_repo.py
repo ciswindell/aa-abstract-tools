@@ -19,6 +19,7 @@ from utils.bookmark_formulas import (
     detect_bookmark_column,
     has_bookmark_formulas,
 )
+from utils.dates import parse_robust
 
 
 class ExcelOpenpyxlRepo:
@@ -43,6 +44,14 @@ class ExcelOpenpyxlRepo:
             df["Index#"] = (
                 df["Index#"].fillna("").astype(str).str.strip().replace("nan", "")
             )
+
+        # Convert date columns that may be formatted as text in Excel
+        # This ensures chronological sorting works correctly
+        date_column_patterns = ["date"]
+        for col in df.columns:
+            col_lower = str(col).lower()
+            if any(pattern in col_lower for pattern in date_column_patterns):
+                df[col] = df[col].apply(parse_robust)
 
         return df
 
