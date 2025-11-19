@@ -10,10 +10,11 @@ A modern Python application that automates the process of sorting Excel data and
 - **PDF Bookmark Synchronization**: Update PDF bookmarks to match new Excel order
 - **Document Unit Architecture**: Maintains immutable Excel row ↔ PDF page range relationships to prevent data corruption
 
-### User Interfaces
-- **Streamlit Web App**: Modern, responsive web interface with multi-page workflow
-- **Tkinter Desktop App**: Traditional desktop GUI for local processing
+### User Interface
+- **Tkinter Desktop App**: Local desktop GUI for interactive processing
 - **Dual Processing Modes**: Single file processing or multi-file merge operations
+
+> **Note**: Streamlit web interface was removed as of 2025-11-19. The application now uses Tkinter exclusively for local desktop operation.
 
 ### Advanced Features
 - **Multi-File Merge**: Combine multiple Excel/PDF pairs into consolidated documents
@@ -42,13 +43,7 @@ The application follows clean architecture principles with clear separation of c
 ├── adapters/               # External interface adapters
 │   ├── excel_repo.py       # Excel file operations
 │   ├── pdf_repo.py         # PDF file operations
-│   ├── ui_streamlit.py     # Streamlit UI adapter
 │   └── ui_tkinter.py       # Tkinter UI adapter
-├── pages/                  # Streamlit page components
-│   ├── mode_selection.py   # Landing page
-│   ├── single_file_processing.py
-│   ├── multi_file_merge.py
-│   └── components/         # Reusable UI components
 └── app/                    # Application entry points
     └── tk_app.py           # Tkinter application
 ```
@@ -107,26 +102,9 @@ Your Excel file must contain these columns (case-insensitive):
 
 ## 🚀 Usage
 
-### Web Interface (Streamlit)
-
-1. **Start the web application**:
-   ```bash
-   streamlit run streamlit_main.py
-   ```
-
-2. **Open your browser** to `http://localhost:8501`
-
-3. **Choose your workflow**:
-   - **Single File Processing**: Process one Excel/PDF pair
-   - **Multi-File Merge**: Combine multiple document sets
-
-4. **Upload files** and configure processing options
-
-5. **Download processed files** with `_processed` suffix
-
 ### Desktop Interface (Tkinter)
 
-1. **Run the desktop application**:
+1. **Run the application**:
    ```bash
    python3 main.py
    ```
@@ -246,10 +224,9 @@ See LICENSE file for details.
 - **pandas**: Data manipulation and analysis
 - **openpyxl**: Excel file operations
 - **pypdf**: PDF processing and bookmark manipulation
-- **streamlit**: Web interface framework
+- **tkinter**: Desktop GUI framework (system package)
 - **natsort**: Natural sorting algorithms
 - **protobuf**: Protocol buffer support (version locked for compatibility)
 
 ## Todo
-[ ] Fix handling of sheet names in Streamlit
-[ ] Fix handling of column names in Streamlit
+> Note: Streamlit-related TODOs removed as Streamlit interface was deprecated 2025-11-19

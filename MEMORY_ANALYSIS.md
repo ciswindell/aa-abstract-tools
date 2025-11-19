@@ -1,6 +1,8 @@
 # Memory Management Analysis & Findings
 
-## Root Causes of Memory Issues
+> **DEPRECATED**: This document analyzes memory issues specific to the Streamlit web interface, which was removed on 2025-11-19. The application now uses Tkinter for local desktop operation only. This document is preserved for historical reference.
+
+## Root Causes of Memory Issues (Streamlit Interface - DEPRECATED)
 
 After extensive testing and consultation with Streamlit documentation (via Context7), we identified the following root causes:
 
