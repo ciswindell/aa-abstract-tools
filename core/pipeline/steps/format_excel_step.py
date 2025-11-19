@@ -79,14 +79,12 @@ class FormatExcelStep(BaseStep):
             returns early without attempting formatting.
         """
         if not context.excel_out_path:
-            self.logger.info("No Excel output path found - skipping formatting")
             return
 
-        self.logger.info("Applying Excel formatting (dates + auto-filter)")
+        self.logger.info(f"Step {context.step_number} of {context.total_steps}: Formatting Excel...")
 
         try:
             self._format_excel_file(context.excel_out_path, context.df)
-            self.logger.info("Excel formatting applied successfully")
         except Exception as e:
             # Log as error but don't fail the pipeline
             self.logger.error(f"Excel formatting failed: {e}")
@@ -121,9 +119,6 @@ class FormatExcelStep(BaseStep):
                 # Case-insensitive check for "date" anywhere in the header
                 if "date" in header_text:
                     date_columns.append(col_idx)
-                    self.logger.info(
-                        f"Found date column at index {col_idx}: '{cell.value}'"
-                    )
 
         return date_columns
 
@@ -148,7 +143,6 @@ class FormatExcelStep(BaseStep):
             Existing cell alignment and other formatting properties are preserved.
         """
         if not date_columns:
-            self.logger.info("No date columns found - skipping date formatting")
             return
 
         # Apply formatting to data rows + 1000 buffer
@@ -161,10 +155,6 @@ class FormatExcelStep(BaseStep):
                 # Only change the number format, preserve all other formatting
                 cell.number_format = "M/D/YYYY"
                 formatted_cells += 1
-
-        self.logger.info(
-            f"Applied date formatting to {len(date_columns)} columns, {formatted_cells} cells"
-        )
 
     def _setup_auto_filter(self, worksheet, data_rows: int) -> None:
         """Setup auto-filter for all columns with 1000-row buffer.
@@ -183,7 +173,6 @@ class FormatExcelStep(BaseStep):
             even when new columns or rows are added to the template.
         """
         if worksheet.max_column == 0:
-            self.logger.info("Worksheet has no columns - skipping auto-filter setup")
             return
 
         # Calculate filter range: A1 to last_column + buffer_rows
@@ -194,9 +183,6 @@ class FormatExcelStep(BaseStep):
         try:
             # Apply auto-filter to the calculated range
             worksheet.auto_filter.ref = filter_range
-            self.logger.info(
-                f"Applied auto-filter to range {filter_range} ({worksheet.max_column} columns)"
-            )
         except Exception as e:
             self.logger.error(f"Failed to apply auto-filter: {e}")
             raise
@@ -254,16 +240,12 @@ class FormatExcelStep(BaseStep):
             date_columns = self._find_date_columns(ws)
             if date_columns:
                 self._apply_date_formatting(ws, date_columns, data_rows)
-                self.logger.info(
-                    f"Applied date formatting to {len(date_columns)} columns"
-                )
 
             # 2. Setup auto-filter for all columns
             self._setup_auto_filter(ws, data_rows)
 
             # Save and close
             wb.save(excel_path)
-            self.logger.info(f"Saved formatted Excel file: {excel_path}")
 
         finally:
             wb.close()

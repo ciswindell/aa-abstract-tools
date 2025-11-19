@@ -37,7 +37,7 @@ class SortDfStep(BaseStep):
         Raises:
             Exception: If sorting fails
         """
-        self.logger.info("Sorting flagged Excel data and renumbering Index# column")
+        self.logger.info(f"Step {context.step_number} of {context.total_steps}: Sorting data...")
 
         try:
             # Validate required data
@@ -66,18 +66,10 @@ class SortDfStep(BaseStep):
                 context.df["_include"] = pd.Series(
                     [True] * len(context.df), index=context.df.index, dtype=bool
                 )
-                self.logger.info(
-                    "No _include column found, including all rows for sorting"
-                )
 
             # Get counts for logging
             total_rows = len(context.df)
             included_rows = context.df["_include"].sum()
-            excluded_rows = total_rows - included_rows
-
-            self.logger.info(
-                f"Sorting {included_rows}/{total_rows} flagged rows ({excluded_rows} excluded)"
-            )
 
             if included_rows == 0:
                 self.logger.warning(
@@ -93,12 +85,6 @@ class SortDfStep(BaseStep):
             # Extract flagged rows for sorting
             included_mask = context.df["_include"]
             included_df = context.df[included_mask].copy()
-
-            # Show what we're about to sort for verification
-            if "Source" in included_df.columns:
-                source_counts_before = included_df.groupby("Source").size()
-                for source, count in source_counts_before.items():
-                    self.logger.info(f"  About to sort {count} rows from {source}")
 
             if included_df.empty:
                 raise ValueError("No flagged rows to sort after filtering")
@@ -135,20 +121,6 @@ class SortDfStep(BaseStep):
                     [sorted_included_df, unflagged_df], ignore_index=True
                 )
 
-                # Verify the rebuild worked correctly
-                final_included_count = context.df["_include"].sum()
-                if "Source" in context.df.columns:
-                    source_counts_after = (
-                        context.df[context.df["_include"]].groupby("Source").size()
-                    )
-                    for source, count in source_counts_after.items():
-                        self.logger.info(
-                            f"  After sort rebuild: {count} rows from {source}"
-                        )
-                self.logger.info(
-                    f"  Total flagged rows after sort: {final_included_count}"
-                )
-
             except Exception as e:
                 raise ValueError(
                     f"Failed to rebuild DataFrame with sorted results: {e}"
@@ -157,21 +129,6 @@ class SortDfStep(BaseStep):
         except Exception as e:
             self.logger.error(f"SortDfStep sorting operation failed: {e}")
             raise
-
-        # Log sorting results
-        new_first_index = None
-        if "Index#" in sorted_included_df.columns and len(sorted_included_df) > 0:
-            new_first_index = sorted_included_df.iloc[0]["Index#"]
-
-        self.logger.info(f"Sorting complete: {included_rows} flagged rows processed")
-
-        if original_first_index is not None and new_first_index is not None:
-            if original_first_index != new_first_index:
-                self.logger.info(
-                    f"Sort order changed: first flagged Index# {original_first_index} -> {new_first_index}"
-                )
-            else:
-                self.logger.info("Flagged data was already in correct sort order")
 
         # Verify Index# column was properly renumbered for flagged rows
         if "Index#" in sorted_included_df.columns:

@@ -26,14 +26,14 @@ def simplify_error(exception: Exception) -> str:
     
     # Common patterns to simplify
     if "FileNotFoundError" in exception_type:
-        return "Cannot find the file. Please check the file path and try again."
+        return "Cannot find the file.\nPlease check the file path and try again."
     elif "PermissionError" in exception_type:
-        return "Cannot access the file. Please check file permissions or close the file if it's open."
+        return "Cannot access the file.\nPlease check file permissions or close the file if it's open."
     elif "invalid" in error_str.lower():
-        return f"Invalid file format: {error_str}"
+        return f"Invalid file format:\n{error_str}"
     else:
-        # Generic fallback - preserve original message for debugging
-        return f"An error occurred: {error_str}. Please check your files and try again."
+        # Return the error message as-is (validation errors are already formatted)
+        return error_str
 
 
 class TkinterUIAdapter:

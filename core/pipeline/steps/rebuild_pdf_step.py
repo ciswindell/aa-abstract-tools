@@ -50,7 +50,7 @@ class RebuildPdfStep(BaseStep):
         Raises:
             Exception: If PDF reconstruction fails
         """
-        self.logger.info("Starting PyPDF-optimized three-phase PDF reconstruction")
+        self.logger.info(f"Step {context.step_number} of {context.total_steps}: Rebuilding PDF...")
 
         # Validate required data
         if context.document_units is None:
@@ -90,9 +90,6 @@ class RebuildPdfStep(BaseStep):
         try:
             # Load intermediate PDF for page extraction
             intermediate_reader = PdfReader(context.intermediate_pdf_path)
-            self.logger.info(
-                f"Loaded intermediate PDF with {len(intermediate_reader.pages)} pages"
-            )
 
             # Phase A: Filter DocumentUnits (conditional execution)
             filtered_units = self._phase_a_filter_units(context)
@@ -113,10 +110,6 @@ class RebuildPdfStep(BaseStep):
             # The pages have been copied to final_writer, so we don't need this anymore
             if intermediate_reader is not None:
                 intermediate_reader = None
-
-            self.logger.info(
-                f"PDF reconstruction complete: {len(sorted_units)} DocumentUnits processed"
-            )
 
         except Exception as e:
             self.logger.error(f"PDF reconstruction failed: {e}")
@@ -140,11 +133,8 @@ class RebuildPdfStep(BaseStep):
         Returns:
             List of DocumentUnits for flagged DataFrame rows
         """
-        self.logger.info("Phase A: Filtering DocumentUnits based on _include flag")
-
         # Check if filtering is needed
         if "_include" not in context.df.columns:
-            self.logger.info("No _include column found, including all DocumentUnits")
             return list(context.document_units)
 
         # Get flagged Document IDs
@@ -157,15 +147,6 @@ class RebuildPdfStep(BaseStep):
             for unit in context.document_units
             if unit.document_id in flagged_doc_ids
         ]
-
-        total_units = len(context.document_units)
-        filtered_count = len(filtered_units)
-        excluded_count = total_units - filtered_count
-
-        self.logger.info(
-            f"Phase A complete: {filtered_count}/{total_units} DocumentUnits included "
-            f"({excluded_count} excluded by filter)"
-        )
 
         return filtered_units
 
@@ -181,11 +162,8 @@ class RebuildPdfStep(BaseStep):
         Returns:
             DocumentUnits sorted by DataFrame order
         """
-        self.logger.info("Phase B: Reordering DocumentUnits by DataFrame sort order")
-
         # Check if reordering is enabled
         if not context.options.get("reorder_pages", False):
-            self.logger.info("Page reordering disabled, preserving original order")
             return filtered_units
 
         # Get flagged DataFrame in sorted order
@@ -203,10 +181,6 @@ class RebuildPdfStep(BaseStep):
             key=lambda unit: df_order.get(
                 unit.document_id, 999
             ),  # Unknown IDs go to end
-        )
-
-        self.logger.info(
-            f"Phase B complete: {len(sorted_units)} DocumentUnits reordered"
         )
 
         return sorted_units
@@ -227,8 +201,6 @@ class RebuildPdfStep(BaseStep):
         Returns:
             PdfWriter with pages and fresh bookmarks
         """
-        self.logger.info("Phase C: Creating fresh PDF with PyPDF bookmarks")
-
         # Create new PDF writer
         writer = PdfWriter()
         writer.page_mode = "/UseOutlines"  # Show bookmark panel by default
@@ -270,10 +242,6 @@ class RebuildPdfStep(BaseStep):
             writer, bookmark_info, context.options.get("sort_bookmarks", False)
         )
 
-        self.logger.info(
-            f"Phase C complete: {current_page} pages added, {bookmarks_added} bookmarks created"
-        )
-
         return writer
 
     def _add_bookmarks_to_writer(
@@ -287,7 +255,6 @@ class RebuildPdfStep(BaseStep):
             sort_bookmarks: Whether to sort bookmarks naturally by title
         """
         if not bookmark_info:
-            self.logger.info("No bookmarks to add")
             return
 
         try:
@@ -301,7 +268,6 @@ class RebuildPdfStep(BaseStep):
                     alg=ns.IGNORECASE,  # Case-insensitive natural sorting
                 )
 
-                self.logger.info(f"Sorting {len(bookmark_info)} bookmarks naturally")
                 bookmarks_to_add = sorted_bookmarks
             else:
                 # Keep original order (follows DocumentUnit/DataFrame order)
@@ -310,9 +276,6 @@ class RebuildPdfStep(BaseStep):
             # Add bookmarks to writer
             for bookmark in bookmarks_to_add:
                 writer.add_outline_item(bookmark["title"], bookmark["page_num"])
-
-            sort_status = "sorted naturally" if sort_bookmarks else "in document order"
-            self.logger.info(f"Added {len(bookmarks_to_add)} bookmarks {sort_status}")
 
         except ImportError:
             self.logger.warning(
@@ -342,9 +305,6 @@ class RebuildPdfStep(BaseStep):
             intermediate_path = Path(context.intermediate_pdf_path)
             if intermediate_path.exists():
                 intermediate_path.unlink()
-                self.logger.info(
-                    f"Cleaned up intermediate PDF: {context.intermediate_pdf_path}"
-                )
                 # Clear the path from context to prevent reuse
                 context.intermediate_pdf_path = None
         except Exception as e:

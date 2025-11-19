@@ -34,7 +34,7 @@ class SaveStep(BaseStep):
         Raises:
             Exception: If saving fails
         """
-        self.logger.info("Saving final Excel and PDF outputs")
+        self.logger.info(f"Step {context.step_number} of {context.total_steps}: Saving outputs...")
 
         # Ensure we have data to save
         if context.df is None:
@@ -52,19 +52,6 @@ class SaveStep(BaseStep):
         should_backup = (
             context.options.get("backup", False) and not context.is_merge_workflow()
         )
-
-        if should_backup:
-            self.logger.info(
-                "Saving with backup enabled (original files will be preserved)"
-            )
-        elif context.is_merge_workflow():
-            self.logger.info(
-                "Saving merged files (originals preserved, no backup needed)"
-            )
-        else:
-            self.logger.info(
-                "Saving without backup (original files will be overwritten)"
-            )
 
         # Save Excel output with proper backup handling
         self._save_excel_output(context, excel_out_path, should_backup)
@@ -84,12 +71,10 @@ class SaveStep(BaseStep):
                 pass  # Ignore if we can't clear pages
             # Null out the reference to release memory
             context.final_pdf = None
-            self.logger.info("Released PdfWriter memory after saving")
 
         # Clear the DataFrame to release memory
         if context.df is not None:
             context.df = None
-            self.logger.info("Released DataFrame memory after saving")
 
         # Clear document units
         if context.document_units is not None:
@@ -97,33 +82,18 @@ class SaveStep(BaseStep):
         if context.processed_document_units is not None:
             context.processed_document_units = None
 
-        self.logger.info(
-            f"Output saved successfully to: {excel_out_path}, {pdf_out_path}"
-        )
-
     def _save_excel_output(
         self, context: PipelineContext, excel_out_path: str, should_backup: bool
     ) -> None:
         """Save Excel DataFrame back to template preserving formatting."""
-        self.logger.info(f"Saving Excel output to: {excel_out_path}")
-
         # Determine target sheet name
         target_sheet = context.options.get("sheet_name") or "Index"
 
         # Save flagged rows (or all rows if no _include column exists)
         if "_include" in context.df.columns:
             df_to_save = context.df[context.df["_include"]].copy()
-            # Show breakdown by source for verification
-            if "Source" in context.df.columns:
-                source_breakdown = df_to_save.groupby("Source").size()
-                for source, count in source_breakdown.items():
-                    self.logger.info(f"  Saving {count} rows from {source}")
         else:
             df_to_save = context.df.copy()
-
-        saved_rows = len(df_to_save)
-        total_rows = len(context.df)
-        self.logger.info(f"Saving {saved_rows}/{total_rows} rows to Excel")
 
         # Define the write function for atomic save
         def write_excel(output_path: str) -> None:
@@ -139,22 +109,16 @@ class SaveStep(BaseStep):
             )
 
         # Use atomic save with backup if needed
-        backup_path = atomic_save_with_backup(
+        atomic_save_with_backup(
             original_path=excel_out_path,
             write_func=write_excel,
             create_backup=should_backup,
         )
 
-        if backup_path:
-            self.logger.info(f"Excel backup created: {backup_path}")
-        self.logger.info(f"Excel saved: {saved_rows} rows to sheet '{target_sheet}'")
-
     def _save_pdf_output(
         self, context: PipelineContext, pdf_out_path: str, should_backup: bool
     ) -> None:
         """Save PDF using PdfWriter from RebuildPdfStep."""
-        self.logger.info(f"Saving PDF output to: {pdf_out_path}")
-
         # Define the write function for atomic save
         def write_pdf(output_path: str) -> None:
             try:
@@ -166,20 +130,8 @@ class SaveStep(BaseStep):
                 raise Exception(f"Failed to write PDF to {output_path}: {e}") from e
 
         # Use atomic save with backup if needed
-        backup_path = atomic_save_with_backup(
+        atomic_save_with_backup(
             original_path=pdf_out_path,
             write_func=write_pdf,
             create_backup=should_backup,
         )
-
-        # Log statistics about the saved PDF
-        page_count = len(context.final_pdf.pages)
-
-        # Count bookmarks by checking outline
-        bookmark_count = 0
-        if hasattr(context.final_pdf, "outline") and context.final_pdf.outline:
-            bookmark_count = len(context.final_pdf.outline)
-
-        if backup_path:
-            self.logger.info(f"PDF backup created: {backup_path}")
-        self.logger.info(f"PDF saved: {page_count} pages, {bookmark_count} bookmarks")

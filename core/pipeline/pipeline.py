@@ -117,7 +117,12 @@ class Pipeline:
             # Create simplified pipeline context
             context = PipelineContext(file_pairs=file_pairs, options=options_dict)
 
-            self.logger.info(f"Starting pipeline with {len(self.steps)} steps")
+            # Count non-skipped steps for progress tracking
+            non_skipped_steps = []
+            for step in self.steps:
+                if not (hasattr(step, "should_execute") and not step.should_execute(context)):
+                    non_skipped_steps.append(step)
+            context.total_steps = len(non_skipped_steps)
 
             # Execute each step in sequence with conditional execution
             executed_steps = 0
@@ -126,19 +131,14 @@ class Pipeline:
 
                 # Check if step should be executed (conditional logic)
                 if hasattr(step, "should_execute") and not step.should_execute(context):
-                    self.logger.info(
-                        f"Skipping step {i + 1}/{len(self.steps)}: {step_name} (conditions not met)"
-                    )
                     continue
 
+                # Increment step counter for non-skipped steps
                 executed_steps += 1
-                self.logger.info(
-                    f"Executing step {i + 1}/{len(self.steps)}: {step_name}"
-                )
+                context.step_number = executed_steps
 
                 try:
                     step.execute(context)
-                    self.logger.info(f"Completed step {step_name}")
                 except Exception as e:
                     # Log the full error with context for debugging
                     full_error_msg = f"Pipeline failed at step {step_name}: {str(e)}"
@@ -147,9 +147,6 @@ class Pipeline:
                     # Return clean error message for user display
                     return Result(success=False, message=str(e))
 
-            self.logger.info(
-                f"Pipeline completed successfully ({executed_steps} steps executed)"
-            )
             return Result(success=True, message="OK")
 
         except Exception as e:

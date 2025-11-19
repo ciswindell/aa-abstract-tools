@@ -33,7 +33,9 @@ class ValidateStep(BaseStep):
             FileNotFoundError: If required files don't exist
             Exception: If files are not accessible or invalid
         """
-        self.logger.info("Validating input files before loading")
+        self.logger.info(
+            f"Step {context.step_number} of {context.total_steps}: Validating files..."
+        )
 
         # Run all validation checks
         self._validate_file_existence(context)
@@ -42,21 +44,14 @@ class ValidateStep(BaseStep):
         self._validate_pdf_bookmarks(context)
         self._validate_pdf_excel_cross_reference(context)
 
-        file_count = len(context.file_pairs)
-        self.logger.info(f"File validation passed: {file_count} file pairs validated")
-
     def _validate_file_existence(self, context: PipelineContext) -> None:
         """Validate that all files in file_pairs exist and are accessible."""
-        self.logger.info("Validating file existence and accessibility")
-
         for i, (excel_path, pdf_path, _) in enumerate(context.file_pairs):
             self._validate_file_exists(excel_path, f"Excel file {i + 1}")
             self._validate_file_exists(pdf_path, f"PDF file {i + 1}")
 
     def _validate_excel_sheets(self, context: PipelineContext) -> None:
         """Validate Excel sheet names and update context with corrected names."""
-        self.logger.info("Validating Excel sheet names")
-
         validated_pairs = []
         for excel_path, pdf_path, sheet_name in context.file_pairs:
             validated_sheet = self._validate_excel_sheet(excel_path, sheet_name)
@@ -67,8 +62,6 @@ class ValidateStep(BaseStep):
 
     def _validate_excel_data_integrity(self, context: PipelineContext) -> None:
         """Validate Excel data integrity (duplicate Index# values, required columns, etc.)."""
-        self.logger.info("Validating Excel data integrity")
-
         for i, (excel_path, _, sheet_name) in enumerate(context.file_pairs):
             excel_filename = Path(excel_path).name
             try:
@@ -91,15 +84,19 @@ class ValidateStep(BaseStep):
                 duplicates = index_col[index_col.duplicated()].unique()
 
                 if len(duplicates) > 0:
-                    duplicate_list = ", ".join(
-                        f"'{dup}'" for dup in duplicates[:5]
-                    )  # Show first 5
-                    if len(duplicates) > 5:
-                        duplicate_list += f" (and {len(duplicates) - 5} more)"
+                    # Format duplicates as bulleted list
+                    bullet_list = "\n".join(
+                        f"  • '{dup}'" for dup in duplicates[:10]
+                    )  # Show first 10
+                    if len(duplicates) > 10:
+                        bullet_list += f"\n  (and {len(duplicates) - 10} more)"
 
                     raise ValueError(
-                        f"Duplicate Index# values found in '{excel_filename}' sheet '{sheet_name}': {duplicate_list}. "
-                        f"Each Index# value must be unique for proper document linking."
+                        f"File: '{excel_filename}'\n"
+                        f"Sheet: '{sheet_name}'\n\n"
+                        f"Duplicate Index# values found:\n{bullet_list}\n\n"
+                        f"Each Index# value must be unique for proper document linking.\n"
+                        f"Please fix the duplicates and try again."
                     )
 
                 # Check for empty Index# values (Index# is already cleaned string from ExcelRepo.load())
@@ -115,23 +112,19 @@ class ValidateStep(BaseStep):
 
                 if empty_count > 0:
                     raise ValueError(
-                        f"Found {empty_count} empty Index# values in '{excel_filename}' sheet '{sheet_name}'. "
-                        f"All rows must have valid Index# values for document linking."
+                        f"File: '{excel_filename}'\n"
+                        f"Sheet: '{sheet_name}'\n\n"
+                        f"Found {empty_count} empty Index# values.\n\n"
+                        f"All rows must have valid Index# values for document linking.\n"
+                        f"Please fill in the missing values and try again."
                     )
 
-                self.logger.info(
-                    f"Excel file {i + 1} data integrity passed: {len(df)} rows, {len(index_col.unique())} unique Index# values"
-                )
-
-            except Exception as e:
-                raise Exception(
-                    f"Excel data integrity validation failed for '{excel_filename}': {e}"
-                ) from e
+            except Exception:
+                # Re-raise without wrapping - error messages are already clear
+                raise
 
     def _validate_pdf_bookmarks(self, context: PipelineContext) -> None:
         """Validate PDF bookmark structure (proper Index# format, no duplicates, etc.)."""
-        self.logger.info("Validating PDF bookmark structure")
-
         for i, (_, pdf_path, _) in enumerate(context.file_pairs):
             pdf_filename = Path(pdf_path).name
             try:
@@ -165,13 +158,18 @@ class ValidateStep(BaseStep):
 
                 # Check that all bookmarks have valid Index# format
                 if invalid_bookmarks:
-                    invalid_list = ", ".join(f"'{bm}'" for bm in invalid_bookmarks[:5])
-                    if len(invalid_bookmarks) > 5:
-                        invalid_list += f" (and {len(invalid_bookmarks) - 5} more)"
+                    bullet_list = "\n".join(
+                        f"  • '{bm}'" for bm in invalid_bookmarks[:10]
+                    )
+                    if len(invalid_bookmarks) > 10:
+                        bullet_list += f"\n  (and {len(invalid_bookmarks) - 10} more)"
 
                     raise ValueError(
-                        f"PDF '{pdf_filename}' has {len(invalid_bookmarks)} bookmarks that don't follow required Index# format: {invalid_list}. "
-                        f"All bookmarks must start with a number followed by a dash (e.g., '1-Document', '2-Report') for proper document linking."
+                        f"File: '{pdf_filename}'\n\n"
+                        f"{len(invalid_bookmarks)} bookmarks don't follow required Index# format:\n{bullet_list}\n\n"
+                        f"All bookmarks must start with a number followed by a dash.\n"
+                        f"Examples: '1-Document', '2-Report'\n\n"
+                        f"Please fix the bookmark names and try again."
                     )
 
                 # Check for duplicate bookmark indices
@@ -184,13 +182,17 @@ class ValidateStep(BaseStep):
                     ]
 
                     if duplicates:
-                        duplicate_list = ", ".join(f"'{dup}'" for dup in duplicates[:5])
-                        if len(duplicates) > 5:
-                            duplicate_list += f" (and {len(duplicates) - 5} more)"
+                        bullet_list = "\n".join(
+                            f"  • '{dup}'" for dup in duplicates[:10]
+                        )
+                        if len(duplicates) > 10:
+                            bullet_list += f"\n  (and {len(duplicates) - 10} more)"
 
                         raise ValueError(
-                            f"PDF '{pdf_filename}' has duplicate bookmark indices: {duplicate_list}. "
-                            f"Each bookmark index must be unique for proper document linking."
+                            f"File: '{pdf_filename}'\n\n"
+                            f"Duplicate bookmark indices found:\n{bullet_list}\n\n"
+                            f"Each bookmark index must be unique for proper document linking.\n"
+                            f"Please fix the duplicates and try again."
                         )
 
                 # Check for multiple bookmarks pointing to the same page (error)
@@ -226,14 +228,6 @@ class ValidateStep(BaseStep):
                     error_lines.append(f"Total affected pages: {len(duplicate_pages)}")
 
                     raise ValueError("\n".join(error_lines))
-
-                # Success logging
-                valid_count = len(bookmark_indices)
-                total_count = len(bookmarks)
-                self.logger.info(
-                    f"PDF file {i + 1} bookmark validation passed: {valid_count}/{total_count} bookmarks have valid Index# format, "
-                    f"{total_pages} pages"
-                )
 
             except Exception:
                 # Re-raise the original exception without adding redundant context
@@ -284,7 +278,6 @@ class ValidateStep(BaseStep):
 
             # Check if requested sheet exists
             if sheet_name in available_sheets:
-                self.logger.info(f"Sheet '{sheet_name}' found in {excel_path}")
                 return sheet_name
 
             # Sheet doesn't exist - prompt user to select
@@ -301,7 +294,6 @@ class ValidateStep(BaseStep):
             if not selected_sheet:
                 raise ValueError(f"No sheet selected for Excel file: {excel_path}")
 
-            self.logger.info(f"User selected sheet '{selected_sheet}' for {excel_path}")
             return selected_sheet
 
         except Exception as e:
@@ -309,8 +301,6 @@ class ValidateStep(BaseStep):
 
     def _validate_pdf_excel_cross_reference(self, context: PipelineContext) -> None:
         """Validate that PDF bookmark indices have corresponding Excel rows."""
-        self.logger.info("Validating PDF bookmark to Excel row cross-references")
-
         for i, (excel_path, pdf_path, sheet_name) in enumerate(context.file_pairs):
             excel_filename = Path(excel_path).name
             pdf_filename = Path(pdf_path).name
@@ -341,31 +331,21 @@ class ValidateStep(BaseStep):
 
                 # Report orphaned bookmarks (PDF bookmarks without Excel rows)
                 if orphaned_bookmarks:
-                    orphaned_list = ", ".join(
-                        f"'{idx}' ({title})" for idx, title in orphaned_bookmarks[:3]
+                    bullet_list = "\n".join(
+                        f"  • '{idx}' — {title}"
+                        for idx, title in orphaned_bookmarks[:10]
                     )
-                    if len(orphaned_bookmarks) > 3:
-                        orphaned_list += f" (and {len(orphaned_bookmarks) - 3} more)"
+                    if len(orphaned_bookmarks) > 10:
+                        bullet_list += f"\n  (and {len(orphaned_bookmarks) - 10} more)"
 
                     raise ValueError(
-                        f"PDF '{pdf_filename}' has {len(orphaned_bookmarks)} bookmark(s) without corresponding Excel rows: {orphaned_list}. "
-                        f"Each PDF bookmark index must have a matching Index# value in Excel sheet '{sheet_name}'."
+                        f"PDF File: '{pdf_filename}'\n"
+                        f"Excel File: '{excel_filename}' (sheet '{sheet_name}')\n\n"
+                        f"{len(orphaned_bookmarks)} PDF bookmark(s) have no matching Excel row:\n{bullet_list}\n\n"
+                        f"Each PDF bookmark index must have a matching Index# value in the Excel sheet.\n"
+                        f"Please add the missing rows or remove the orphaned bookmarks."
                     )
 
-                # Success logging
-                matched_count = len(bookmark_indices)
-                total_bookmarks = len(
-                    [
-                        b
-                        for b in bookmarks
-                        if extract_original_index(str(b.get("title", "")).strip())
-                    ]
-                )
-                self.logger.info(
-                    f"Cross-reference validation passed for pair {i + 1}: {matched_count}/{total_bookmarks} PDF bookmarks have matching Excel rows"
-                )
-
-            except Exception as e:
-                raise Exception(
-                    f"Cross-reference validation failed between '{pdf_filename}' and '{excel_filename}': {e}"
-                ) from e
+            except Exception:
+                # Re-raise without wrapping - error messages are already clear
+                raise

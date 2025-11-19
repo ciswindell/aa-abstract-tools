@@ -40,12 +40,13 @@ class FilterDfStep(BaseStep):
         Raises:
             Exception: If filtering fails
         """
+        self.logger.info(f"Step {context.step_number} of {context.total_steps}: Filtering data...")
+
         filter_column = context.options.get("filter_column")
         filter_values = context.options.get("filter_values", [])
 
         # If filter values are not set, prompt the user with the merged DataFrame
         if not filter_column or not filter_values:
-            self.logger.info("Filter enabled but no values selected - prompting user")
 
             # Show available values by source for user reference
             if (
@@ -69,18 +70,10 @@ class FilterDfStep(BaseStep):
                     context.options["filter_column"] = col
                     context.options["filter_values"] = vals
                 else:
-                    self.logger.info(
-                        "User cancelled filter selection - skipping filter"
-                    )
                     return
             except Exception as e:
                 self.logger.error(f"Failed to prompt for filter selection: {e}")
                 return
-
-        self.logger.info(
-            f"Flagging DataFrame rows by column '{filter_column}' "
-            f"with {len(filter_values)} values"
-        )
 
         try:
             # Validate required data
@@ -131,26 +124,6 @@ class FilterDfStep(BaseStep):
 
         # Count flagged rows for logging
         included_rows = context.df["_include"].sum()
-        excluded_rows = total_rows - included_rows
-
-        self.logger.info(
-            f"Filtering complete: {included_rows}/{total_rows} rows flagged for inclusion "
-            f"({excluded_rows} rows excluded)"
-        )
-
-        # Show filter results by source for verification
-        if "Source" in context.df.columns:
-            source_results = context.df.groupby("Source")["_include"].agg(
-                ["sum", "count"]
-            )
-            for source, (included, total) in source_results.iterrows():
-                excluded = total - included
-                self.logger.info(
-                    f"  {source}: {included}/{total} included ({excluded} excluded)"
-                )
-
-        # Show applied filter for verification
-        self.logger.info(f"Filter applied: {filter_column} in {filter_values}")
 
         # Warn if all rows were filtered out
         if included_rows == 0:

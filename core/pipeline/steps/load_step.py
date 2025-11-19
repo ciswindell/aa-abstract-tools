@@ -50,14 +50,12 @@ class LoadStep(BaseStep):
             Exception: If file loading, linking, or PDF merging fails
         """
         try:
-            self.logger.info("Starting file loading and merging")
+            self.logger.info(f"Step {context.step_number} of {context.total_steps}: Loading data...")
 
             # Get all file pairs to process
             file_pairs = context.file_pairs
             if not file_pairs:
                 raise ValueError("No file pairs found to process")
-
-            self.logger.info(f"Found {len(file_pairs)} file pairs to process")
 
             # Initialize collections for merging
             all_document_units = []
@@ -68,10 +66,6 @@ class LoadStep(BaseStep):
             # Process each file pair individually
             for i, (excel_path, pdf_path, sheet_name) in enumerate(file_pairs):
                 try:
-                    self.logger.info(
-                        f"Processing pair {i + 1}/{len(file_pairs)}: {excel_path}, {pdf_path}"
-                    )
-
                     # Process this specific file pair
                     pair_units, pair_df, pages_added = self._process_file_pair(
                         excel_path,
@@ -93,10 +87,6 @@ class LoadStep(BaseStep):
                     all_document_units.extend(pair_units)
                     all_df_parts.append(pair_df)
                     current_page_offset += pages_added
-
-                    self.logger.info(
-                        f"Pair {i + 1} processed: {len(pair_units)} DocumentUnits, {pages_added} pages"
-                    )
 
                 except Exception as e:
                     self.logger.error(
@@ -133,10 +123,6 @@ class LoadStep(BaseStep):
             context.df = merged_df
             context.intermediate_pdf_path = intermediate_pdf_path
             context.total_pages = current_page_offset
-
-            self.logger.info(
-                f"Loading complete: {len(all_document_units)} DocumentUnits, {current_page_offset} total pages"
-            )
 
         except Exception as e:
             self.logger.error(f"LoadStep execution failed: {e}")
@@ -179,7 +165,6 @@ class LoadStep(BaseStep):
 
         try:
             # Load Excel file and add Document IDs using this file's path
-            self.logger.info(f"Loading Excel: {excel_path}")
             pair_df = self.excel_repo.load(excel_path, sheet_name)
 
             if pair_df.empty:
@@ -189,22 +174,16 @@ class LoadStep(BaseStep):
             # Index# column is already cleaned to string format by ExcelRepo.load()
             # Generate Document IDs using the loaded DataFrame
             pair_df_with_ids = add_document_ids(pair_df, excel_path)
-            self.logger.info(f"Loaded {len(pair_df_with_ids)} rows from {excel_path}")
 
         except Exception as e:
             raise Exception(f"Failed to load Excel file {excel_path}: {e}") from e
 
         try:
             # Load PDF file
-            self.logger.info(f"Loading PDF: {pdf_path}")
             pair_bookmarks, pair_total_pages = self.pdf_repo.read(pdf_path)
 
             if pair_total_pages <= 0:
                 raise ValueError(f"PDF has no pages: {pdf_path}")
-
-            self.logger.info(
-                f"Loaded PDF with {pair_total_pages} pages, {len(pair_bookmarks)} bookmarks from {pdf_path}"
-            )
 
         except Exception as e:
             raise Exception(f"Failed to load PDF file {pdf_path}: {e}") from e
@@ -240,21 +219,10 @@ class LoadStep(BaseStep):
                 total_pages=pair_total_pages,
             )
 
-            self.logger.info(
-                f"Created {len(document_units)} DocumentUnits from {excel_path}:{pdf_path}"
-            )
-
             # Add Document_Found column calculation (always calculated for consistency)
             linked_document_ids = {unit.document_id for unit in document_units}
             pair_df_with_ids["Document_Found"] = pair_df_with_ids["Document_ID"].isin(
                 linked_document_ids
-            )
-
-            # Log document linking statistics
-            linked_count = pair_df_with_ids["Document_Found"].sum()
-            total_count = len(pair_df_with_ids)
-            self.logger.info(
-                f"Document linking: {linked_count}/{total_count} Excel rows have corresponding PDF documents"
             )
 
             # Log linking statistics
@@ -285,7 +253,6 @@ class LoadStep(BaseStep):
             with open(temp_path, "wb") as temp_file:
                 merged_writer.write(temp_file)
 
-            self.logger.info(f"Created intermediate PDF: {temp_path}")
             return temp_path
         except Exception:
             # Clean up temp file if creation failed
@@ -306,9 +273,6 @@ class LoadStep(BaseStep):
         # Concatenate all DataFrames safely (each already has unique Document IDs)
         try:
             merged_df = pd.concat(df_parts, ignore_index=True, sort=False)
-            self.logger.info(
-                f"Merged {len(df_parts)} DataFrames into {len(merged_df)} total rows"
-            )
         except Exception as e:
             raise ValueError(f"Failed to concatenate DataFrames: {e}") from e
 

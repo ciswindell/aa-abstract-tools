@@ -48,6 +48,10 @@ class PipelineContext:
     excel_out_path: Optional[str] = None
     pdf_out_path: Optional[str] = None
 
+    # Step counter for progress tracking (injected by pipeline executor)
+    step_number: int = 0
+    total_steps: int = 0
+
     def is_merge_workflow(self) -> bool:
         """Check if this is a merge workflow (more than one file pair)."""
         return len(self.file_pairs) > 1
