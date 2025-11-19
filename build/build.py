@@ -197,17 +197,7 @@ class BuildOrchestrator:
             "PyInstaller",
             str(self.spec_file),
         ]
-
-        # Add mode-specific flags
-        if self.mode == "onefile":
-            cmd.append("--onefile")
-        elif self.mode == "onedir":
-            cmd.append("--onedir")
-
-        # Collect all submodules for packages that have dynamic imports
-        cmd.extend(["--collect-all", "pandas"])
-        cmd.extend(["--collect-all", "numpy"])
-        cmd.extend(["--collect-all", "openpyxl"])
+        # Note: Mode flags and collect-all are configured in the spec file, not via CLI
 
         # Add optimization flags
         if self.optimize == "medium":
