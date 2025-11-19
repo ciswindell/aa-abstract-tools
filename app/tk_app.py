@@ -12,6 +12,11 @@ from typing import Optional, Tuple
 
 from adapters.ui_tkinter import TkinterUIAdapter
 from core.app_controller import AppController
+from core.message_types import MSG_ERROR, MSG_INFO, MSG_SUCCESS, MSG_WARNING
+
+# Message history management constants
+MAX_MESSAGES = 500  # Trim threshold to prevent unbounded growth
+TRIM_AMOUNT = 100  # Lines to remove when threshold reached
 
 
 class AbstractRenumberGUI:
@@ -64,7 +69,7 @@ class AbstractRenumberGUI:
     def setup_window(self) -> None:
         """Setup main window properties."""
         self.root.title("Abstract Renumber Tool")
-        self.root.geometry("900x700")
+        self.root.geometry("900x900")  # Increased height to show status area
         self.root.resizable(True, True)
 
         # Configure grid weights
@@ -392,7 +397,12 @@ class AbstractRenumberGUI:
             self.merge_summary_label.config(text="No pairs selected", foreground="gray")
 
     def _create_status_area(self, parent: ttk.Frame) -> None:
-        """Create status text area with scrollbar."""
+        """Create status text area with scrollbar and configure message type styling.
+        
+        Sets up a Text widget for displaying timestamped status messages with
+        color-coded styling based on message type (info, error, success, warning).
+        Configures tags for visual distinction and adds vertical scrollbar.
+        """
         status_frame = ttk.LabelFrame(parent, text="Status", padding="10")
         status_frame.grid(
             row=6,
@@ -406,6 +416,18 @@ class AbstractRenumberGUI:
 
         self.status_text = tk.Text(status_frame, height=8, width=70, wrap=tk.WORD)
         self.status_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+
+        # Configure tags for message types (applied via log_status msg_type parameter)
+        # Each tag defines foreground color and optional font styling for visual distinction
+        self.status_text.tag_config(MSG_INFO, foreground="black")  # Default messages
+        self.status_text.tag_config(
+            MSG_ERROR, foreground="#d32f2f", font=("Arial", 9, "bold")  # Red bold for errors
+        )
+        self.status_text.tag_config(
+            MSG_SUCCESS, foreground="#388e3c", font=("Arial", 9, "bold")  # Green bold for success
+        )
+        self.status_text.tag_config(MSG_WARNING, foreground="#f57c00")  # Orange for warnings
+        self.status_text.tag_config("separator", foreground="gray")  # Gray for operation separators
 
         scrollbar = ttk.Scrollbar(
             status_frame, orient="vertical", command=self.status_text.yview
@@ -454,12 +476,41 @@ class AbstractRenumberGUI:
         else:
             self.process_button.config(state="disabled")
 
-    def log_status(self, message: str) -> None:
-        """Add a timestamped message to the status text."""
+    def log_status(self, message: str, msg_type: str = MSG_INFO) -> None:
+        """Add a timestamped message to the status text.
+
+        Automatically trims oldest messages if history exceeds MAX_MESSAGES
+        to prevent unbounded memory growth and UI slowdown.
+
+        Args:
+            message: The status message to display
+            msg_type: Message type constant (MSG_INFO, MSG_ERROR, MSG_SUCCESS, MSG_WARNING)
+                     Default is MSG_INFO for backward compatibility
+        """
+        # Trim oldest messages if we've exceeded the limit
+        line_count = int(self.status_text.index("end-1c").split(".")[0])
+        if line_count > MAX_MESSAGES:
+            # Remove oldest TRIM_AMOUNT lines to bring count back down
+            self.status_text.delete("1.0", f"{TRIM_AMOUNT}.0")
+
+        # Insert new message with timestamp and styling
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self.status_text.insert(tk.END, f"[{timestamp}] {message}\n")
+        self.status_text.insert(tk.END, f"[{timestamp}] {message}\n", msg_type)
         self.status_text.see(tk.END)
         self.root.update()
+
+    def start_new_operation(self) -> None:
+        """Insert visual separator to mark the start of a new operation.
+
+        Adds a gray horizontal line separator if there are existing messages,
+        providing visual distinction between consecutive processing operations.
+        """
+        # Only add separator if there's existing content
+        if self.status_text.get("1.0", "end-1c").strip():
+            separator = "\n" + "=" * 50 + "\n\n"
+            self.status_text.insert(tk.END, separator, "separator")
+            self.status_text.see(tk.END)
+            self.root.update()
 
     def get_selected_files(self) -> Tuple[Optional[str], Optional[str]]:
         """Return the selected file paths."""

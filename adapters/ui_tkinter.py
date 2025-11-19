@@ -8,7 +8,32 @@ from tkinter import filedialog, messagebox, ttk
 from typing import Any, List, Optional, Tuple
 
 # Note: UIController Protocol imported where needed; not required here.
+from core.message_types import MSG_ERROR, MSG_INFO, MSG_SUCCESS, MSG_WARNING
 from core.models import Options
+
+
+def simplify_error(exception: Exception) -> str:
+    """Convert technical error to user-friendly message.
+    
+    Args:
+        exception: The exception to simplify
+        
+    Returns:
+        User-friendly error message in plain language
+    """
+    error_str = str(exception)
+    exception_type = type(exception).__name__
+    
+    # Common patterns to simplify
+    if "FileNotFoundError" in exception_type:
+        return "Cannot find the file. Please check the file path and try again."
+    elif "PermissionError" in exception_type:
+        return "Cannot access the file. Please check file permissions or close the file if it's open."
+    elif "invalid" in error_str.lower():
+        return f"Invalid file format: {error_str}"
+    else:
+        # Generic fallback - preserve original message for debugging
+        return f"An error occurred: {error_str}. Please check your files and try again."
 
 
 class TkinterUIAdapter:
@@ -56,13 +81,36 @@ class TkinterUIAdapter:
             merge_pairs=merge_pairs,
         )
 
-    def log_status(self, message: str) -> None:
-        """Log a status message to the UI."""
-        self.gui.log_status(message)
+    def log_status(self, message: str, msg_type: str = MSG_INFO) -> None:
+        """Log a status message to the UI.
+        
+        Args:
+            message: The status message to display
+            msg_type: Message type constant (MSG_INFO, MSG_ERROR, MSG_SUCCESS, MSG_WARNING)
+                     Default is MSG_INFO for backward compatibility
+        """
+        self.gui.log_status(message, msg_type)
+
+    def start_new_operation(self) -> None:
+        """Mark the start of a new operation with visual separator.
+        
+        Inserts a gray horizontal line in the status area to visually
+        separate messages from consecutive operations.
+        """
+        self.gui.start_new_operation()
 
     def show_error(self, title: str, message: str) -> None:
-        """Show an error message to the user."""
-        self.gui.log_status(f"Error: {message}")
+        """Show an error message to the user.
+        
+        Logs the error to status area with MSG_ERROR styling (red bold) and
+        displays an error dialog for user action.
+        
+        Args:
+            title: Dialog title
+            message: Error message to display (should be user-friendly)
+        """
+        # Log error to status area with red bold styling
+        self.gui.log_status(f"Error: {message}", MSG_ERROR)
 
         # For validation errors (long messages with many lines), use custom dialog
         if len(message) > 300 or message.count("\n") > 10:
