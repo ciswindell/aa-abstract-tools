@@ -68,7 +68,13 @@ class AbstractRenumberGUI:
 
     def setup_window(self) -> None:
         """Setup main window properties."""
-        self.root.title("Abstract Renumber Tool")
+        # Import version with fallback to "Unknown" if not available
+        try:
+            from _version import __version__
+        except (ImportError, AttributeError):
+            __version__ = "Unknown"
+        
+        self.root.title(f"Abstract Renumber Tool v{__version__}")
         self.root.geometry("900x900")  # Increased height to show status area
         self.root.resizable(True, True)
 
@@ -116,6 +122,9 @@ class AbstractRenumberGUI:
 
         # Status area
         self._create_status_area(main_frame)
+
+        # Version footer
+        self._create_version_footer(main_frame)
 
         # Initial status
         self.log_status("Ready. Please select Excel and PDF files.")
@@ -434,6 +443,29 @@ class AbstractRenumberGUI:
         )
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.status_text.configure(yscrollcommand=scrollbar.set)
+
+    def _create_version_footer(self, parent: ttk.Frame) -> None:
+        """Create version footer at bottom of window.
+        
+        Displays the application version in an unobtrusive footer with
+        gray text, right-aligned at the bottom of the main window.
+        """
+        # Import version with fallback to "Unknown"
+        try:
+            from _version import __version__
+        except (ImportError, AttributeError):
+            __version__ = "Unknown"
+        
+        footer_frame = ttk.Frame(parent)
+        footer_frame.grid(row=7, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(5, 0))
+        
+        version_label = ttk.Label(
+            footer_frame,
+            text=f"Version {__version__}",
+            foreground="gray",
+            font=("Arial", 9)
+        )
+        version_label.pack(side=tk.RIGHT)
 
     def _get_default_directory(self) -> str:
         """Get the user's Downloads directory."""

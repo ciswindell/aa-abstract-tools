@@ -1,0 +1,38 @@
+# aa-abstract-renumber Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2025-11-18
+
+## Active Technologies
+- Python 3.7+ + Tkinter (GUI), openpyxl (Excel), PyPDF2/pypdf (PDF), pytest (testing) (003-reduce-info-logging)
+- Local filesystem (Excel/PDF files) (003-reduce-info-logging)
+- Python 3.7+ + Standard library (`os`, `fcntl`, `platform`, `pathlib`) (004-detect-open-files)
+- Python 3.7+ (existing project requirement) + PyInstaller 6.x, pandas, openpyxl, pypdf 4.2.0, tkinter, natsort, python-dateutil (004-pyinstaller-setup)
+- Files (spec file, build scripts, documentation) (004-pyinstaller-setup)
+- Python 3.11 + tkinter (GUI), PyInstaller (build) (005-version-display-system)
+- N/A (version string in Python module) (005-version-display-system)
+
+- Python 3.7+ + tkinter (stdlib), existing Protocol-based architecture (001-user-feedback-display)
+
+## Project Structure
+
+```text
+src/
+tests/
+```
+
+## Commands
+
+cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLOGIES] pytest [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLOGIES] ruff check .
+
+## Code Style
+
+Python 3.7+: Follow standard conventions
+
+## Recent Changes
+- 005-version-display-system: Added Python 3.11 + tkinter (GUI), PyInstaller (build)
+- 004-pyinstaller-setup: Added Python 3.7+ (existing project requirement) + PyInstaller 6.x, pandas, openpyxl, pypdf 4.2.0, tkinter, natsort, python-dateutil
+- 004-detect-open-files: Added Python 3.7+ + Standard library (`os`, `fcntl`, `platform`, `pathlib`)
+
+
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->

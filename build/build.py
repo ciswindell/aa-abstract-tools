@@ -18,6 +18,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+# Add project root to Python path to import version
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Import version with fallback to "dev" for development builds
+try:
+    from _version import __version__
+except (ImportError, AttributeError):
+    __version__ = "dev"
+
 
 @dataclass
 class BuildResult:
@@ -190,14 +199,18 @@ class BuildOrchestrator:
         if self.clean:
             self.clean_build_directories()
 
-        # Build PyInstaller command
+        # Build PyInstaller command with versioned executable name
+        exe_name = f"AbstractRenumberTool-v{__version__}"
         cmd = [
             sys.executable,
             "-m",
             "PyInstaller",
+            "--name",
+            exe_name,
             str(self.spec_file),
         ]
         # Note: Mode flags and collect-all are configured in the spec file, not via CLI
+        # The --name flag overrides the APP_NAME in the spec file
 
         # Add optimization flags
         if self.optimize == "medium":
