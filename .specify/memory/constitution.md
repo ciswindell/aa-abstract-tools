@@ -1,21 +1,27 @@
 <!--
   SYNC IMPACT REPORT
-  Version: 0.0.0 → 1.0.0 (Initial Constitution)
-  Date: 2025-11-19
+  Version: 1.1.0 → 1.1.1 (Version Increment Requirement Clarified)
+  Date: 2025-11-20
   
   Changes:
-  - Initial constitution ratification
-  - Defined 5 core principles for Abstract Renumber Tool
-  - Established quality standards and development workflow
-  - Set governance rules
+  - Clarified that code changes MUST trigger version increments
+  - Made version update mandatory for all code changes (features, fixes, breaking changes)
+  - Emphasized version updates are part of the standard development workflow
+  
+  Previous Changes (v1.1.0):
+  - Added new "Version Management" quality standard section
+  - Defined single source of truth pattern for versioning
+  - Established semantic versioning rules (MAJOR.MINOR.PATCH)
+  - Documented version display requirements
+  - Added version update workflow to Feature Development section
   
   Template Updates Required:
-  ✅ plan-template.md - Updated constitution check section
-  ✅ spec-template.md - No changes needed (already aligned)
-  ✅ tasks-template.md - No changes needed (already aligned)
+  ✅ plan-template.md - Constitution check already flexible enough
+  ✅ spec-template.md - No changes needed
+  ✅ tasks-template.md - No changes needed
   
   Follow-up TODOs:
-  - None (all placeholders filled)
+  - None (all standards implemented in feature 005-version-display-system)
 -->
 
 # Abstract Renumber Tool Constitution
@@ -75,6 +81,26 @@ All code MUST follow PEP 8. MUST apply SOLID and DRY principles. MUST NOT add sp
 - Repository root MUST maintain up-to-date README.md
 - Breaking changes MUST be documented in commit messages
 
+### Version Management
+
+- Application version MUST be stored in a single source of truth file (`_version.py` at project root)
+- Version MUST follow semantic versioning format: `MAJOR.MINOR.PATCH` (e.g., "1.0.0")
+- Version MUST be displayed in multiple locations for user visibility:
+  - GUI window title: "Abstract Renumber Tool v{VERSION}"
+  - GUI footer: "Version {VERSION}" (bottom-right, gray text)
+  - Build artifacts: Executable named "AbstractRenumberTool-v{VERSION}.exe"
+- All version displays MUST import from `_version.py` (no hardcoded version strings)
+- **Code changes MUST trigger version increments** in `_version.py` according to semantic versioning rules:
+  - **MAJOR**: Breaking changes affecting user workflows (UI redesigns, removed features, incompatible changes)
+  - **MINOR**: New features that are backward compatible (new options, enhancements, additional functionality)
+  - **PATCH**: Bug fixes and minor improvements (error corrections, performance tweaks, documentation updates)
+- Version increment MUST occur before building distribution artifacts
+- Version updates MUST be committed with descriptive message: `chore: bump version to X.Y.Z`
+- Build scripts MUST automatically read version from `_version.py` for artifact naming
+- Application MUST handle missing or invalid version gracefully with fallback to "Unknown"
+
+**Rationale**: Single source of truth prevents version inconsistencies across displays. Semantic versioning communicates change impact to users. Mandatory version increments for code changes ensure users can identify which release they're running and track changes over time. Automatic propagation eliminates manual update errors. Graceful fallback ensures application stability even with version file issues.
+
 ## Development Workflow
 
 ### Code Organization
@@ -84,6 +110,7 @@ All code MUST follow PEP 8. MUST apply SOLID and DRY principles. MUST NOT add sp
 - Application entry points: `app/`
 - Tests mirror source structure: `tests/`
 - Shared utilities: `utils/`
+- Version information: `_version.py` (project root)
 
 ### Dependency Management
 
@@ -98,6 +125,10 @@ All code MUST follow PEP 8. MUST apply SOLID and DRY principles. MUST NOT add sp
 3. Create adapters in `adapters/` for external integrations
 4. Add UI components in `app/` or `adapters/ui_*.py`
 5. Write tests covering happy path and edge cases
+6. Update version in `_version.py` if releasing:
+   - PATCH for bug fixes (X.Y.Z → X.Y.Z+1)
+   - MINOR for new features (X.Y.Z → X.Y+1.0)
+   - MAJOR for breaking changes (X.Y.Z → X+1.0.0)
 
 ## Governance
 
@@ -121,4 +152,4 @@ This constitution supersedes all other development practices. Amendments require
 - Code reviews MUST check for PEP 8 violations, dependency direction, and protocol usage
 - Complexity MUST be justified if deviating from principles (document in plan.md)
 
-**Version**: 1.0.0 | **Ratified**: 2025-11-19 | **Last Amended**: 2025-11-19
+**Version**: 1.1.1 | **Ratified**: 2025-11-19 | **Last Amended**: 2025-11-20
