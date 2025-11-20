@@ -34,7 +34,9 @@ class SaveStep(BaseStep):
         Raises:
             Exception: If saving fails
         """
-        self.logger.info(f"Step {context.step_number} of {context.total_steps}: Saving outputs...")
+        self.logger.info(
+            f"Step {context.step_number} of {context.total_steps}: Saving outputs..."
+        )
 
         # Ensure we have data to save
         if context.df is None:
@@ -85,7 +87,13 @@ class SaveStep(BaseStep):
     def _save_excel_output(
         self, context: PipelineContext, excel_out_path: str, should_backup: bool
     ) -> None:
-        """Save Excel DataFrame back to template preserving formatting."""
+        """
+        Save Excel DataFrame back to template preserving formatting.
+
+        Automatically enables column preservation for merge workflows, ensuring all
+        columns from all merged files are included in the output. For single-file
+        workflows, only adds columns if check_document_images option is enabled.
+        """
         # Determine target sheet name
         target_sheet = context.options.get("sheet_name") or "Index"
 
@@ -98,7 +106,11 @@ class SaveStep(BaseStep):
         # Define the write function for atomic save
         def write_excel(output_path: str) -> None:
             # Check if user wants to add missing columns (Document_Found)
-            add_missing_columns = context.options.get("check_document_images", False)
+            # or if this is a merge workflow (preserve all columns from all files)
+            add_missing_columns = (
+                context.options.get("check_document_images", False)
+                or context.is_merge_workflow()
+            )
 
             self.excel_repo.save(
                 df=df_to_save,
@@ -119,6 +131,7 @@ class SaveStep(BaseStep):
         self, context: PipelineContext, pdf_out_path: str, should_backup: bool
     ) -> None:
         """Save PDF using PdfWriter from RebuildPdfStep."""
+
         # Define the write function for atomic save
         def write_pdf(output_path: str) -> None:
             try:

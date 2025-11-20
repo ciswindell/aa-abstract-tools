@@ -18,6 +18,9 @@ A modern Python application that automates the process of sorting Excel data and
 
 ### Advanced Features
 - **Multi-File Merge**: Combine multiple Excel/PDF pairs into consolidated documents
+  - **Column Preservation**: Automatically preserves all columns from all merged files
+  - **Smart Column Matching**: Case-insensitive, whitespace-tolerant column matching
+  - **Logical Column Order**: Template columns first, followed by new columns
 - **Data Filtering**: Filter Excel data by column values before processing
 - **PDF Page Reordering**: Optionally reorder PDF pages to match bookmark order
 - **Document Image Checking**: Add/update Document_Found column in Excel output

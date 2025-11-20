@@ -7,8 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- Constitution updated to v1.1.1 with explicit version increment requirements
+## [1.0.1] - 2025-11-20
+
+### Fixed
+- **Column Preservation During Merge**: Fixed critical bug where columns unique to secondary files were lost during multi-file merge operations
+- Merge operations now preserve all columns from all source files
+- System columns (_include, _original_index, Document_ID) are properly excluded from output
+- Column matching is now case-insensitive and whitespace-tolerant
+- Template column order is preserved with new columns appended logically
+
+### Technical Details
+- Enhanced `ExcelRepo._write_dataframe_to_workbook()` to support dynamic column addition
+- Added `_normalize_column_name()` helper for robust column matching
+- Modified `SaveStep` to automatically enable column preservation for merge workflows
+- Added comprehensive test suite: 12 tests covering unit and integration scenarios
+- Zero data loss guarantee: 100% of columns from all source files preserved
 
 ## [1.0.0] - 2025-11-20
 

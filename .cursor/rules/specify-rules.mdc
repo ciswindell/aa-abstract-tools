@@ -10,6 +10,8 @@ Auto-generated from all feature plans. Last updated: 2025-11-18
 - Files (spec file, build scripts, documentation) (004-pyinstaller-setup)
 - Python 3.11 + tkinter (GUI), PyInstaller (build) (005-version-display-system)
 - N/A (version string in Python module) (005-version-display-system)
+- Python 3.7+ (per constitution requirements) + pandas, openpyxl (existing Excel processing libraries) (006-merge-column-fix)
+- File-based (Excel/PDF files) (006-merge-column-fix)
 
 - Python 3.7+ + tkinter (stdlib), existing Protocol-based architecture (001-user-feedback-display)
 
@@ -29,9 +31,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.7+: Follow standard conventions
 
 ## Recent Changes
+- 006-merge-column-fix: Added Python 3.7+ (per constitution requirements) + pandas, openpyxl (existing Excel processing libraries)
 - 005-version-display-system: Added Python 3.11 + tkinter (GUI), PyInstaller (build)
 - 004-pyinstaller-setup: Added Python 3.7+ (existing project requirement) + PyInstaller 6.x, pandas, openpyxl, pypdf 4.2.0, tkinter, natsort, python-dateutil
-- 004-detect-open-files: Added Python 3.7+ + Standard library (`os`, `fcntl`, `platform`, `pathlib`)
 
 
 <!-- MANUAL ADDITIONS START -->
