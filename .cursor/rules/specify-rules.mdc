@@ -12,6 +12,8 @@ Auto-generated from all feature plans. Last updated: 2025-11-18
 - N/A (version string in Python module) (005-version-display-system)
 - Python 3.7+ (per constitution requirements) + pandas, openpyxl (existing Excel processing libraries) (006-merge-column-fix)
 - File-based (Excel/PDF files) (006-merge-column-fix)
+- Python 3.7+ (per constitution requirements) + tkinter (existing GUI framework) (007-merge-validation)
+- N/A (validation logic only) (007-merge-validation)
 
 - Python 3.7+ + tkinter (stdlib), existing Protocol-based architecture (001-user-feedback-display)
 
@@ -31,9 +33,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.7+: Follow standard conventions
 
 ## Recent Changes
+- 007-merge-validation: Added Python 3.7+ (per constitution requirements) + tkinter (existing GUI framework)
 - 006-merge-column-fix: Added Python 3.7+ (per constitution requirements) + pandas, openpyxl (existing Excel processing libraries)
 - 005-version-display-system: Added Python 3.11 + tkinter (GUI), PyInstaller (build)
-- 004-pyinstaller-setup: Added Python 3.7+ (existing project requirement) + PyInstaller 6.x, pandas, openpyxl, pypdf 4.2.0, tkinter, natsort, python-dateutil
 
 
 <!-- MANUAL ADDITIONS START -->

@@ -48,7 +48,13 @@ class TkinterUIAdapter:
         return self.gui.get_selected_files()
 
     def get_options(self) -> Options:
-        """Get processing options from UI."""
+        """
+        Get processing options from UI with merge validation.
+        
+        Returns merge_pairs as None (not empty list) when merge is enabled
+        but no pairs have been selected, allowing downstream validation to
+        detect the invalid state.
+        """
         filter_enabled = (
             getattr(self.gui, "get_filter_enabled", None)
             and self.gui.get_filter_enabled()
@@ -62,12 +68,17 @@ class TkinterUIAdapter:
             else None
         )
 
-        merge_pairs = (
-            list(getattr(self.gui, "merge_pairs", []) or [])
-            if getattr(self.gui, "get_merge_enabled", None)
+        # Get merge pairs only if merge is enabled AND pairs were actually selected
+        merge_enabled = (
+            getattr(self.gui, "get_merge_enabled", None)
             and self.gui.get_merge_enabled()
-            else None
         )
+        if merge_enabled:
+            pairs_list = list(getattr(self.gui, "merge_pairs", []) or [])
+            # Return None (not empty list) if no pairs selected to distinguish from disabled
+            merge_pairs = pairs_list if len(pairs_list) > 0 else None
+        else:
+            merge_pairs = None
 
         return Options(
             backup=self.gui.get_backup_enabled(),
