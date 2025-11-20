@@ -321,6 +321,9 @@ class AbstractRenumberGUI:
                     foreground="green",
                 )
                 self.merge_summary_label.config(text="", foreground="gray")
+            
+            # Update Process button state when merge mode changes
+            self._update_process_button_state()
 
         self.merge_enabled.trace_add("write", on_merge_toggle)
 
@@ -404,6 +407,9 @@ class AbstractRenumberGUI:
             )
         else:
             self.merge_summary_label.config(text="No pairs selected", foreground="gray")
+        
+        # Update Process button state after pairs selection
+        self._update_process_button_state()
 
     def _create_status_area(self, parent: ttk.Frame) -> None:
         """Create status text area with scrollbar and configure message type styling.
@@ -501,12 +507,37 @@ class AbstractRenumberGUI:
             self._check_files_ready()
 
     def _check_files_ready(self) -> None:
-        """Enable process button if both files are selected."""
+        """Enable process button if both files are selected and merge is valid."""
+        # Use the new validation logic instead of simple file check
+        self._update_process_button_state()
+        
+        # Log status if files are selected
         if self.excel_file and self.pdf_file:
-            self.process_button.config(state="normal")
-            self.log_status("Ready to process!")
-        else:
-            self.process_button.config(state="disabled")
+            merge_valid = not self.merge_enabled.get() or len(self.merge_pairs) > 0
+            if merge_valid:
+                self.log_status("Ready to process!")
+            else:
+                self.log_status("Select merge pairs to continue...")
+    
+    def _update_process_button_state(self) -> None:
+        """
+        Update Process button enabled state based on file selection and merge validity.
+        
+        Enables Process button only when:
+        - Primary files are selected AND
+        - Either merge is disabled OR merge has pairs selected
+        
+        Prevents invalid state where merge is enabled but no pairs selected.
+        """
+        files_selected = self.excel_file is not None and self.pdf_file is not None
+        
+        # Check merge validity: merge disabled OR merge enabled with pairs selected
+        merge_valid = not self.merge_enabled.get() or len(self.merge_pairs) > 0
+        
+        should_enable = files_selected and merge_valid
+        
+        if self.process_button:
+            self.process_button.config(state="normal" if should_enable else "disabled")
 
     def log_status(self, message: str, msg_type: str = MSG_INFO) -> None:
         """Add a timestamped message to the status text.

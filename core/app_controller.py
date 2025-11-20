@@ -37,7 +37,17 @@ class AppController:
         self._logger = logger
 
     def process_files(self) -> None:
-        """Main processing function."""
+        """
+        Main processing function with merge validation.
+        
+        Validates that merge mode configuration is correct before processing:
+        - If merge enabled, at least one file pair must be selected
+        - Prevents single-file processing with merge mode active
+        - Ensures backup protection is not inappropriately disabled
+        
+        Raises:
+            ValueError: If merge enabled but no pairs selected
+        """
         try:
             # Mark start of new operation with visual separator
             self.ui.start_new_operation()
@@ -59,6 +69,15 @@ class AppController:
             # Get options from UI
             options = self.ui.get_options()
             options.sheet_name = target_sheet
+
+            # Validate merge configuration: prevent merge mode with no pairs selected
+            if self.ui.get_merge_enabled() and (options.merge_pairs is None or len(options.merge_pairs) == 0):
+                error_msg = (
+                    "Merge mode is enabled but no file pairs were selected.\n\n"
+                    "Please select at least one additional file pair using the 'Pairs...' button,\n"
+                    "or disable merge mode to process as a single file."
+                )
+                raise ValueError(error_msg)
 
             # If merging, disable backups regardless of checkbox (originals untouched)
             if options.merge_pairs:

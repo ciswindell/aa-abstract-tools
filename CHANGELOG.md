@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2025-11-20
+
+### Fixed
+- **Merge Mode Validation**: Fixed critical bug where users could enable merge mode without selecting any file pairs
+- System now prevents processing when merge enabled but no pairs selected
+- Process button automatically disabled when invalid merge state detected
+- Clear error message guides users to select pairs or disable merge mode
+- Prevents inappropriate backup disable for single-file operations
+
+### Technical Details
+- Added three-layer validation: UI (Process button state), Adapter (Options validation), Controller (pre-processing check)
+- Enhanced `_update_process_button_state()` method in GUI to check merge validity
+- Modified `get_options()` to return None instead of empty list for merge_pairs when invalid
+- Added backend validation in `AppController.process_files()` as safety net
+- Comprehensive test suite: 4 tests covering validation and regression scenarios
+
 ## [1.0.1] - 2025-11-20
 
 ### Fixed
