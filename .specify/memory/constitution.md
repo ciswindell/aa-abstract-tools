@@ -1,19 +1,24 @@
 <!--
   SYNC IMPACT REPORT
-  Version: 1.1.0 → 1.1.1 (Version Increment Requirement Clarified)
+  Version: 1.1.1 → 1.2.0 (Version Logging System Added)
   Date: 2025-11-20
   
   Changes:
+  - Added CHANGELOG.md maintenance requirement to Version Management section
+  - Added git tag creation requirement for all releases
+  - Defined changelog format standard (Keep a Changelog)
+  - Established tag naming convention (vX.Y.Z)
+  - Integrated changelog and tag creation into release workflow
+  
+  Previous Changes (v1.1.1):
   - Clarified that code changes MUST trigger version increments
   - Made version update mandatory for all code changes (features, fixes, breaking changes)
-  - Emphasized version updates are part of the standard development workflow
   
   Previous Changes (v1.1.0):
   - Added new "Version Management" quality standard section
   - Defined single source of truth pattern for versioning
   - Established semantic versioning rules (MAJOR.MINOR.PATCH)
   - Documented version display requirements
-  - Added version update workflow to Feature Development section
   
   Template Updates Required:
   ✅ plan-template.md - Constitution check already flexible enough
@@ -21,7 +26,7 @@
   ✅ tasks-template.md - No changes needed
   
   Follow-up TODOs:
-  - None (all standards implemented in feature 005-version-display-system)
+  - None (changelog and git tag system implemented and documented)
 -->
 
 # Abstract Renumber Tool Constitution
@@ -98,8 +103,18 @@ All code MUST follow PEP 8. MUST apply SOLID and DRY principles. MUST NOT add sp
 - Version updates MUST be committed with descriptive message: `chore: bump version to X.Y.Z`
 - Build scripts MUST automatically read version from `_version.py` for artifact naming
 - Application MUST handle missing or invalid version gracefully with fallback to "Unknown"
+- **CHANGELOG.md MUST be maintained** at project root following [Keep a Changelog](https://keepachangelog.com/) format:
+  - Each version entry MUST include: version number, release date, and categorized changes
+  - Changes MUST be categorized: Added, Changed, Deprecated, Removed, Fixed, Security
+  - Unreleased changes MUST be tracked under `## [Unreleased]` section until release
+  - CHANGELOG updates MUST occur before creating release tags
+- **Git tags MUST be created** for all releases:
+  - Tag format: `vX.Y.Z` (e.g., `v1.0.0`, `v1.2.3`)
+  - Tags MUST be created after version bump and CHANGELOG update
+  - Tags MUST be pushed to remote: `git push origin vX.Y.Z`
+  - Tag message SHOULD reference CHANGELOG section: `git tag -a vX.Y.Z -m "Release vX.Y.Z - see CHANGELOG.md"`
 
-**Rationale**: Single source of truth prevents version inconsistencies across displays. Semantic versioning communicates change impact to users. Mandatory version increments for code changes ensure users can identify which release they're running and track changes over time. Automatic propagation eliminates manual update errors. Graceful fallback ensures application stability even with version file issues.
+**Rationale**: Single source of truth prevents version inconsistencies across displays. Semantic versioning communicates change impact to users. Mandatory version increments for code changes ensure users can identify which release they're running and track changes over time. Automatic propagation eliminates manual update errors. Graceful fallback ensures application stability even with version file issues. CHANGELOG provides human-readable release history for users and stakeholders. Git tags enable precise version tracking in source control, facilitating rollbacks, comparisons, and CI/CD integration.
 
 ## Development Workflow
 
@@ -125,10 +140,15 @@ All code MUST follow PEP 8. MUST apply SOLID and DRY principles. MUST NOT add sp
 3. Create adapters in `adapters/` for external integrations
 4. Add UI components in `app/` or `adapters/ui_*.py`
 5. Write tests covering happy path and edge cases
-6. Update version in `_version.py` if releasing:
+6. Update version in `_version.py` when releasing:
    - PATCH for bug fixes (X.Y.Z → X.Y.Z+1)
    - MINOR for new features (X.Y.Z → X.Y+1.0)
    - MAJOR for breaking changes (X.Y.Z → X+1.0.0)
+7. Update `CHANGELOG.md` with release notes:
+   - Move changes from `[Unreleased]` to new `[X.Y.Z] - YYYY-MM-DD` section
+   - Categorize changes appropriately (Added, Changed, Fixed, etc.)
+8. Commit version and changelog updates: `chore: bump version to X.Y.Z`
+9. Create and push git tag: `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`
 
 ## Governance
 
@@ -152,4 +172,4 @@ This constitution supersedes all other development practices. Amendments require
 - Code reviews MUST check for PEP 8 violations, dependency direction, and protocol usage
 - Complexity MUST be justified if deviating from principles (document in plan.md)
 
-**Version**: 1.1.1 | **Ratified**: 2025-11-19 | **Last Amended**: 2025-11-20
+**Version**: 1.2.0 | **Ratified**: 2025-11-19 | **Last Amended**: 2025-11-20
