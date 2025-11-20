@@ -63,6 +63,24 @@ class ExcelOpenpyxlRepo:
         finally:
             wb.close()
 
+    def _normalize_column_name(self, name: str) -> str:
+        """
+        Normalize column name for matching.
+
+        Converts to lowercase and normalizes whitespace (trim and collapse).
+
+        Args:
+            name: Raw column name
+
+        Returns:
+            Normalized name for case-insensitive, whitespace-tolerant matching
+
+        Example:
+            " Status  " -> "status"
+            "Date Created" -> "date created"
+        """
+        return " ".join(str(name).strip().lower().split())
+
     def _write_dataframe_to_workbook(
         self,
         temp_path: str,
@@ -71,7 +89,24 @@ class ExcelOpenpyxlRepo:
         bookmark_col_name: Optional[str],
         add_missing_columns: bool = False,
     ) -> None:
-        """Write DataFrame to workbook and apply bookmark formulas if needed."""
+        """
+        Write DataFrame to workbook and apply bookmark formulas if needed.
+
+        Supports dynamic column addition for merge workflows. When add_missing_columns
+        is True, new columns from the DataFrame that don't exist in the template are
+        added to the output, excluding system columns (those starting with underscore
+        or named Document_ID).
+
+        Column matching is case-insensitive and whitespace-tolerant, allowing proper
+        merging of files with minor column name variations.
+
+        Args:
+            temp_path: Path to temporary workbook file
+            df: DataFrame to write
+            target_sheet: Name of sheet to write to
+            bookmark_col_name: Optional bookmark column to skip
+            add_missing_columns: If True, adds new columns from df (excluding system columns)
+        """
         wb = load_workbook(temp_path)
         try:
             # Find target sheet
@@ -83,25 +118,28 @@ class ExcelOpenpyxlRepo:
                 )
             ws = wb[sheet_name]
 
-            # Build header map
+            # Build header map with normalized column names
             header_values = [
                 "" if cell.value is None else str(cell.value).strip() for cell in ws[1]
             ]
             header_to_col = {
-                h.lower(): idx + 1 for idx, h in enumerate(header_values) if h != ""
+                self._normalize_column_name(h): idx + 1
+                for idx, h in enumerate(header_values)
+                if h != ""
             }
 
-            # Handle new columns that should be added if missing (whitelist approach)
+            # Handle new columns that should be added if missing
             if add_missing_columns:
-                # Define columns that are allowed to be added to Excel output
-                ADDABLE_COLUMNS = {"Document_Found"}
+                # Define system columns that should never be added to output
+                # These are internal tracking columns not meant for user visibility
+                SYSTEM_COLUMNS = {"_include", "_original_index", "Document_ID"}
 
-                # Find whitelisted new columns that don't exist in template
+                # Find all new columns that don't exist in template (excluding system columns)
                 new_columns = [
                     col
                     for col in df.columns
-                    if col.strip().lower() not in header_to_col
-                    and col in ADDABLE_COLUMNS
+                    if self._normalize_column_name(col) not in header_to_col
+                    and col not in SYSTEM_COLUMNS
                 ]
 
                 # Add new columns to the Excel template header row
@@ -111,7 +149,9 @@ class ExcelOpenpyxlRepo:
                     )
                     for new_col in new_columns:
                         ws.cell(row=1, column=next_col_idx, value=new_col)
-                        header_to_col[new_col.strip().lower()] = next_col_idx
+                        header_to_col[self._normalize_column_name(new_col)] = (
+                            next_col_idx
+                        )
                         next_col_idx += 1
 
                     # Note: Logging would require logger dependency - skip for now to keep class simple
@@ -125,12 +165,11 @@ class ExcelOpenpyxlRepo:
 
             # Write DataFrame values
             for df_col in df.columns:
-                if (
-                    bookmark_col_name
-                    and str(df_col).strip().lower() == bookmark_col_name.strip().lower()
-                ):
+                if bookmark_col_name and self._normalize_column_name(
+                    df_col
+                ) == self._normalize_column_name(bookmark_col_name):
                     continue  # Skip bookmark formula column
-                col_idx = header_to_col.get(str(df_col).strip().lower())
+                col_idx = header_to_col.get(self._normalize_column_name(df_col))
                 if col_idx:
                     # Convert boolean values to "Yes"/"No" for Document_Found column
                     if df_col == "Document_Found":
