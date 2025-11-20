@@ -128,6 +128,108 @@ export PDF_BACKEND=pypdf  # PDF processing backend (currently only pypdf support
 - **Data Filtering**: Filter by column values
 - **Document Image Check**: Add Document_Found column
 
+## 🔢 Version Management
+
+### Version Display
+
+The application displays its version in multiple locations for easy identification:
+- **Window Title**: "Abstract Renumber Tool v1.0.0" (visible in title bar)
+- **Footer**: "Version 1.0.0" (bottom-right of main window in gray text)
+- **Executable Name**: `AbstractRenumberTool-v1.0.0.exe` (when built for distribution)
+
+### Single Source of Truth
+
+All version information comes from a single file: **`_version.py`** at the project root.
+
+This ensures consistency across all displays without manual updates in multiple places.
+
+### Semantic Versioning Rules
+
+Version numbers follow the **MAJOR.MINOR.PATCH** format (e.g., `1.0.0`):
+
+| Component | When to Increment | Examples |
+|-----------|-------------------|----------|
+| **MAJOR** | Breaking changes that affect user workflows | UI redesign, removed features, incompatible changes |
+| **MINOR** | New features that are backward compatible | New buttons, additional options, enhanced functionality |
+| **PATCH** | Bug fixes and minor improvements | Fixed errors, typo corrections, performance tweaks |
+
+**Increment Rules**:
+- When incrementing a component, reset lower components to 0
+- Examples:
+  - `1.2.5` → `1.3.0` (added feature, reset PATCH)
+  - `1.3.7` → `2.0.0` (breaking change, reset MINOR and PATCH)
+
+### Version Update Workflow
+
+To release a new version:
+
+1. **Update version** in `_version.py`:
+   ```bash
+   # Edit the file
+   vim _version.py
+   # Change: __version__ = "1.0.0" to "1.0.1" (or appropriate version)
+   ```
+
+2. **Update CHANGELOG.md**:
+   ```bash
+   # Add new version section with changes
+   vim CHANGELOG.md
+   # Add: ## [1.0.1] - 2025-11-20
+   #      ### Fixed
+   #      - Description of changes
+   ```
+
+3. **Commit the changes**:
+   ```bash
+   git add _version.py CHANGELOG.md
+   git commit -m "chore: bump version to 1.0.1"
+   ```
+
+4. **Create git tag**:
+   ```bash
+   git tag -a v1.0.1 -m "Version 1.0.1: Brief description of changes"
+   git push origin main v1.0.1
+   ```
+
+5. **Build the executable**:
+   ```bash
+   cd build
+   python3 build.py
+   ```
+
+6. **Verify the update**:
+   - Check executable name: `ls dist/AbstractRenumberTool-v1.0.1.exe`
+   - Launch the app and verify window title shows "v1.0.1"
+   - Check footer shows "Version 1.0.1"
+   - Verify git tag: `git tag -l`
+
+### Version Increment Examples
+
+**Bug Fix (PATCH)**: `1.0.0` → `1.0.1`
+```bash
+# Example: Fixed Windows file locking warning
+echo '__version__ = "1.0.1"' > _version.py
+```
+
+**New Feature (MINOR)**: `1.0.1` → `1.1.0`
+```bash
+# Example: Added export to CSV button
+echo '__version__ = "1.1.0"' > _version.py
+```
+
+**Breaking Change (MAJOR)**: `1.1.0` → `2.0.0`
+```bash
+# Example: Redesigned GUI workflow
+echo '__version__ = "2.0.0"' > _version.py
+```
+
+### Detailed Version Management Guide
+
+For comprehensive version management instructions, workflow examples, and troubleshooting, see:
+- **CHANGELOG**: `CHANGELOG.md` - Version history and release notes
+- **Quickstart Guide**: `specs/005-version-display-system/quickstart.md`
+- **Technical Specification**: `specs/005-version-display-system/spec.md`
+
 ## 📊 Data Processing
 
 ### Sorting Priority
