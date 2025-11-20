@@ -70,8 +70,15 @@ class AppController:
             options = self.ui.get_options()
             options.sheet_name = target_sheet
 
-            # Validate merge configuration: prevent merge mode with no pairs selected
-            if self.ui.get_merge_enabled() and (options.merge_pairs is None or len(options.merge_pairs) == 0):
+            # Validate merge configuration: check if merge was enabled but no pairs selected
+            # The adapter returns None for merge_pairs when merge is enabled but no pairs selected
+            # We need to check if the GUI has merge enabled to distinguish from normal single-file mode
+            gui_merge_enabled = (
+                hasattr(self.ui, 'gui') 
+                and hasattr(self.ui.gui, 'get_merge_enabled') 
+                and self.ui.gui.get_merge_enabled()
+            )
+            if gui_merge_enabled and (options.merge_pairs is None or len(options.merge_pairs) == 0):
                 error_msg = (
                     "Merge mode is enabled but no file pairs were selected.\n\n"
                     "Please select at least one additional file pair using the 'Pairs...' button,\n"
