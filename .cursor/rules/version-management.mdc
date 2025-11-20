@@ -1,0 +1,128 @@
+---
+description: Commiting changes to git
+alwaysApply: false
+---
+# Version Management & Git Tags
+
+## Version Workflow (MANDATORY)
+
+Every code change MUST follow this sequence:
+
+### 1. Update Version (`_version.py`)
+```python
+# _version.py
+__version__ = "X.Y.Z"
+```
+
+**Increment Rules:**
+- **MAJOR** (X): Breaking changes (UI redesigns, removed features, incompatible changes)
+- **MINOR** (Y): New features (backward compatible enhancements, new options)
+- **PATCH** (Z): Bug fixes (error corrections, performance tweaks, docs)
+
+### 2. Update CHANGELOG.md
+
+Move changes from `[Unreleased]` to versioned section:
+
+```markdown
+## [X.Y.Z] - YYYY-MM-DD
+
+### Added
+- New features
+
+### Changed
+- Modifications to existing features
+
+### Fixed
+- Bug fixes
+
+### Deprecated
+- Soon-to-be removed features
+
+### Removed
+- Deleted features
+
+### Security
+- Security fixes
+```
+
+### 3. Commit Changes
+```bash
+git add _version.py CHANGELOG.md [other-files]
+git commit -m "chore: bump version to X.Y.Z"
+```
+
+### 4. Create Annotated Tag
+```bash
+git tag -a vX.Y.Z -m "Release vX.Y.Z - see CHANGELOG.md"
+```
+
+### 5. Push Everything
+```bash
+git push origin <branch-name>
+git push origin vX.Y.Z
+```
+
+## Quick Commands
+
+```bash
+# List all tags
+git tag
+
+# Show tag details
+git show vX.Y.Z
+
+# Delete tag (if mistake)
+git tag -d vX.Y.Z                    # local
+git push origin --delete vX.Y.Z      # remote
+
+# View release history
+git log --tags --simplify-by-decoration --pretty="format:%ci %d"
+
+# Compare versions
+git diff v1.0.0 v1.1.0
+
+# Check what's deployed
+git describe --tags
+```
+
+## Tag Naming Convention
+
+- Format: `vMAJOR.MINOR.PATCH`
+- Examples: `v1.0.0`, `v2.3.1`, `v10.15.2`
+- Always prefix with `v`
+- Always use annotated tags (`-a` flag)
+
+## Version Display Locations
+
+Version automatically appears in:
+- GUI window title: "Abstract Renumber Tool v{VERSION}"
+- GUI footer: "Version {VERSION}"
+- Executable name: "AbstractRenumberTool-v{VERSION}.exe"
+
+All import from `_version.py` (single source of truth)
+
+## Pre-Release Checklist
+
+- [ ] Version incremented in `_version.py`
+- [ ] CHANGELOG.md updated with release notes
+- [ ] All tests passing (`pytest`)
+- [ ] Build tested (`python3 build/build.py`)
+- [ ] Changes committed
+- [ ] Annotated tag created
+- [ ] Tag pushed to remote
+
+## Emergency: Fix Wrong Tag
+
+```bash
+# Delete incorrect tag
+git tag -d vX.Y.Z
+git push origin --delete vX.Y.Z
+
+# Create correct tag (specify commit if needed)
+git tag -a vX.Y.Z -m "Release vX.Y.Z" [commit-hash]
+git push origin vX.Y.Z
+```
+
+## Constitution Reference
+
+See `.specify/memory/constitution.md` Section "Version Management" for full governance rules.

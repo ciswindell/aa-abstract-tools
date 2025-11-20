@@ -1,21 +1,32 @@
 <!--
   SYNC IMPACT REPORT
-  Version: 0.0.0 → 1.0.0 (Initial Constitution)
-  Date: 2025-11-19
+  Version: 1.1.1 → 1.2.0 (Version Logging System Added)
+  Date: 2025-11-20
   
   Changes:
-  - Initial constitution ratification
-  - Defined 5 core principles for Abstract Renumber Tool
-  - Established quality standards and development workflow
-  - Set governance rules
+  - Added CHANGELOG.md maintenance requirement to Version Management section
+  - Added git tag creation requirement for all releases
+  - Defined changelog format standard (Keep a Changelog)
+  - Established tag naming convention (vX.Y.Z)
+  - Integrated changelog and tag creation into release workflow
+  
+  Previous Changes (v1.1.1):
+  - Clarified that code changes MUST trigger version increments
+  - Made version update mandatory for all code changes (features, fixes, breaking changes)
+  
+  Previous Changes (v1.1.0):
+  - Added new "Version Management" quality standard section
+  - Defined single source of truth pattern for versioning
+  - Established semantic versioning rules (MAJOR.MINOR.PATCH)
+  - Documented version display requirements
   
   Template Updates Required:
-  ✅ plan-template.md - Updated constitution check section
-  ✅ spec-template.md - No changes needed (already aligned)
-  ✅ tasks-template.md - No changes needed (already aligned)
+  ✅ plan-template.md - Constitution check already flexible enough
+  ✅ spec-template.md - No changes needed
+  ✅ tasks-template.md - No changes needed
   
   Follow-up TODOs:
-  - None (all placeholders filled)
+  - None (changelog and git tag system implemented and documented)
 -->
 
 # Abstract Renumber Tool Constitution
@@ -75,6 +86,36 @@ All code MUST follow PEP 8. MUST apply SOLID and DRY principles. MUST NOT add sp
 - Repository root MUST maintain up-to-date README.md
 - Breaking changes MUST be documented in commit messages
 
+### Version Management
+
+- Application version MUST be stored in a single source of truth file (`_version.py` at project root)
+- Version MUST follow semantic versioning format: `MAJOR.MINOR.PATCH` (e.g., "1.0.0")
+- Version MUST be displayed in multiple locations for user visibility:
+  - GUI window title: "Abstract Renumber Tool v{VERSION}"
+  - GUI footer: "Version {VERSION}" (bottom-right, gray text)
+  - Build artifacts: Executable named "AbstractRenumberTool-v{VERSION}.exe"
+- All version displays MUST import from `_version.py` (no hardcoded version strings)
+- **Code changes MUST trigger version increments** in `_version.py` according to semantic versioning rules:
+  - **MAJOR**: Breaking changes affecting user workflows (UI redesigns, removed features, incompatible changes)
+  - **MINOR**: New features that are backward compatible (new options, enhancements, additional functionality)
+  - **PATCH**: Bug fixes and minor improvements (error corrections, performance tweaks, documentation updates)
+- Version increment MUST occur before building distribution artifacts
+- Version updates MUST be committed with descriptive message: `chore: bump version to X.Y.Z`
+- Build scripts MUST automatically read version from `_version.py` for artifact naming
+- Application MUST handle missing or invalid version gracefully with fallback to "Unknown"
+- **CHANGELOG.md MUST be maintained** at project root following [Keep a Changelog](https://keepachangelog.com/) format:
+  - Each version entry MUST include: version number, release date, and categorized changes
+  - Changes MUST be categorized: Added, Changed, Deprecated, Removed, Fixed, Security
+  - Unreleased changes MUST be tracked under `## [Unreleased]` section until release
+  - CHANGELOG updates MUST occur before creating release tags
+- **Git tags MUST be created** for all releases:
+  - Tag format: `vX.Y.Z` (e.g., `v1.0.0`, `v1.2.3`)
+  - Tags MUST be created after version bump and CHANGELOG update
+  - Tags MUST be pushed to remote: `git push origin vX.Y.Z`
+  - Tag message SHOULD reference CHANGELOG section: `git tag -a vX.Y.Z -m "Release vX.Y.Z - see CHANGELOG.md"`
+
+**Rationale**: Single source of truth prevents version inconsistencies across displays. Semantic versioning communicates change impact to users. Mandatory version increments for code changes ensure users can identify which release they're running and track changes over time. Automatic propagation eliminates manual update errors. Graceful fallback ensures application stability even with version file issues. CHANGELOG provides human-readable release history for users and stakeholders. Git tags enable precise version tracking in source control, facilitating rollbacks, comparisons, and CI/CD integration.
+
 ## Development Workflow
 
 ### Code Organization
@@ -84,6 +125,7 @@ All code MUST follow PEP 8. MUST apply SOLID and DRY principles. MUST NOT add sp
 - Application entry points: `app/`
 - Tests mirror source structure: `tests/`
 - Shared utilities: `utils/`
+- Version information: `_version.py` (project root)
 
 ### Dependency Management
 
@@ -98,6 +140,15 @@ All code MUST follow PEP 8. MUST apply SOLID and DRY principles. MUST NOT add sp
 3. Create adapters in `adapters/` for external integrations
 4. Add UI components in `app/` or `adapters/ui_*.py`
 5. Write tests covering happy path and edge cases
+6. Update version in `_version.py` when releasing:
+   - PATCH for bug fixes (X.Y.Z → X.Y.Z+1)
+   - MINOR for new features (X.Y.Z → X.Y+1.0)
+   - MAJOR for breaking changes (X.Y.Z → X+1.0.0)
+7. Update `CHANGELOG.md` with release notes:
+   - Move changes from `[Unreleased]` to new `[X.Y.Z] - YYYY-MM-DD` section
+   - Categorize changes appropriately (Added, Changed, Fixed, etc.)
+8. Commit version and changelog updates: `chore: bump version to X.Y.Z`
+9. Create and push git tag: `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`
 
 ## Governance
 
@@ -121,4 +172,4 @@ This constitution supersedes all other development practices. Amendments require
 - Code reviews MUST check for PEP 8 violations, dependency direction, and protocol usage
 - Complexity MUST be justified if deviating from principles (document in plan.md)
 
-**Version**: 1.0.0 | **Ratified**: 2025-11-19 | **Last Amended**: 2025-11-19
+**Version**: 1.2.0 | **Ratified**: 2025-11-19 | **Last Amended**: 2025-11-20
