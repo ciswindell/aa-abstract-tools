@@ -144,7 +144,7 @@ class BuildOrchestrator:
         # Platform warning
         if platform.system() != "Windows" and not errors:
             print(
-                "[⚠] Warning: Building on non-Windows platform. Test on Windows required."
+                "[!] Warning: Building on non-Windows platform. Test on Windows required."
             )
 
         return (len(errors) == 0, errors)
@@ -163,7 +163,7 @@ class BuildOrchestrator:
             removed.append("build/build/")
 
         if removed:
-            print(f"[✓] Cleaned build directories: {', '.join(removed)}")
+            print(f"[OK] Cleaned build directories: {', '.join(removed)}")
 
     def build(self) -> BuildResult:
         """
@@ -193,24 +193,21 @@ class BuildOrchestrator:
                 warnings=warnings,
             )
 
-        print("[✓] Prerequisites validated")
+        print("[OK] Prerequisites validated")
 
         # Clean if requested
         if self.clean:
             self.clean_build_directories()
 
-        # Build PyInstaller command with versioned executable name
-        exe_name = f"AbstractRenumberTool-v{__version__}"
+        # Build PyInstaller command
+        # Note: executable name is configured in the spec file, not via CLI
         cmd = [
             sys.executable,
             "-m",
             "PyInstaller",
-            "--name",
-            exe_name,
             str(self.spec_file),
         ]
         # Note: Mode flags and collect-all are configured in the spec file, not via CLI
-        # The --name flag overrides the APP_NAME in the spec file
 
         # Add optimization flags
         if self.optimize == "medium":
@@ -226,7 +223,7 @@ class BuildOrchestrator:
             cmd.append("--log-level=WARN")
 
         # Run PyInstaller
-        print("[→] Running PyInstaller...")
+        print("[>] Running PyInstaller...")
         print(f"    Mode: {self.mode}")
         print(f"    Optimization: {self.optimize}")
         if self.verbose:
@@ -316,16 +313,22 @@ class BuildOrchestrator:
         if not dist_dir.exists():
             return None, warnings
 
-        # Find executable
+        # Find executable - look for any .exe file in dist
         if self.mode == "onefile":
-            exe_path = dist_dir / "AbstractRenumberTool.exe"
-            if not exe_path.exists():
+            exe_files = list(dist_dir.glob("*.exe"))
+            if not exe_files:
                 return None, warnings
+            exe_path = exe_files[0]  # Get first .exe found
         else:
-            exe_dir = dist_dir / "AbstractRenumberTool"
-            exe_path = exe_dir / "AbstractRenumberTool.exe"
-            if not exe_path.exists():
+            # In onedir mode, find the directory containing the executable
+            exe_dirs = [d for d in dist_dir.iterdir() if d.is_dir()]
+            if not exe_dirs:
                 return None, warnings
+            exe_dir = exe_dirs[0]
+            exe_files = list(exe_dir.glob("*.exe"))
+            if not exe_files:
+                return None, warnings
+            exe_path = exe_files[0]
 
             # Check for _internal directory in onedir mode
             internal_dir = exe_dir / "_internal"
@@ -401,7 +404,7 @@ def print_build_summary(result: BuildResult) -> None:
     print()
     print("=" * 70)
     if result.success:
-        print("[✓] Build completed successfully!")
+        print("[OK] Build completed successfully!")
         print("=" * 70)
         print()
         print("Build Summary:")
@@ -418,7 +421,7 @@ def print_build_summary(result: BuildResult) -> None:
             print()
             print("Warnings:")
             for warning in result.warnings:
-                print(f"  ⚠ {warning}")
+                print(f"  [!] {warning}")
 
         print()
         print("Next Steps:")
@@ -428,14 +431,14 @@ def print_build_summary(result: BuildResult) -> None:
         print("3. Distribute to end users")
         print()
     else:
-        print("[✗] Build failed")
+        print("[X] Build failed")
         print("=" * 70)
         print(result.error_message)
         if result.warnings:
             print()
             print("Warnings:")
             for warning in result.warnings:
-                print(f"  ⚠ {warning}")
+                print(f"  [!] {warning}")
         print()
 
 
@@ -532,7 +535,7 @@ Examples:
         return 1
 
     except KeyboardInterrupt:
-        print("\n[✗] Build cancelled by user")
+        print("\n[X] Build cancelled by user")
         return 130
 
     except Exception as e:

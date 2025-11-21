@@ -12,7 +12,19 @@ into a standalone Windows executable.
 # CONFIGURATION SECTION - Users can modify these values
 # =============================================================================
 
-APP_NAME = 'AbstractRenumberTool'
+# Import version - SPECPATH is provided by PyInstaller
+import sys
+from pathlib import Path
+# SPECPATH points to directory containing the spec file (build/)
+# Parent is the repo root
+_repo_root = str(Path(SPECPATH).parent)
+sys.path.insert(0, _repo_root)
+try:
+    from _version import __version__
+except (ImportError, AttributeError):
+    __version__ = "dev"
+
+APP_NAME = f'AbstractRenumberTool-v{__version__}'
 ENTRY_POINT = 'main.py'
 ICON_PATH = None  # Set to 'path/to/icon.ico' if you have a custom icon
 CONSOLE = False  # True to show console window (useful for debugging)
@@ -105,7 +117,7 @@ EXCLUDES = [
 # =============================================================================
 
 import os
-from pathlib import Path
+# Note: sys and Path already imported above for version handling
 
 # Get the repository root (parent of build directory)
 # SPECPATH is provided by PyInstaller and points to the directory containing the spec file
