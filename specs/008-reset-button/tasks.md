@@ -132,8 +132,8 @@ This project uses single-project structure:
 - [x] T033 Read current version from _version.py and increment MINOR (new feature)
 - [x] T034 Update _version.py with new version (e.g., 1.0.0 → 1.1.0)
 - [x] T035 Update CHANGELOG.md: Add "Reset button for clearing app state" under [Unreleased] → Added section
-- [ ] T036 Run application manually and verify Reset button appears and functions: python3 main.py
-- [ ] T037 Commit changes: git commit -m "feat: add reset button for clearing app state"
+- [x] T036 Run application manually and verify Reset button appears and functions: python3 main.py
+- [x] T037 Commit changes: git commit -m "feat: add reset button for clearing app state"
 
 ---
 
