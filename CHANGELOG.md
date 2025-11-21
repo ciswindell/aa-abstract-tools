@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2025-11-21
+
+### Added
+- **Reset Button**: Added Reset button next to Process button for quick state clearing
+- One-click reset functionality clears file selections, filter/merge configurations
+- Returns app to ready state without manual cleanup between operations
+- Preserves user preference settings (backup, sort bookmarks, reorder pages)
+- Reset button always enabled with distinctive styling (white background, red text)
+- Process button uses state-based styling (gray when disabled, green when enabled)
+
+### Changed
+- Button styling updated to use ttk.Style with state-based appearance
+- Process button shows clear visual feedback: flat gray (disabled) vs raised with colored border (enabled)
+
 ## [1.0.2] - 2025-11-20
 
 ### Fixed

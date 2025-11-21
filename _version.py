@@ -10,5 +10,5 @@ Version Format: MAJOR.MINOR.PATCH (Semantic Versioning 2.0.0)
 - PATCH: Bug fixes (backward compatible)
 """
 
-__version__ = "1.0.2"
+__version__ = "1.1.0"
 

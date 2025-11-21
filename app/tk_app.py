@@ -54,6 +54,7 @@ class AbstractRenumberGUI:
         self.excel_label: Optional[ttk.Label] = None
         self.pdf_label: Optional[ttk.Label] = None
         self.process_button: Optional[ttk.Button] = None
+        self.reset_button: Optional[ttk.Button] = None
         self.status_text: Optional[tk.Text] = None
         self.backup_checkbox: Optional[ttk.Checkbutton] = None
         self.backup_info_label: Optional[ttk.Label] = None
@@ -73,7 +74,7 @@ class AbstractRenumberGUI:
             from _version import __version__
         except (ImportError, AttributeError):
             __version__ = "Unknown"
-        
+
         self.root.title(f"Abstract Renumber Tool v{__version__}")
         self.root.geometry("900x900")  # Increased height to show status area
         self.root.resizable(True, True)
@@ -93,6 +94,37 @@ class AbstractRenumberGUI:
 
     def setup_gui(self) -> None:
         """Initialize GUI components."""
+        # Configure custom button styles
+        style = ttk.Style()
+
+        # Process button style - GREEN when enabled (like "Click me!"), gray when disabled (like "Quit!")
+        style.configure(
+            "Process.TButton",
+            font=("Calibri", 11, "bold"),
+            borderwidth=2,
+        )
+        # Map states: disabled vs normal (enabled)
+        style.map(
+            "Process.TButton",
+            relief=[("disabled", "flat"), ("!disabled", "raised")],
+            borderwidth=[("disabled", 1), ("!disabled", 3)],
+            background=[("disabled", "#D3D3D3"), ("!disabled", "white")],
+            foreground=[("disabled", "#808080"), ("!disabled", "green")],
+        )
+
+        # Reset button style - Always enabled with red/pink appearance
+        style.configure(
+            "Reset.TButton",
+            font=("Calibri", 11, "bold"),
+            borderwidth=3,
+            relief="raised",
+        )
+        style.map(
+            "Reset.TButton",
+            background=[("!disabled", "white")],
+            foreground=[("!disabled", "#FF6B6B")],
+        )
+
         # Main frame
         main_frame = ttk.Frame(self.root, padding="20")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -111,14 +143,29 @@ class AbstractRenumberGUI:
         # Backup options
         self._create_backup_options(main_frame)
 
-        # Process button
+        # Button frame to hold Process and Reset buttons horizontally
+        button_frame = ttk.Frame(main_frame)
+        button_frame.grid(row=5, column=0, columnspan=2, pady=20)
+
+        # Process button (blue primary action)
         self.process_button = ttk.Button(
-            main_frame,
+            button_frame,
             text="Process Files",
             command=self.controller.process_files,
             state="disabled",
+            style="Process.TButton",
         )
-        self.process_button.grid(row=5, column=0, columnspan=2, pady=20)
+        self.process_button.grid(row=0, column=0, padx=(0, 10), ipadx=15, ipady=5)
+
+        # Reset button (light red)
+        self.reset_button = ttk.Button(
+            button_frame,
+            text="Reset",
+            command=self._on_reset_clicked,
+            state="normal",  # Always enabled per spec FR-008
+            style="Reset.TButton",
+        )
+        self.reset_button.grid(row=0, column=1, ipadx=15, ipady=5)
 
         # Status area
         self._create_status_area(main_frame)
@@ -321,7 +368,7 @@ class AbstractRenumberGUI:
                     foreground="green",
                 )
                 self.merge_summary_label.config(text="", foreground="gray")
-            
+
             # Update Process button state when merge mode changes
             self._update_process_button_state()
 
@@ -407,13 +454,13 @@ class AbstractRenumberGUI:
             )
         else:
             self.merge_summary_label.config(text="No pairs selected", foreground="gray")
-        
+
         # Update Process button state after pairs selection
         self._update_process_button_state()
 
     def _create_status_area(self, parent: ttk.Frame) -> None:
         """Create status text area with scrollbar and configure message type styling.
-        
+
         Sets up a Text widget for displaying timestamped status messages with
         color-coded styling based on message type (info, error, success, warning).
         Configures tags for visual distinction and adds vertical scrollbar.
@@ -436,13 +483,21 @@ class AbstractRenumberGUI:
         # Each tag defines foreground color and optional font styling for visual distinction
         self.status_text.tag_config(MSG_INFO, foreground="black")  # Default messages
         self.status_text.tag_config(
-            MSG_ERROR, foreground="#d32f2f", font=("Arial", 9, "bold")  # Red bold for errors
+            MSG_ERROR,
+            foreground="#d32f2f",
+            font=("Arial", 9, "bold"),  # Red bold for errors
         )
         self.status_text.tag_config(
-            MSG_SUCCESS, foreground="#388e3c", font=("Arial", 9, "bold")  # Green bold for success
+            MSG_SUCCESS,
+            foreground="#388e3c",
+            font=("Arial", 9, "bold"),  # Green bold for success
         )
-        self.status_text.tag_config(MSG_WARNING, foreground="#f57c00")  # Orange for warnings
-        self.status_text.tag_config("separator", foreground="gray")  # Gray for operation separators
+        self.status_text.tag_config(
+            MSG_WARNING, foreground="#f57c00"
+        )  # Orange for warnings
+        self.status_text.tag_config(
+            "separator", foreground="gray"
+        )  # Gray for operation separators
 
         scrollbar = ttk.Scrollbar(
             status_frame, orient="vertical", command=self.status_text.yview
@@ -452,7 +507,7 @@ class AbstractRenumberGUI:
 
     def _create_version_footer(self, parent: ttk.Frame) -> None:
         """Create version footer at bottom of window.
-        
+
         Displays the application version in an unobtrusive footer with
         gray text, right-aligned at the bottom of the main window.
         """
@@ -461,15 +516,17 @@ class AbstractRenumberGUI:
             from _version import __version__
         except (ImportError, AttributeError):
             __version__ = "Unknown"
-        
+
         footer_frame = ttk.Frame(parent)
-        footer_frame.grid(row=7, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(5, 0))
-        
+        footer_frame.grid(
+            row=7, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(5, 0)
+        )
+
         version_label = ttk.Label(
             footer_frame,
             text=f"Version {__version__}",
             foreground="gray",
-            font=("Arial", 9)
+            font=("Arial", 9),
         )
         version_label.pack(side=tk.RIGHT)
 
@@ -510,7 +567,7 @@ class AbstractRenumberGUI:
         """Enable process button if both files are selected and merge is valid."""
         # Use the new validation logic instead of simple file check
         self._update_process_button_state()
-        
+
         # Log status if files are selected
         if self.excel_file and self.pdf_file:
             merge_valid = not self.merge_enabled.get() or len(self.merge_pairs) > 0
@@ -518,26 +575,37 @@ class AbstractRenumberGUI:
                 self.log_status("Ready to process!")
             else:
                 self.log_status("Select merge pairs to continue...")
-    
+
     def _update_process_button_state(self) -> None:
         """
         Update Process button enabled state based on file selection and merge validity.
-        
+
         Enables Process button only when:
         - Primary files are selected AND
         - Either merge is disabled OR merge has pairs selected
-        
+
         Prevents invalid state where merge is enabled but no pairs selected.
         """
         files_selected = self.excel_file is not None and self.pdf_file is not None
-        
+
         # Check merge validity: merge disabled OR merge enabled with pairs selected
         merge_valid = not self.merge_enabled.get() or len(self.merge_pairs) > 0
-        
+
         should_enable = files_selected and merge_valid
-        
+
         if self.process_button:
             self.process_button.config(state="normal" if should_enable else "disabled")
+
+    def _on_reset_clicked(self) -> None:
+        """Handle Reset button click event.
+
+        Delegates to existing reset_gui() method which clears transient
+        operation state (file selections, filter/merge configs) while
+        preserving user preference settings.
+
+        Future enhancement: Add defensive check if processing is active.
+        """
+        self.reset_gui()
 
     def log_status(self, message: str, msg_type: str = MSG_INFO) -> None:
         """Add a timestamped message to the status text.
