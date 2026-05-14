@@ -25,10 +25,15 @@ jobs:
           python-version: '3.10'
           cache: 'pip'
 
-      - name: Install dependencies
+      - name: Install system dependencies for Tkinter tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk xvfb
+
+      - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
           pip install pytest
 
-      - name: Run pytest
-        run: pytest
+      - name: Run pytest under xvfb (virtual display for Tkinter)
+        run: xvfb-run -a pytest
