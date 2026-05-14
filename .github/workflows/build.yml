@@ -1,0 +1,70 @@
+name: Build Windows Executable
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version string to inject (e.g. 1.2.3). Used only for manual runs.'
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $version = "${{ github.ref_name }}".TrimStart('v')
+          } else {
+            $version = "${{ inputs.version }}"
+          }
+          if (-not $version) { throw "No version resolved" }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Output "Resolved version: $version"
+
+      - name: Inject version into _version.py
+        shell: pwsh
+        run: |
+          $content = '__version__ = "${{ steps.version.outputs.version }}"'
+          Set-Content -Path _version.py -Value $content
+          Get-Content _version.py
+
+      - name: Build executable
+        run: python build/build.py
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AbstractRenumberTool-v${{ steps.version.outputs.version }}
+          path: dist/AbstractRenumberTool-v${{ steps.version.outputs.version }}.exe
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/AbstractRenumberTool-v${{ steps.version.outputs.version }}.exe
+          fail_on_unmatched_files: true
+          generate_release_notes: true
