@@ -4,29 +4,22 @@ Integration tests for column preservation during full merge workflows.
 Tests the end-to-end pipeline with merge operations.
 """
 
-import sys
 import tempfile
 from pathlib import Path
 
-# Add project root to Python path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-# Add tests directory to path for fixtures
-tests_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(tests_dir))
-
 import pandas as pd
+from fixtures.excel_fixtures import (
+    create_excel_with_basic_columns,
+    create_excel_with_extra_columns,
+)
 from openpyxl import load_workbook
 from pypdf import PdfWriter
 
-from core.models import Options
+from adapters.excel_repo import ExcelOpenpyxlRepo
+from adapters.logger_tk import TkLogger
+from adapters.pdf_repo import PdfRepo
 from core.pipeline.context import PipelineContext
 from core.pipeline.steps.save_step import SaveStep
-from adapters.excel_repo import ExcelOpenpyxlRepo
-from adapters.pdf_repo import PdfRepo
-from adapters.logger_tk import TkLogger
-from fixtures.excel_fixtures import create_excel_with_basic_columns, create_excel_with_extra_columns
 
 
 class TestMergeColumnPreservation:
@@ -133,12 +126,12 @@ class TestMergeColumnPreservation:
         )
 
         # Test detection
-        assert (
-            not single_pair_context.is_merge_workflow()
-        ), "Single file should not be detected as merge"
-        assert (
-            merge_context.is_merge_workflow()
-        ), "Multiple files should be detected as merge"
+        assert not single_pair_context.is_merge_workflow(), (
+            "Single file should not be detected as merge"
+        )
+        assert merge_context.is_merge_workflow(), (
+            "Multiple files should be detected as merge"
+        )
 
         # Clean up
         file1_fixture["path"].unlink()
@@ -197,9 +190,14 @@ class TestMergeColumnPreservation:
         """Test that merging 3+ files preserves all unique columns from all files."""
         # Create three test Excel files with different column structures
         file1_fixture = create_excel_with_basic_columns()  # [Index#, Date, Name]
-        file2_fixture = create_excel_with_extra_columns()  # [Index#, Date, Name, Status, Comments]
+        file2_fixture = (
+            create_excel_with_extra_columns()
+        )  # [Index#, Date, Name, Status, Comments]
         from fixtures.excel_fixtures import create_excel_with_disjoint_columns
-        file3_fixture = create_excel_with_disjoint_columns()  # [Index#, Priority, Category, Owner]
+
+        file3_fixture = (
+            create_excel_with_disjoint_columns()
+        )  # [Index#, Priority, Category, Owner]
 
         # Simulate merged DataFrame from 3 files (what pipeline would create)
         # Union of all columns: Index#, Date, Name, Status, Comments, Priority, Category, Owner
@@ -338,10 +336,9 @@ class TestMergeColumnPreservation:
 
         # Performance assertion: should complete in reasonable time
         # For 100 rows with 5 columns, expect < 2 seconds
-        assert (
-            elapsed_time < 2.0
-        ), f"Save operation took {elapsed_time:.2f}s, should be < 2s"
+        assert elapsed_time < 2.0, (
+            f"Save operation took {elapsed_time:.2f}s, should be < 2s"
+        )
 
         # Note: Actual <5% impact test would require baseline measurement
         # This test ensures merge operations complete in reasonable time
-

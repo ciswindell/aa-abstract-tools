@@ -372,7 +372,7 @@ class TestLoadStep:
             mock_mkstemp.return_value = (1, "/tmp/test.pdf")
 
             # Mock file write failure
-            with patch("builtins.open", side_effect=IOError("Write failed")):
+            with patch("builtins.open", side_effect=OSError("Write failed")):
                 with pytest.raises(Exception) as exc_info:
                     self.load_step.execute(context)
 

@@ -6,17 +6,20 @@ Provides bookmark reading and writing while keeping calling code
 independent of backend types.
 """
 
-from typing import Any, Dict, List, Mapping, Sequence, Tuple
+import contextlib
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 # pypdf backend imports
-from pypdf import PdfReader as PyPdfReader, PdfWriter as PyPdfWriter
+from pypdf import PdfReader as PyPdfReader
+from pypdf import PdfWriter as PyPdfWriter
 from pypdf.generic import Fit as PyPdfFit
 
 
 class PypdfPdfRepo:
     """PDF repository using pypdf for read/pages/write with bookmarks."""
 
-    def read(self, path: str) -> Tuple[List[Mapping[str, Any]], int]:
+    def read(self, path: str) -> tuple[list[Mapping[str, Any]], int]:
         reader = PyPdfReader(path)
         pages_count = len(reader.pages)
         outline = getattr(reader, "outline", None)
@@ -25,7 +28,7 @@ class PypdfPdfRepo:
         if not outline:
             return [], pages_count
 
-        bookmarks: List[Dict[str, Any]] = []
+        bookmarks: list[dict[str, Any]] = []
         self._parse_outline(reader, outline, bookmarks, level=0)
         return bookmarks, pages_count
 
@@ -46,10 +49,8 @@ class PypdfPdfRepo:
             except (TypeError, ValueError, AttributeError):
                 continue
 
-        try:
+        with contextlib.suppress(AttributeError):
             writer.page_mode = "/UseOutlines"
-        except AttributeError:
-            pass
 
         for bm in bookmarks:
             title = str(bm.get("title", ""))
@@ -67,8 +68,8 @@ class PypdfPdfRepo:
     def _parse_outline(
         self,
         reader: PyPdfReader,
-        outline: List[Any],
-        bookmarks: List[Dict[str, Any]],
+        outline: list[Any],
+        bookmarks: list[dict[str, Any]],
         level: int,
     ) -> None:
         for item in outline:

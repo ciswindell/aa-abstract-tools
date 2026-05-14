@@ -3,8 +3,6 @@
 Bookmark formula utilities for Excel templates.
 """
 
-from typing import Optional
-
 import pandas as pd
 from openpyxl import load_workbook
 
@@ -94,7 +92,7 @@ def has_bookmark_formulas(workbook_path: str, bookmark_column: str) -> bool:
         return False
 
 
-def detect_bookmark_column(df: pd.DataFrame) -> Optional[str]:
+def detect_bookmark_column(df: pd.DataFrame) -> str | None:
     """Detect bookmark formula column in DataFrame."""
     candidates = ["Bookmark Formula", "Bookmark", "Bookmark Text", "Formula"]
     for col in df.columns:

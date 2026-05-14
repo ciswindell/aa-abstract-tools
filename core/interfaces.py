@@ -5,7 +5,8 @@ Interfaces (Protocols) for core services and adapters.
 Defines minimal contracts to decouple UI and IO from core logic.
 """
 
-from typing import Any, List, Mapping, Optional, Protocol, Sequence, Tuple
+from collections.abc import Mapping, Sequence
+from typing import Any, Protocol
 
 import pandas as pd
 
@@ -20,7 +21,7 @@ class Logger(Protocol):
 
     def error(self, message: str) -> None:
         """Log an error message."""
-    
+
     def warning(self, message: str) -> None:
         """Log a warning message."""
 
@@ -28,10 +29,10 @@ class Logger(Protocol):
 class ExcelRepo(Protocol):
     """Excel repository for loading and saving workbooks."""
 
-    def load(self, path: str, sheet: Optional[str]) -> pd.DataFrame:
+    def load(self, path: str, sheet: str | None) -> pd.DataFrame:
         """Load a worksheet into a DataFrame."""
 
-    def get_sheet_names(self, path: str) -> List[str]:
+    def get_sheet_names(self, path: str) -> list[str]:
         """Get list of sheet names in the Excel file."""
 
     def save(
@@ -43,7 +44,7 @@ class ExcelRepo(Protocol):
 class PdfRepo(Protocol):
     """PDF repository for reading and writing PDFs with bookmarks."""
 
-    def read(self, path: str) -> Tuple[List[Mapping[str, Any]], int]:
+    def read(self, path: str) -> tuple[list[Mapping[str, Any]], int]:
         """Return (bookmarks, total_pages)."""
 
     def pages(self, path: str) -> Sequence[Any]:
@@ -61,7 +62,7 @@ class PdfRepo(Protocol):
 class UIController(Protocol):
     """Interface for UI controllers that handle user interactions."""
 
-    def get_file_paths(self) -> Tuple[Optional[str], Optional[str]]:
+    def get_file_paths(self) -> tuple[str | None, str | None]:
         """Get selected Excel and PDF file paths."""
 
     def get_options(self) -> Options:
@@ -85,20 +86,18 @@ class UIController(Protocol):
     def prompt_sheet_selection(
         self,
         file_path: str,
-        sheet_names: List[str],
-        default_sheet: Optional[str] = None,
-    ) -> Optional[str]:
+        sheet_names: list[str],
+        default_sheet: str | None = None,
+    ) -> str | None:
         """Prompt user to select a sheet from available options."""
 
-    def prompt_filter_selection(
-        self, df: pd.DataFrame
-    ) -> Tuple[Optional[str], List[str]]:
+    def prompt_filter_selection(self, df: pd.DataFrame) -> tuple[str | None, list[str]]:
         """Prompt user to pick a filter column and values; returns (column, values).
 
         Returns (None, []) if the user cancels.
         """
 
-    def prompt_merge_pairs(self) -> Optional[List[Tuple[str, str]]]:
+    def prompt_merge_pairs(self) -> list[tuple[str, str]] | None:
         """Prompt user to select one or more (Excel, PDF) pairs for merge.
 
         Returns None if the user cancels.

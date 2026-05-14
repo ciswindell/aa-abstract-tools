@@ -112,7 +112,7 @@ class TestLinkBookmarksToExcelRows:
         # Check that page ranges are offset correctly
         # (exact ranges depend on detect_page_ranges implementation)
         for unit in units:
-            start, end = unit.merged_page_range
+            start, _end = unit.merged_page_range
             assert start > 20  # Should be offset by 20
 
     def test_link_bookmarks_empty_inputs(self):

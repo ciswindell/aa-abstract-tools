@@ -107,7 +107,7 @@ class TestValidateStep:
         """Test file validation when file doesn't exist."""
         with patch("pathlib.Path.exists", return_value=False):
             with pytest.raises(
-                FileNotFoundError, match="Excel file file not found: missing.xlsx"
+                FileNotFoundError, match=r"Excel file file not found: missing\.xlsx"
             ):
                 self.validate_step._validate_file_exists("missing.xlsx", "Excel file")
 
@@ -130,7 +130,7 @@ class TestValidateStep:
             patch("builtins.open", side_effect=PermissionError("Access denied")),
         ):
             with pytest.raises(
-                Exception, match="Excel file file is not readable.*Access denied"
+                Exception, match=r"Excel file file is not readable.*Access denied"
             ):
                 self.validate_step._validate_file_exists("protected.xlsx", "Excel file")
 
@@ -219,7 +219,7 @@ class TestValidateStep:
         self.excel_repo.load.return_value = pd.DataFrame()
 
         with pytest.raises(
-            Exception, match="Excel sheet 'Sheet1' is empty in file 'test.xlsx'"
+            Exception, match=r"Excel sheet 'Sheet1' is empty in file 'test\.xlsx'"
         ):
             self.validate_step._validate_excel_data_integrity(context)
 
@@ -300,7 +300,7 @@ class TestValidateStep:
 
         self.pdf_repo.read.return_value = ([], 0)
 
-        with pytest.raises(ValueError, match="PDF 'test.pdf' has no pages"):
+        with pytest.raises(ValueError, match=r"PDF 'test\.pdf' has no pages"):
             self.validate_step._validate_pdf_bookmarks(context)
 
     def test_validate_pdf_bookmarks_no_bookmarks(self):
@@ -309,7 +309,7 @@ class TestValidateStep:
 
         self.pdf_repo.read.return_value = ([], 10)
 
-        with pytest.raises(ValueError, match="PDF 'test.pdf' has no bookmarks"):
+        with pytest.raises(ValueError, match=r"PDF 'test\.pdf' has no bookmarks"):
             self.validate_step._validate_pdf_bookmarks(context)
 
     def test_validate_pdf_bookmarks_invalid_format(self):

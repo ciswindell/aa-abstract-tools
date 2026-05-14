@@ -2,12 +2,11 @@
 """
 Pure Excel DataFrame transforms.
 
-Functions here are side‑effect free and return new DataFrames.
+Functions here are side-effect free and return new DataFrames.
 """
 
 import hashlib
 from pathlib import Path
-from typing import List, Optional
 
 import pandas as pd
 
@@ -82,7 +81,7 @@ def add_document_ids(
 
 def sort_and_renumber(
     df: pd.DataFrame,
-    sort_columns: Optional[List[str]] = None,
+    sort_columns: list[str] | None = None,
     index_col: str = "Index#",
 ) -> pd.DataFrame:
     """Sort by available columns ascending and renumber index_col from 1..N."""

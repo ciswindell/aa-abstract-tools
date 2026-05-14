@@ -4,27 +4,16 @@ Unit tests for ExcelRepo column preservation during merge operations.
 Tests column preservation, system column exclusion, and whitespace normalization.
 """
 
-import sys
 import tempfile
 from pathlib import Path
 
-# Add project root to Python path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-# Add tests directory to path for fixtures
-tests_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(tests_dir))
-
 import pandas as pd
+from fixtures.excel_fixtures import (
+    create_excel_with_basic_columns,
+)
 from openpyxl import load_workbook
 
 from adapters.excel_repo import ExcelOpenpyxlRepo
-from fixtures.excel_fixtures import (
-    create_excel_with_basic_columns,
-    create_excel_with_extra_columns,
-    create_excel_with_system_columns,
-)
 
 
 class TestExcelRepoColumnPreservation:
@@ -174,12 +163,12 @@ class TestExcelRepoColumnPreservation:
 
         # Assert system columns are excluded, user column is included
         assert "_include" not in headers, "System column _include should be excluded"
-        assert (
-            "Document_ID" not in headers
-        ), "System column Document_ID should be excluded"
-        assert (
-            "_original_index" not in headers
-        ), "System column _original_index should be excluded"
+        assert "Document_ID" not in headers, (
+            "System column Document_ID should be excluded"
+        )
+        assert "_original_index" not in headers, (
+            "System column _original_index should be excluded"
+        )
         assert "Status" in headers, "User column Status should be included"
         assert len(headers) == 4, f"Expected 4 columns, got {len(headers)}: {headers}"
 
@@ -265,9 +254,7 @@ class TestExcelRepoColumnPreservation:
         wb.close()
 
         # Assert data was written (whitespace normalized)
-        assert (
-            index_val == "1"
-        ), "Data should be written despite whitespace differences"
+        assert index_val == "1", "Data should be written despite whitespace differences"
 
     def test_multi_file_column_union(self):
         """Test that merging multiple files creates a union of all columns."""
@@ -374,4 +361,3 @@ class TestExcelRepoColumnPreservation:
         assert headers[3] in ["Zebra", "Apple"], "New columns should be appended"
         assert headers[4] in ["Zebra", "Apple"], "New columns should be appended"
         assert len(headers) == 5
-

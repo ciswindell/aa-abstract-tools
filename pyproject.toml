@@ -1,0 +1,43 @@
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+extend-exclude = [
+    ".venv",
+    "build",
+    "dist",
+    "specs",
+    "docs",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "C4",   # flake8-comprehensions
+    "N",    # pep8-naming
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "E501",  # line too long — formatter handles wrapping
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "N802",  # function names — pytest test names can violate naming
+    "N803",  # argument naming — mock/fixture args
+    "N806",  # variable in function — test fixtures often use CamelCase
+    "B011",  # assert False — fine in tests
+    "B017",  # assert raises Exception — fine in tests
+    "SIM117", # nested with — pytest style sometimes prefers it
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

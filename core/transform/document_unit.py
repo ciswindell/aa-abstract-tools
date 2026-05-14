@@ -6,7 +6,8 @@ This module provides core operations for DocumentUnit objects, supporting
 the memory-efficient two-phase approach that eliminates data coupling fragility.
 """
 
-from typing import Any, Dict, List, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any
 
 import pandas as pd
 
@@ -19,8 +20,8 @@ def create_document_unit_from_bookmark(
     excel_row: pd.Series,
     page_offset: int,
     source_info: str,
-    page_ranges: Dict[str, Dict[str, int]],
-) -> Optional[DocumentUnit]:
+    page_ranges: dict[str, dict[str, int]],
+) -> DocumentUnit | None:
     """Create a DocumentUnit from a PDF bookmark and linked Excel row.
 
     Args:
@@ -56,12 +57,12 @@ def create_document_unit_from_bookmark(
 
 
 def link_bookmarks_to_excel_rows(
-    bookmarks: List[Mapping[str, Any]],
+    bookmarks: list[Mapping[str, Any]],
     excel_df: pd.DataFrame,
     page_offset: int,
     source_info: str,
     total_pages: int,
-) -> List[DocumentUnit]:
+) -> list[DocumentUnit]:
     """Link PDF bookmarks to Excel rows within a single file pair.
 
     This function prevents Document ID collisions by processing each file
@@ -88,7 +89,7 @@ def link_bookmarks_to_excel_rows(
     excel_index_map = {}
     duplicate_indices = []
 
-    for idx, row in excel_df.iterrows():
+    for _idx, row in excel_df.iterrows():
         original_index = str(row["Index#"]).strip()
         if original_index in excel_index_map:
             duplicate_indices.append(

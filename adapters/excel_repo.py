@@ -7,8 +7,6 @@ back into an existing workbook template and sheet, then applies
 formatting via `ExcelFormatter`.
 """
 
-from typing import Optional
-
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
@@ -25,7 +23,7 @@ from utils.dates import parse_robust
 class ExcelOpenpyxlRepo:
     """Concrete ExcelRepo implementation using pandas/openpyxl."""
 
-    def load(self, path: str, sheet: Optional[str]) -> pd.DataFrame:
+    def load(self, path: str, sheet: str | None) -> pd.DataFrame:
         """Load a worksheet into a DataFrame preserving native Excel data types.
 
         Date columns remain as datetime objects, while Index# is converted to string
@@ -86,7 +84,7 @@ class ExcelOpenpyxlRepo:
         temp_path: str,
         df: pd.DataFrame,
         target_sheet: str,
-        bookmark_col_name: Optional[str],
+        bookmark_col_name: str | None,
         add_missing_columns: bool = False,
     ) -> None:
         """
@@ -132,14 +130,14 @@ class ExcelOpenpyxlRepo:
             if add_missing_columns:
                 # Define system columns that should never be added to output
                 # These are internal tracking columns not meant for user visibility
-                SYSTEM_COLUMNS = {"_include", "_original_index", "Document_ID"}
+                system_columns = {"_include", "_original_index", "Document_ID"}
 
                 # Find all new columns that don't exist in template (excluding system columns)
                 new_columns = [
                     col
                     for col in df.columns
                     if self._normalize_column_name(col) not in header_to_col
-                    and col not in SYSTEM_COLUMNS
+                    and col not in system_columns
                 ]
 
                 # Add new columns to the Excel template header row
@@ -200,9 +198,7 @@ class ExcelOpenpyxlRepo:
             # Clear fills across the same row range and the header columns.
             empty_fill = PatternFill(fill_type=None)
             last_col = max(header_to_col.values()) if header_to_col else 1
-            for row in ws.iter_rows(
-                min_row=1, max_row=clear_max_row, max_col=last_col
-            ):
+            for row in ws.iter_rows(min_row=1, max_row=clear_max_row, max_col=last_col):
                 for cell in row:
                     cell.fill = empty_fill
             wb.save(temp_path)

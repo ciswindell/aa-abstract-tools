@@ -37,7 +37,9 @@ class SortDfStep(BaseStep):
         Raises:
             Exception: If sorting fails
         """
-        self.logger.info(f"Step {context.step_number} of {context.total_steps}: Sorting data...")
+        self.logger.info(
+            f"Step {context.step_number} of {context.total_steps}: Sorting data..."
+        )
 
         try:
             # Validate required data
@@ -68,7 +70,7 @@ class SortDfStep(BaseStep):
                 )
 
             # Get counts for logging
-            total_rows = len(context.df)
+            len(context.df)
             included_rows = context.df["_include"].sum()
 
             if included_rows == 0:
@@ -90,9 +92,8 @@ class SortDfStep(BaseStep):
                 raise ValueError("No flagged rows to sort after filtering")
 
             # Store original first index for logging
-            original_first_index = None
             if "Index#" in included_df.columns and len(included_df) > 0:
-                original_first_index = included_df.iloc[0]["Index#"]
+                included_df.iloc[0]["Index#"]
 
             # Sort and renumber only the flagged rows
             try:

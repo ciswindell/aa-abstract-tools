@@ -7,13 +7,6 @@ import tkinter as tk
 from tkinter import ttk
 from unittest.mock import Mock, patch
 
-import sys
-from pathlib import Path
-
-# Add project root to Python path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
 from app.tk_app import AbstractRenumberGUI
 
 

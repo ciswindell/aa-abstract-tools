@@ -14,7 +14,6 @@ Three-phase reconstruction process:
 """
 
 from pathlib import Path
-from typing import List
 
 from pypdf import PdfReader, PdfWriter
 
@@ -50,7 +49,9 @@ class RebuildPdfStep(BaseStep):
         Raises:
             Exception: If PDF reconstruction fails
         """
-        self.logger.info(f"Step {context.step_number} of {context.total_steps}: Rebuilding PDF...")
+        self.logger.info(
+            f"Step {context.step_number} of {context.total_steps}: Rebuilding PDF..."
+        )
 
         # Validate required data
         if context.document_units is None:
@@ -124,7 +125,7 @@ class RebuildPdfStep(BaseStep):
             # Clean up intermediate PDF file if it exists
             self._cleanup_intermediate_pdf(context)
 
-    def _phase_a_filter_units(self, context: PipelineContext) -> List[DocumentUnit]:
+    def _phase_a_filter_units(self, context: PipelineContext) -> list[DocumentUnit]:
         """Phase A: Filter DocumentUnits based on _include flag.
 
         Args:
@@ -151,8 +152,8 @@ class RebuildPdfStep(BaseStep):
         return filtered_units
 
     def _phase_b_reorder_units(
-        self, context: PipelineContext, filtered_units: List[DocumentUnit]
-    ) -> List[DocumentUnit]:
+        self, context: PipelineContext, filtered_units: list[DocumentUnit]
+    ) -> list[DocumentUnit]:
         """Phase B: Reorder DocumentUnits by sorted DataFrame order.
 
         Args:
@@ -188,7 +189,7 @@ class RebuildPdfStep(BaseStep):
     def _phase_c_create_pdf_with_bookmarks(
         self,
         context: PipelineContext,
-        sorted_units: List[DocumentUnit],
+        sorted_units: list[DocumentUnit],
         intermediate_reader: PdfReader,
     ) -> PdfWriter:
         """Phase C: Create fresh PDF with PyPDF bookmarks.
