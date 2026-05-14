@@ -66,9 +66,9 @@ class TestDocumentUnitWorkflowIntegration:
         assert context is not None
         assert len(context.file_pairs) == 1
         assert context.file_pairs[0] == ("/tmp/test.xlsx", "/tmp/test.pdf", "Sheet1")
-        assert context.options["backup"] == True
-        assert context.options["sort_bookmarks"] == True
-        assert context.options["filter_enabled"] == False
+        assert context.options["backup"]
+        assert context.options["sort_bookmarks"]
+        assert not context.options["filter_enabled"]
 
         # Test pipeline step registration
         self.pipeline.register_steps()
@@ -130,7 +130,7 @@ class TestDocumentUnitWorkflowIntegration:
         context = PipelineContext(file_pairs=file_pairs, options=options_dict)
 
         # Verify merge workflow context
-        assert context.is_merge_workflow() == True
+        assert context.is_merge_workflow()
         assert len(context.file_pairs) == 2
         assert context.file_pairs[0] == ("/tmp/test1.xlsx", "/tmp/test1.pdf", "Sheet1")
         assert context.file_pairs[1] == ("/tmp/test2.xlsx", "/tmp/test2.pdf", "Sheet1")
@@ -169,10 +169,10 @@ class TestDocumentUnitWorkflowIntegration:
         context = PipelineContext(file_pairs=file_pairs, options=options_dict)
 
         # Verify single file workflow context
-        assert context.is_merge_workflow() == False
+        assert not context.is_merge_workflow()
         assert len(context.file_pairs) == 1
         assert context.file_pairs[0] == ("/tmp/single.xlsx", "/tmp/single.pdf", "Data")
-        assert context.options["filter_enabled"] == True
+        assert context.options["filter_enabled"]
         assert context.options["filter_column"] == "Status"
         assert context.options["filter_values"] == ["Active", "Pending"]
 
@@ -375,11 +375,11 @@ class TestDocumentUnitWorkflowIntegration:
         }
 
         # Verify conversion
-        assert options_dict["backup"] == True
-        assert options_dict["sort_bookmarks"] == False
-        assert options_dict["reorder_pages"] == True
+        assert options_dict["backup"]
+        assert not options_dict["sort_bookmarks"]
+        assert options_dict["reorder_pages"]
         assert options_dict["sheet_name"] == "CustomSheet"
-        assert options_dict["filter_enabled"] == True
+        assert options_dict["filter_enabled"]
         assert options_dict["filter_column"] == "Category"
         assert options_dict["filter_values"] == ["A", "B", "C"]
 
@@ -418,9 +418,9 @@ class TestDocumentUnitWorkflowIntegration:
 
         assert filter_step is not None
         # FilterDfStep should not execute when filter_enabled is False
-        assert filter_step.should_execute(context_no_filter) == False
+        assert not filter_step.should_execute(context_no_filter)
         # FilterDfStep should execute when filter_enabled is True
-        assert filter_step.should_execute(context_with_filter) == True
+        assert filter_step.should_execute(context_with_filter)
 
         # Test that all steps have should_execute method
         for step in self.pipeline.steps:

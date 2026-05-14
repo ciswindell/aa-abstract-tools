@@ -3,11 +3,12 @@
 File helpers for backups and atomic writes.
 """
 
+import contextlib
 import os
 import shutil
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 # Removed unused backup functions:
 # - generate_backup_filename()
@@ -77,10 +78,8 @@ def atomic_save_with_backup(
     except Exception:
         # Cleanup temp backup on failure
         if temp_backup and temp_backup.exists():
-            try:
+            with contextlib.suppress(Exception):
                 temp_backup.unlink()
-            except Exception:
-                pass
         raise
 
 
@@ -116,7 +115,5 @@ def atomic_write_with_template(
         temp_file = None
     finally:
         if temp_file and os.path.exists(temp_file):
-            try:
+            with contextlib.suppress(Exception):
                 os.remove(temp_file)
-            except Exception:
-                pass

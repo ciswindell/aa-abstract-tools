@@ -8,7 +8,6 @@ import tkinter as tk
 from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, ttk
-from typing import Optional, Tuple
 
 from adapters.ui_tkinter import TkinterUIAdapter
 from core.app_controller import AppController
@@ -25,8 +24,8 @@ class AbstractRenumberGUI:
     def __init__(self, root: tk.Tk, controller: "AbstractRenumberTool") -> None:
         self.root = root
         self.controller = controller
-        self.excel_file: Optional[str] = None
-        self.pdf_file: Optional[str] = None
+        self.excel_file: str | None = None
+        self.pdf_file: str | None = None
         self.backup_enabled: tk.BooleanVar = tk.BooleanVar(
             value=True
         )  # Backup enabled by default
@@ -42,7 +41,7 @@ class AbstractRenumberGUI:
 
         # Filter UI state (selection will be prompted during processing)
         self.filter_enabled: tk.BooleanVar = tk.BooleanVar(value=False)
-        self.filter_column: Optional[str] = None
+        self.filter_column: str | None = None
         self.filter_values: list[str] = []
         self._filter_prompt_requested: bool = False
 
@@ -51,18 +50,18 @@ class AbstractRenumberGUI:
         self.merge_pairs: list[tuple[str, str]] = []
 
         # Initialize GUI components
-        self.excel_label: Optional[ttk.Label] = None
-        self.pdf_label: Optional[ttk.Label] = None
-        self.process_button: Optional[ttk.Button] = None
-        self.reset_button: Optional[ttk.Button] = None
-        self.status_text: Optional[tk.Text] = None
-        self.backup_checkbox: Optional[ttk.Checkbutton] = None
-        self.backup_info_label: Optional[ttk.Label] = None
-        self.sort_bookmarks_checkbox: Optional[ttk.Checkbutton] = None
-        self.reorder_pages_checkbox: Optional[ttk.Checkbutton] = None
-        self.reorder_pages_info_label: Optional[ttk.Label] = None
-        self.check_document_images_checkbox: Optional[ttk.Checkbutton] = None
-        self.check_document_images_info_label: Optional[ttk.Label] = None
+        self.excel_label: ttk.Label | None = None
+        self.pdf_label: ttk.Label | None = None
+        self.process_button: ttk.Button | None = None
+        self.reset_button: ttk.Button | None = None
+        self.status_text: tk.Text | None = None
+        self.backup_checkbox: ttk.Checkbutton | None = None
+        self.backup_info_label: ttk.Label | None = None
+        self.sort_bookmarks_checkbox: ttk.Checkbutton | None = None
+        self.reorder_pages_checkbox: ttk.Checkbutton | None = None
+        self.reorder_pages_info_label: ttk.Label | None = None
+        self.check_document_images_checkbox: ttk.Checkbutton | None = None
+        self.check_document_images_info_label: ttk.Label | None = None
 
         self.setup_window()
         self.setup_gui()
@@ -643,7 +642,7 @@ class AbstractRenumberGUI:
             self.status_text.see(tk.END)
             self.root.update()
 
-    def get_selected_files(self) -> Tuple[Optional[str], Optional[str]]:
+    def get_selected_files(self) -> tuple[str | None, str | None]:
         """Return the selected file paths."""
         return self.excel_file, self.pdf_file
 
@@ -670,7 +669,7 @@ class AbstractRenumberGUI:
     def get_filter_prompt_requested(self) -> bool:
         return self._filter_prompt_requested
 
-    def set_filter_selection(self, column: Optional[str], values: list[str]) -> None:
+    def set_filter_selection(self, column: str | None, values: list[str]) -> None:
         self.filter_column = column
         self.filter_values = list(values or [])
         if column and values:

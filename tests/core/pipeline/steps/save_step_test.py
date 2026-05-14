@@ -261,7 +261,7 @@ class TestSaveStep:
         mock_atomic.side_effect = execute_write_func
 
         # The write function should raise the expected exception
-        with pytest.raises(Exception, match="Failed to write PDF to output.pdf"):
+        with pytest.raises(Exception, match=r"Failed to write PDF to output\.pdf"):
             self.save_step._save_pdf_output(context, "output.pdf", False)
 
     # NOTE: test_save_pdf_output_statistics_logging and

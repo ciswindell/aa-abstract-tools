@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Strict ruff lint+format adopted project-wide**. New `pyproject.toml` enables `E, F, W, I, B, UP, SIM, C4, N, RUF` rulesets plus `ruff format`. Codebase reformatted (21 files) and 299 lint violations resolved (252 auto-fixes, 15 hand-fixes, 32 unsafe-but-reviewed). `pytest.ini` now sets `pythonpath = . tests`, removing the need for `sys.path` manipulation in test files; this also fixes pre-existing collection errors on `tests/adapters/*_smoke_test.py`. All 213 tests remain green. See `specs/012-ruff-strict/spec.md`.
+
 ### Fixed
 - **SaveStep hang on workbooks with phantom dimensions**: Excel templates whose used range reports a phantom `max_row` near Excel's 1M-row limit no longer cause the value-clear and fill-clear loops in `ExcelOpenpyxlRepo._write_dataframe_to_workbook` to iterate over millions of empty cells. Loops are now bounded by `max(real_max_row, len(df) + 1)`, where `real_max_row` is computed from openpyxl's loaded-cell dict — covering both filter (df smaller than template) and merge (df larger than template) workflows. Affected file pair previously projected a multi-hour save time; now completes in ~1 second. See `specs/009-excel-clear-fills-perf/spec.md`.
 

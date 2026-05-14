@@ -26,17 +26,19 @@ from openpyxl import Workbook, load_workbook
 from adapters.excel_repo import ExcelOpenpyxlRepo
 
 
-class _TestTimeout(Exception):
+class _TimeoutError(Exception):
     pass
 
 
 def _on_alarm(signum, frame):
-    raise _TestTimeout("save() exceeded budget — phantom dimensions not bounded")
+    raise _TimeoutError("save() exceeded budget — phantom dimensions not bounded")
 
 
-def _build_template_with_phantom_dimensions(path, sheet_name, phantom_row=500_000, phantom_col=16):
+def _build_template_with_phantom_dimensions(
+    path, sheet_name, phantom_row=500_000, phantom_col=16
+):
     """Create an .xlsx whose used-range extends to (phantom_row, phantom_col)
-    while real data is only 4 rows × 4 cols."""
+    while real data is only 4 rows x 4 cols."""
     wb = Workbook()
     ws = wb.active
     ws.title = sheet_name
@@ -67,12 +69,14 @@ def test_save_completes_quickly_on_workbook_with_phantom_dimensions(tmp_path):
     assert check[sheet_name].max_column >= 16, "fixture didn't extend columns"
     check.close()
 
-    df = pd.DataFrame({
-        "Index#": ["1", "2", "3"],
-        "Document Type": ["Release", "Release", "Release"],
-        "Document Date": ["2024-01-01", "2024-01-01", "2024-01-01"],
-        "Received Date": ["2024-01-02", "2024-01-02", "2024-01-02"],
-    })
+    df = pd.DataFrame(
+        {
+            "Index#": ["1", "2", "3"],
+            "Document Type": ["Release", "Release", "Release"],
+            "Document Date": ["2024-01-01", "2024-01-01", "2024-01-01"],
+            "Received Date": ["2024-01-02", "2024-01-02", "2024-01-02"],
+        }
+    )
 
     repo = ExcelOpenpyxlRepo()
 
@@ -85,8 +89,10 @@ def test_save_completes_quickly_on_workbook_with_phantom_dimensions(tmp_path):
         t0 = time.monotonic()
         try:
             repo.save(df, str(template), sheet_name, str(out_path))
-        except _TestTimeout:
-            pytest.fail("save() hung past the 10 s hard limit on a phantom-dimension workbook")
+        except _TimeoutError:
+            pytest.fail(
+                "save() hung past the 10 s hard limit on a phantom-dimension workbook"
+            )
         elapsed = time.monotonic() - t0
     finally:
         signal.alarm(0)
@@ -125,12 +131,14 @@ def test_save_blanks_template_rows_beyond_smaller_dataframe(tmp_path):
     # Template: 10 rows of real data. DataFrame: 4 rows (simulating a filter).
     _build_template_with_n_data_rows(template, sheet_name, n=10)
 
-    df = pd.DataFrame({
-        "Index#": ["1", "2", "3", "4"],
-        "Document Type": ["NewType", "NewType", "NewType", "NewType"],
-        "Document Date": ["2024-01-01"] * 4,
-        "Received Date": ["2024-01-02"] * 4,
-    })
+    df = pd.DataFrame(
+        {
+            "Index#": ["1", "2", "3", "4"],
+            "Document Type": ["NewType", "NewType", "NewType", "NewType"],
+            "Document Date": ["2024-01-01"] * 4,
+            "Received Date": ["2024-01-02"] * 4,
+        }
+    )
 
     ExcelOpenpyxlRepo().save(df, str(template), sheet_name, str(out_path))
 

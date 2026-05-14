@@ -5,25 +5,25 @@ Tkinter UI adapter that implements the UIController interface.
 
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 # Note: UIController Protocol imported where needed; not required here.
-from core.message_types import MSG_ERROR, MSG_INFO, MSG_SUCCESS, MSG_WARNING
+from core.message_types import MSG_ERROR, MSG_INFO
 from core.models import Options
 
 
 def simplify_error(exception: Exception) -> str:
     """Convert technical error to user-friendly message.
-    
+
     Args:
         exception: The exception to simplify
-        
+
     Returns:
         User-friendly error message in plain language
     """
     error_str = str(exception)
     exception_type = type(exception).__name__
-    
+
     # Common patterns to simplify
     if "FileNotFoundError" in exception_type:
         return "Cannot find the file.\nPlease check the file path and try again."
@@ -43,14 +43,14 @@ class TkinterUIAdapter:
         """Initialize with existing GUI instance."""
         self.gui = gui
 
-    def get_file_paths(self) -> Tuple[Optional[str], Optional[str]]:
+    def get_file_paths(self) -> tuple[str | None, str | None]:
         """Get selected Excel and PDF file paths."""
         return self.gui.get_selected_files()
 
     def get_options(self) -> Options:
         """
         Get processing options from UI with merge validation.
-        
+
         Returns merge_pairs as None (not empty list) when merge is enabled
         but no pairs have been selected, allowing downstream validation to
         detect the invalid state.
@@ -94,7 +94,7 @@ class TkinterUIAdapter:
 
     def log_status(self, message: str, msg_type: str = MSG_INFO) -> None:
         """Log a status message to the UI.
-        
+
         Args:
             message: The status message to display
             msg_type: Message type constant (MSG_INFO, MSG_ERROR, MSG_SUCCESS, MSG_WARNING)
@@ -104,7 +104,7 @@ class TkinterUIAdapter:
 
     def start_new_operation(self) -> None:
         """Mark the start of a new operation with visual separator.
-        
+
         Inserts a gray horizontal line in the status area to visually
         separate messages from consecutive operations.
         """
@@ -112,10 +112,10 @@ class TkinterUIAdapter:
 
     def show_error(self, title: str, message: str) -> None:
         """Show an error message to the user.
-        
+
         Logs the error to status area with MSG_ERROR styling (red bold) and
         displays an error dialog for user action.
-        
+
         Args:
             title: Dialog title
             message: Error message to display (should be user-friendly)
@@ -173,9 +173,9 @@ class TkinterUIAdapter:
     def prompt_sheet_selection(
         self,
         file_path: str,
-        sheet_names: List[str],
-        default_sheet: Optional[str] = None,
-    ) -> Optional[str]:
+        sheet_names: list[str],
+        default_sheet: str | None = None,
+    ) -> str | None:
         """Prompt user to select a sheet from available options."""
 
         if not sheet_names:

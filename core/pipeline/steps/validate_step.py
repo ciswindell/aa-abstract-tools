@@ -62,7 +62,7 @@ class ValidateStep(BaseStep):
 
     def _validate_excel_data_integrity(self, context: PipelineContext) -> None:
         """Validate Excel data integrity (duplicate Index# values, required columns, etc.)."""
-        for i, (excel_path, _, sheet_name) in enumerate(context.file_pairs):
+        for _i, (excel_path, _, sheet_name) in enumerate(context.file_pairs):
             excel_filename = Path(excel_path).name
             try:
                 # Load Excel data to check integrity
@@ -125,7 +125,7 @@ class ValidateStep(BaseStep):
 
     def _validate_pdf_bookmarks(self, context: PipelineContext) -> None:
         """Validate PDF bookmark structure (proper Index# format, no duplicates, etc.)."""
-        for i, (_, pdf_path, _) in enumerate(context.file_pairs):
+        for _i, (_, pdf_path, _) in enumerate(context.file_pairs):
             pdf_filename = Path(pdf_path).name
             try:
                 # Load PDF bookmarks
@@ -301,7 +301,7 @@ class ValidateStep(BaseStep):
 
     def _validate_pdf_excel_cross_reference(self, context: PipelineContext) -> None:
         """Validate that PDF bookmark indices have corresponding Excel rows."""
-        for i, (excel_path, pdf_path, sheet_name) in enumerate(context.file_pairs):
+        for _i, (excel_path, pdf_path, sheet_name) in enumerate(context.file_pairs):
             excel_filename = Path(excel_path).name
             pdf_filename = Path(pdf_path).name
 

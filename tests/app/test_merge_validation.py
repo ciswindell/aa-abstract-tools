@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """Tests for merge mode validation logic."""
 
-import sys
-from pathlib import Path
-
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
+import contextlib
+from unittest.mock import Mock, patch
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+
 from core.app_controller import AppController
 from core.models import Options
 
@@ -34,7 +31,7 @@ class TestMergeValidation:
         ui.show_error = Mock()
 
         controller = AppController(ui)
-        
+
         # Mock the sheet resolution methods to avoid file I/O
         controller._resolve_processing_sheet_name = Mock(return_value="Index")
 
@@ -43,17 +40,19 @@ class TestMergeValidation:
 
         # Verify show_error was called
         ui.show_error.assert_called_once()
-        
+
         # Get the actual error message that was passed
         call_args = ui.show_error.call_args
         if call_args[0]:  # positional args
             error_msg = call_args[0][1] if len(call_args[0]) > 1 else ""
         else:
             error_msg = call_args[1].get("message", "")
-        
+
         # The error message should mention merge and pairs
         error_lower = error_msg.lower()
-        assert "merge" in error_lower and ("pair" in error_lower or "file" in error_lower)
+        assert "merge" in error_lower and (
+            "pair" in error_lower or "file" in error_lower
+        )
 
     def test_merge_enabled_empty_list_raises_error(self):
         """Test that empty merge_pairs list is treated as invalid."""
@@ -79,16 +78,18 @@ class TestMergeValidation:
 
         # Verify show_error was called
         ui.show_error.assert_called_once()
-        
+
         # Get the actual error message
         call_args = ui.show_error.call_args
         if call_args[0]:
             error_msg = call_args[0][1] if len(call_args[0]) > 1 else ""
         else:
             error_msg = call_args[1].get("message", "")
-        
+
         error_lower = error_msg.lower()
-        assert "merge" in error_lower and ("pair" in error_lower or "file" in error_lower)
+        assert "merge" in error_lower and (
+            "pair" in error_lower or "file" in error_lower
+        )
 
     def test_merge_disabled_single_file_succeeds(self):
         """Test that single-file mode bypasses merge validation."""
@@ -116,11 +117,8 @@ class TestMergeValidation:
                         with patch("core.app_controller.TkinterLogger"):
                             # If we get past validation without ValueError, test passes
                             # The actual processing will fail due to mocks, but that's expected
-                            try:
+                            with contextlib.suppress(AttributeError, TypeError):
                                 controller.process_files()
-                            except (AttributeError, TypeError):
-                                # Expected - mocks aren't complete
-                                pass
         except ValueError as e:
             # Should NOT get ValueError about merge pairs
             if "no file pairs were selected" in str(e).lower():
@@ -150,11 +148,8 @@ class TestMergeValidation:
                 with patch("core.app_controller.ExcelOpenpyxlRepo"):
                     with patch("core.app_controller.PdfRepo"):
                         with patch("core.app_controller.TkinterLogger"):
-                            try:
+                            with contextlib.suppress(AttributeError, TypeError):
                                 controller.process_files()
-                            except (AttributeError, TypeError):
-                                # Expected - mocks aren't complete
-                                pass
         except ValueError as e:
             # Should NOT get ValueError about merge pairs for valid config
             if "no file pairs were selected" in str(e).lower():
@@ -162,4 +157,3 @@ class TestMergeValidation:
                     f"Valid merge configuration should pass validation, got: {e}"
                 )
             raise
-

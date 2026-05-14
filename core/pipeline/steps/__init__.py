@@ -81,4 +81,4 @@ class BaseStep(ABC):
 
 
 # Re-export the protocol for convenience
-__all__ = ["PipelineStep", "BaseStep"]
+__all__ = ["BaseStep", "PipelineStep"]

@@ -4,7 +4,6 @@ Core models (dataclasses) used by application services and adapters.
 """
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
 
 import pandas as pd
 
@@ -30,12 +29,12 @@ class Options:
     backup: bool
     sort_bookmarks: bool
     reorder_pages: bool
-    sheet_name: Optional[str]
+    sheet_name: str | None
     filter_enabled: bool = False
-    filter_column: Optional[str] = None
-    filter_values: Optional[List[str]] = None
-    merge_pairs: Optional[List[Tuple[str, str]]] = None
-    merge_pairs_with_sheets: Optional[List[Tuple[str, str, str]]] = None
+    filter_column: str | None = None
+    filter_values: list[str] | None = None
+    merge_pairs: list[tuple[str, str]] | None = None
+    merge_pairs_with_sheets: list[tuple[str, str, str]] | None = None
     check_document_images: bool = False
 
 
@@ -44,7 +43,7 @@ class Result:
     """Outcome from a service operation."""
 
     success: bool
-    message: Optional[str] = None
+    message: str | None = None
 
 
 @dataclass
@@ -63,6 +62,6 @@ class DocumentUnit:
     """
 
     document_id: str
-    merged_page_range: Tuple[int, int]
+    merged_page_range: tuple[int, int]
     excel_row_data: pd.Series
     source_info: str

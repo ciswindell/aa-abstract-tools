@@ -9,7 +9,7 @@ relationships by modifying separate lists independently.
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import pandas as pd
 from pypdf import PdfWriter
@@ -31,22 +31,22 @@ class PipelineContext:
     """
 
     # Input configuration
-    file_pairs: List[Tuple[str, str, str]]  # (excel_path, pdf_path, sheet_name)
-    options: Dict[str, Any]  # Simple dictionary of options
+    file_pairs: list[tuple[str, str, str]]  # (excel_path, pdf_path, sheet_name)
+    options: dict[str, Any]  # Simple dictionary of options
 
     # Processing results (populated by pipeline steps)
-    document_units: Optional[List[DocumentUnit]] = None
-    df: Optional[pd.DataFrame] = None
-    intermediate_pdf_path: Optional[str] = None
-    total_pages: Optional[int] = None
+    document_units: list[DocumentUnit] | None = None
+    df: pd.DataFrame | None = None
+    intermediate_pdf_path: str | None = None
+    total_pages: int | None = None
 
     # Final outputs (populated by RebuildPdfStep)
-    final_pdf: Optional[PdfWriter] = None
-    processed_document_units: Optional[List[DocumentUnit]] = None
+    final_pdf: PdfWriter | None = None
+    processed_document_units: list[DocumentUnit] | None = None
 
     # Output paths (determined during processing)
-    excel_out_path: Optional[str] = None
-    pdf_out_path: Optional[str] = None
+    excel_out_path: str | None = None
+    pdf_out_path: str | None = None
 
     # Step counter for progress tracking (injected by pipeline executor)
     step_number: int = 0
@@ -70,7 +70,7 @@ class PipelineContext:
             raise ValueError("No file pairs available")
         return self.file_pairs[0][1]
 
-    def get_output_paths(self) -> Tuple[str, str]:
+    def get_output_paths(self) -> tuple[str, str]:
         """Get output paths for Excel and PDF files.
 
         Returns:

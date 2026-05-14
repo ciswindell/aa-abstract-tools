@@ -3,8 +3,6 @@
 Tests for user feedback display functionality, specifically error message simplification.
 """
 
-import pytest
-
 from adapters.ui_tkinter import simplify_error
 
 
@@ -41,4 +39,3 @@ class TestErrorSimplification:
         result = simplify_error(error)
         assert "Invalid" in result
         assert "row 12" in result
-
