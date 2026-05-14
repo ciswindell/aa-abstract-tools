@@ -7,8 +7,6 @@ approach that prevents data corruption by maintaining immutable Excel row ↔ PD
 page range relationships throughout the pipeline execution.
 """
 
-from typing import List
-
 from core.interfaces import ExcelRepo, Logger, PdfRepo, UIController
 from core.models import Options, Result
 from core.pipeline.context import PipelineContext
@@ -35,7 +33,7 @@ class Pipeline:
         self.pdf_repo = pdf_repo
         self.logger = logger
         self.ui = ui
-        self.steps: List[PipelineStep] = []
+        self.steps: list[PipelineStep] = []
 
     def add_step(self, step: PipelineStep) -> None:
         """Add a step to the pipeline."""
@@ -120,13 +118,15 @@ class Pipeline:
             # Count non-skipped steps for progress tracking
             non_skipped_steps = []
             for step in self.steps:
-                if not (hasattr(step, "should_execute") and not step.should_execute(context)):
+                if not (
+                    hasattr(step, "should_execute") and not step.should_execute(context)
+                ):
                     non_skipped_steps.append(step)
             context.total_steps = len(non_skipped_steps)
 
             # Execute each step in sequence with conditional execution
             executed_steps = 0
-            for i, step in enumerate(self.steps):
+            for _i, step in enumerate(self.steps):
                 step_name = step.__class__.__name__
 
                 # Check if step should be executed (conditional logic)
@@ -141,7 +141,7 @@ class Pipeline:
                     step.execute(context)
                 except Exception as e:
                     # Log the full error with context for debugging
-                    full_error_msg = f"Pipeline failed at step {step_name}: {str(e)}"
+                    full_error_msg = f"Pipeline failed at step {step_name}: {e!s}"
                     self.logger.error(full_error_msg)
 
                     # Return clean error message for user display
@@ -150,6 +150,6 @@ class Pipeline:
             return Result(success=True, message="OK")
 
         except Exception as e:
-            error_msg = f"Pipeline initialization failed: {str(e)}"
+            error_msg = f"Pipeline initialization failed: {e!s}"
             self.logger.error(error_msg)
             return Result(success=False, message=error_msg)

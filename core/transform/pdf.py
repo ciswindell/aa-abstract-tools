@@ -2,17 +2,18 @@
 """
 Pure PDF bookmark transforms.
 
-All functions are side‑effect free and independent of backend PDF types.
+All functions are side-effect free and independent of backend PDF types.
 """
 
-from typing import Any, Dict, List, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any
 
 import pandas as pd
 
 from utils.dates import format_mdy
 
 
-def extract_original_index(bookmark_title: str) -> Optional[str]:
+def extract_original_index(bookmark_title: str) -> str | None:
     """Return the original index number before the first '-' in a bookmark title.
 
     This extracts the original Excel Index# value that was used to create the bookmark.
@@ -31,7 +32,7 @@ def extract_original_index(bookmark_title: str) -> Optional[str]:
         return None
 
 
-def make_titles(df: pd.DataFrame) -> Dict[str, str]:
+def make_titles(df: pd.DataFrame) -> dict[str, str]:
     """Generate new bookmark titles from a processed DataFrame.
 
     Requires columns: "Document_ID", "Index#", "Document Type", "Received Date".
@@ -45,7 +46,7 @@ def make_titles(df: pd.DataFrame) -> Dict[str, str]:
         if col not in df.columns:
             return {}
 
-    titles: Dict[str, str] = {}
+    titles: dict[str, str] = {}
     for _, row in df.iterrows():
         try:
             doc_id = str(row["Document_ID"]).strip()
@@ -60,8 +61,8 @@ def make_titles(df: pd.DataFrame) -> Dict[str, str]:
 
 
 def detect_page_ranges(
-    bookmarks: List[Mapping[str, Any]], total_pages: int
-) -> Dict[str, Dict[str, int]]:
+    bookmarks: list[Mapping[str, Any]], total_pages: int
+) -> dict[str, dict[str, int]]:
     """Detect inclusive page ranges for each bookmark, ordered by page.
 
     Input pages are 1-based. For each bookmark, the range extends up to
@@ -72,7 +73,7 @@ def detect_page_ranges(
         return {}
 
     ordered = sorted(bookmarks, key=lambda b: int(b.get("page", 1)))
-    ranges: Dict[str, Dict[str, int]] = {}
+    ranges: dict[str, dict[str, int]] = {}
     for i, bm in enumerate(ordered):
         title = str(bm.get("title", ""))
         start = int(bm.get("page", 1))

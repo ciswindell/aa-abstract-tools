@@ -12,8 +12,6 @@ Key Features:
 - Integration with existing DocumentUnit architecture
 """
 
-from typing import List, Optional
-
 import pandas as pd
 
 from core.interfaces import ExcelRepo, Logger, PdfRepo, UIController
@@ -81,7 +79,9 @@ class FormatExcelStep(BaseStep):
         if not context.excel_out_path:
             return
 
-        self.logger.info(f"Step {context.step_number} of {context.total_steps}: Formatting Excel...")
+        self.logger.info(
+            f"Step {context.step_number} of {context.total_steps}: Formatting Excel..."
+        )
 
         try:
             self._format_excel_file(context.excel_out_path, context.df)
@@ -92,7 +92,7 @@ class FormatExcelStep(BaseStep):
                 "Pipeline will continue - core processing completed successfully"
             )
 
-    def _find_date_columns(self, worksheet) -> List[int]:
+    def _find_date_columns(self, worksheet) -> list[int]:
         """Find column indices that contain 'Date' in header using robust pattern matching.
 
         This method performs case-insensitive pattern matching to identify date columns
@@ -123,7 +123,7 @@ class FormatExcelStep(BaseStep):
         return date_columns
 
     def _apply_date_formatting(
-        self, worksheet, date_columns: List[int], data_rows: int
+        self, worksheet, date_columns: list[int], data_rows: int
     ) -> None:
         """Apply M/D/YYYY formatting to date columns with 1000-row buffer.
 
@@ -203,7 +203,7 @@ class FormatExcelStep(BaseStep):
 
         return get_column_letter(column_index)
 
-    def _format_excel_file(self, excel_path: str, df: Optional[pd.DataFrame]) -> None:
+    def _format_excel_file(self, excel_path: str, df: pd.DataFrame | None) -> None:
         """Apply date formatting and auto-filter to Excel file.
 
         This helper method performs the actual Excel formatting operations:

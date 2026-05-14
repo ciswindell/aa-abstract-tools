@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **GitHub Actions CI/CD**: three workflows now run on push/PR and tag events. `lint.yml` and `ci.yml` run on every PR to `dev`/`main` (ruff check + format check, full pytest). `build.yml` triggers on `v*` tags (or manually via workflow_dispatch): it injects the version from the tag into `_version.py`, runs `python build/build.py`, uploads the executable as an artifact, and publishes a GitHub Release with auto-generated notes. Local builds remain available via `python build/build.py`. See `specs/010-github-actions/spec.md`.
+
+### Changed
+- **`build/build.py` slimmed from 550 lines to ~35**. Removed argparse, prerequisite validation, disk-space checks, UPX detection, and the `BuildOrchestrator`/`BuildResult` scaffolding — CI handles environment validation, and the spec file owns all packaging configuration. The script now just shells out to `python -m PyInstaller --noconfirm build/AbstractRenumberTool.spec`.
+- **Release workflow documented in README**: tag-driven CI build replaces the previous "edit `_version.py` and run `build.py` locally" flow. `_version.py` is now the local-dev version only; the git tag is the source of truth for release builds.
+- **Strict ruff lint+format adopted project-wide**. New `pyproject.toml` enables `E, F, W, I, B, UP, SIM, C4, N, RUF` rulesets plus `ruff format`. Codebase reformatted (21 files) and 299 lint violations resolved (252 auto-fixes, 15 hand-fixes, 32 unsafe-but-reviewed). `pytest.ini` now sets `pythonpath = . tests`, removing the need for `sys.path` manipulation in test files; this also fixes pre-existing collection errors on `tests/adapters/*_smoke_test.py`. All 213 tests remain green. See `specs/012-ruff-strict/spec.md`.
+
+### Fixed
+- **SaveStep hang on workbooks with phantom dimensions**: Excel templates whose used range reports a phantom `max_row` near Excel's 1M-row limit no longer cause the value-clear and fill-clear loops in `ExcelOpenpyxlRepo._write_dataframe_to_workbook` to iterate over millions of empty cells. Loops are now bounded by `max(real_max_row, len(df) + 1)`, where `real_max_row` is computed from openpyxl's loaded-cell dict — covering both filter (df smaller than template) and merge (df larger than template) workflows. Affected file pair previously projected a multi-hour save time; now completes in ~1 second. See `specs/009-excel-clear-fills-perf/spec.md`.
+
 ## [1.1.0] - 2025-11-21
 
 ### Added

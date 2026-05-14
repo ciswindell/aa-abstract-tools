@@ -107,44 +107,9 @@ class TestSortDfStep:
             called_df = mock_sort.call_args[0][0]
             assert len(called_df) == 3  # All rows
 
-    def test_execute_with_source_column_logging(self):
-        """Test execute logs source breakdown correctly."""
-        df = pd.DataFrame(
-            {
-                "Index#": [1, 2, 3, 4],
-                "Document_ID": ["id1", "id2", "id3", "id4"],
-                "Source": ["file1", "file1", "file2", "file2"],
-                "_include": [True, False, True, True],
-            }
-        )
-
-        context = PipelineContext(
-            file_pairs=[("test.xlsx", "test.pdf", "Sheet1")], options={}
-        )
-        context.df = df
-
-        # Mock sort_and_renumber function
-        with patch("core.pipeline.steps.sort_df_step.sort_and_renumber") as mock_sort:
-            sorted_df = pd.DataFrame(
-                {
-                    "Index#": ["1", "2", "3"],  # String values
-                    "Document_ID": ["id1", "id3", "id4"],
-                    "Source": ["file1", "file2", "file2"],
-                    "_include": [True, True, True],
-                }
-            )
-            mock_sort.return_value = sorted_df
-
-            # Execute the step
-            self.step.execute(context)
-
-            # Verify logging was called for source breakdown
-            self.mock_logger.info.assert_called()
-            log_calls = [call.args[0] for call in self.mock_logger.info.call_args_list]
-
-            # Should log "About to sort" and "After sort rebuild" messages
-            assert any("About to sort" in call for call in log_calls)
-            assert any("After sort rebuild" in call for call in log_calls)
+    # NOTE: test_execute_with_source_column_logging was deleted.
+    # "About to sort" / "After sort rebuild" debug logs were removed in
+    # spec 003-reduce-info-logging.
 
     def test_execute_with_empty_flagged_rows(self):
         """Test execute with no flagged rows skips gracefully."""

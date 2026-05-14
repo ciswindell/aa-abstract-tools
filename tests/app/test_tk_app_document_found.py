@@ -1,19 +1,13 @@
 #!/usr/bin/env python3
 """
-Unit tests for Document Found checkbox functionality in TkinterApp.
+Unit tests for Document Found checkbox functionality in AbstractRenumberGUI.
 """
 
 import tkinter as tk
+from tkinter import ttk
 from unittest.mock import Mock, patch
 
-import sys
-from pathlib import Path
-
-# Add project root to Python path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-from app.tk_app import TkinterApp
+from app.tk_app import AbstractRenumberGUI
 
 
 class TestTkAppDocumentFoundCheckbox:
@@ -27,10 +21,9 @@ class TestTkAppDocumentFoundCheckbox:
 
         # Mock dependencies
         self.mock_controller = Mock()
-        self.mock_logger = Mock()
 
-        # Create TkinterApp instance
-        self.app = TkinterApp(self.root, self.mock_controller, self.mock_logger)
+        # Create GUI instance
+        self.app = AbstractRenumberGUI(self.root, self.mock_controller)
 
     def teardown_method(self):
         """Clean up after tests."""
@@ -49,13 +42,13 @@ class TestTkAppDocumentFoundCheckbox:
         """Test that the checkbox widget is created."""
         # The checkbox widget should be created during initialization
         assert self.app.check_document_images_checkbox is not None
-        assert isinstance(self.app.check_document_images_checkbox, tk.Checkbutton)
+        assert isinstance(self.app.check_document_images_checkbox, ttk.Checkbutton)
 
     def test_check_document_images_info_label_exists(self):
         """Test that the info label widget is created."""
         # The info label should be created during initialization
         assert self.app.check_document_images_info_label is not None
-        assert isinstance(self.app.check_document_images_info_label, tk.Label)
+        assert isinstance(self.app.check_document_images_info_label, ttk.Label)
 
     def test_check_document_images_toggle_functionality(self):
         """Test toggling the checkbox state."""
@@ -169,5 +162,5 @@ class TestTkAppDocumentFoundCheckbox:
         )
         assert info_label.cget("text") == expected_text
 
-        # Should have blue foreground
-        assert info_label.cget("foreground") == "blue"
+        # Should have blue foreground (ttk.Label.cget returns a color wrapper, not str)
+        assert str(info_label.cget("foreground")) == "blue"

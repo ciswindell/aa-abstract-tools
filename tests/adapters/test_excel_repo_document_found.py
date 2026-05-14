@@ -4,13 +4,8 @@ Unit tests for ExcelOpenpyxlRepo Document_Found column enhancement.
 Tests new column addition and boolean to "Yes"/"No" conversion functionality.
 """
 
-import sys
 import tempfile
 from pathlib import Path
-
-# Add project root to Python path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
 
 import pandas as pd
 from openpyxl import Workbook, load_workbook
@@ -25,7 +20,9 @@ class TestExcelRepoDocumentFoundEnhancement:
         """Set up test fixtures."""
         self.repo = ExcelOpenpyxlRepo()
 
-    def _create_test_excel_template(self, columns: list, data: list = None) -> Path:
+    def _create_test_excel_template(
+        self, columns: list, data: list | None = None
+    ) -> Path:
         """Create a test Excel template with specified columns."""
         wb = Workbook()
         ws = wb.active
@@ -42,11 +39,12 @@ class TestExcelRepoDocumentFoundEnhancement:
                     ws.cell(row=row_idx, column=col_idx, value=value)
 
         # Save to temporary file
-        temp_file = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
-        wb.save(temp_file.name)
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
+            temp_path = temp_file.name
+        wb.save(temp_path)
         wb.close()
 
-        return Path(temp_file.name)
+        return Path(temp_path)
 
     def test_add_missing_columns_disabled_by_default(self):
         """Test that new columns are not added when add_missing_columns=False (default)."""

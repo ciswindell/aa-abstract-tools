@@ -40,14 +40,15 @@ class FilterDfStep(BaseStep):
         Raises:
             Exception: If filtering fails
         """
-        self.logger.info(f"Step {context.step_number} of {context.total_steps}: Filtering data...")
+        self.logger.info(
+            f"Step {context.step_number} of {context.total_steps}: Filtering data..."
+        )
 
         filter_column = context.options.get("filter_column")
         filter_values = context.options.get("filter_values", [])
 
         # If filter values are not set, prompt the user with the merged DataFrame
         if not filter_column or not filter_values:
-
             # Show available values by source for user reference
             if (
                 "Source" in context.df.columns
@@ -92,7 +93,7 @@ class FilterDfStep(BaseStep):
                 raise ValueError("Filter values list is empty")
 
             # Store original row count for logging
-            total_rows = len(context.df)
+            len(context.df)
 
             # Validate filter column exists in DataFrame
             if filter_column not in context.df.columns:

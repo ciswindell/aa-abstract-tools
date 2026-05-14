@@ -3,8 +3,6 @@
 Tests for user feedback display functionality, specifically error message simplification.
 """
 
-import pytest
-
 from adapters.ui_tkinter import simplify_error
 
 
@@ -28,12 +26,12 @@ class TestErrorSimplification:
         assert "PermissionError" not in result
 
     def test_generic_error_fallback(self):
-        """Unknown errors should use generic fallback message."""
+        """Unknown errors are returned as-is — validation errors are pre-formatted
+        upstream, and per spec 003-reduce-info-logging the wrapping fallback was
+        intentionally removed."""
         error = RuntimeError("Something unexpected happened")
         result = simplify_error(error)
-        assert "error occurred" in result.lower()
-        assert "Something unexpected happened" in result
-        assert "try again" in result
+        assert result == "Something unexpected happened"
 
     def test_invalid_format_error(self):
         """Errors containing 'invalid' should preserve details."""
@@ -41,4 +39,3 @@ class TestErrorSimplification:
         result = simplify_error(error)
         assert "Invalid" in result
         assert "row 12" in result
-

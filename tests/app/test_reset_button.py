@@ -3,14 +3,6 @@
 Tests for Reset Button functionality in AbstractRenumberGUI.
 """
 
-import sys
-from pathlib import Path
-
-# Add project root to sys.path for imports
-project_root = Path(__file__).parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
-
 import tkinter as tk
 from unittest.mock import MagicMock
 
@@ -38,7 +30,8 @@ def test_reset_button_exists(gui):
 
 def test_reset_button_always_enabled(gui):
     """Verify Reset button is always enabled (spec FR-008)."""
-    assert gui.reset_button.cget("state") == "normal"
+    # ttk.Button.cget("state") returns a Tcl_Obj wrapper, not a plain str
+    assert str(gui.reset_button.cget("state")) == "normal"
 
 
 def test_reset_clears_file_selections(gui):
@@ -96,7 +89,7 @@ def test_reset_disables_process_button(gui):
 
     gui.reset_gui()
 
-    assert gui.process_button.cget("state") == "disabled"
+    assert str(gui.process_button.cget("state")) == "disabled"
 
 
 def test_reset_with_empty_state_safe(gui):

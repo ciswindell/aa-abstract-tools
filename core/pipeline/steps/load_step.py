@@ -12,9 +12,9 @@ This phase separation ensures scalable multi-file processing and prevents the da
 corruption issues that existed in the previous fragile bookmark/page list architecture.
 """
 
+import contextlib
 import tempfile
 from pathlib import Path
-from typing import List
 
 import pandas as pd
 from pypdf import PdfWriter
@@ -50,7 +50,9 @@ class LoadStep(BaseStep):
             Exception: If file loading, linking, or PDF merging fails
         """
         try:
-            self.logger.info(f"Step {context.step_number} of {context.total_steps}: Loading data...")
+            self.logger.info(
+                f"Step {context.step_number} of {context.total_steps}: Loading data..."
+            )
 
             # Get all file pairs to process
             file_pairs = context.file_pairs
@@ -131,10 +133,8 @@ class LoadStep(BaseStep):
                 hasattr(context, "intermediate_pdf_path")
                 and context.intermediate_pdf_path
             ):
-                try:
+                with contextlib.suppress(Exception):
                     Path(context.intermediate_pdf_path).unlink(missing_ok=True)
-                except Exception:
-                    pass
             raise
 
     def _process_file_pair(
@@ -144,7 +144,7 @@ class LoadStep(BaseStep):
         sheet_name: str,
         page_offset: int,
         merged_writer: PdfWriter,
-    ) -> tuple[List[DocumentUnit], pd.DataFrame, int]:
+    ) -> tuple[list[DocumentUnit], pd.DataFrame, int]:
         """Process a single Excel/PDF pair and return DocumentUnits, DataFrame, and pages added.
 
         Prevents Document ID collisions by processing each file individually before merging.
@@ -245,7 +245,7 @@ class LoadStep(BaseStep):
     def _create_intermediate_pdf(self, merged_writer: PdfWriter) -> str:
         """Create intermediate merged PDF file and return its path."""
         # Create temporary file for intermediate PDF
-        temp_fd, temp_path = tempfile.mkstemp(
+        _temp_fd, temp_path = tempfile.mkstemp(
             suffix=".pdf", prefix="intermediate_merged_"
         )
 
@@ -256,13 +256,11 @@ class LoadStep(BaseStep):
             return temp_path
         except Exception:
             # Clean up temp file if creation failed
-            try:
+            with contextlib.suppress(Exception):
                 Path(temp_path).unlink(missing_ok=True)
-            except Exception:
-                pass
             raise
 
-    def _merge_dataframes(self, df_parts: List[pd.DataFrame]) -> pd.DataFrame:
+    def _merge_dataframes(self, df_parts: list[pd.DataFrame]) -> pd.DataFrame:
         """Merge all DataFrame parts into a single DataFrame."""
         if not df_parts:
             return pd.DataFrame()

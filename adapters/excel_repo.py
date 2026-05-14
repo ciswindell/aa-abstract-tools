@@ -7,8 +7,6 @@ back into an existing workbook template and sheet, then applies
 formatting via `ExcelFormatter`.
 """
 
-from typing import Optional
-
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
@@ -25,7 +23,7 @@ from utils.dates import parse_robust
 class ExcelOpenpyxlRepo:
     """Concrete ExcelRepo implementation using pandas/openpyxl."""
 
-    def load(self, path: str, sheet: Optional[str]) -> pd.DataFrame:
+    def load(self, path: str, sheet: str | None) -> pd.DataFrame:
         """Load a worksheet into a DataFrame preserving native Excel data types.
 
         Date columns remain as datetime objects, while Index# is converted to string
@@ -86,7 +84,7 @@ class ExcelOpenpyxlRepo:
         temp_path: str,
         df: pd.DataFrame,
         target_sheet: str,
-        bookmark_col_name: Optional[str],
+        bookmark_col_name: str | None,
         add_missing_columns: bool = False,
     ) -> None:
         """
@@ -132,14 +130,14 @@ class ExcelOpenpyxlRepo:
             if add_missing_columns:
                 # Define system columns that should never be added to output
                 # These are internal tracking columns not meant for user visibility
-                SYSTEM_COLUMNS = {"_include", "_original_index", "Document_ID"}
+                system_columns = {"_include", "_original_index", "Document_ID"}
 
                 # Find all new columns that don't exist in template (excluding system columns)
                 new_columns = [
                     col
                     for col in df.columns
                     if self._normalize_column_name(col) not in header_to_col
-                    and col not in SYSTEM_COLUMNS
+                    and col not in system_columns
                 ]
 
                 # Add new columns to the Excel template header row
@@ -156,10 +154,27 @@ class ExcelOpenpyxlRepo:
 
                     # Note: Logging would require logger dependency - skip for now to keep class simple
 
-            # Clear all existing data cell values (preserve formatting)
-            if ws.max_row > 1:
-                max_row = ws.max_row
-                for row_idx in range(2, max_row + 1):
+            # Bound clearing loops by the real data extent, not ws.max_row.
+            # Some templates report phantom dimensions (max_row near Excel's
+            # 1M-row limit) from a stray cell touched far below the data. The
+            # max() across populated cells in our header columns gives the true
+            # extent in microseconds; combined with len(df)+1 it covers both
+            # the filter case (df smaller than template) and the merge case
+            # (df larger than template).
+            data_col_indices = set(header_to_col.values())
+            real_max_row = max(
+                (
+                    r
+                    for (r, c), cell in ws._cells.items()
+                    if c in data_col_indices and cell.value is not None
+                ),
+                default=1,
+            )
+            clear_max_row = max(real_max_row, len(df) + 1)
+
+            # Clear existing data cell values (preserve formatting)
+            if clear_max_row > 1:
+                for row_idx in range(2, clear_max_row + 1):
                     for col_idx in header_to_col.values():
                         ws.cell(row=row_idx, column=col_idx, value="")
 
@@ -180,11 +195,10 @@ class ExcelOpenpyxlRepo:
                         for row_idx, value in enumerate(df[df_col].tolist(), start=2):
                             ws.cell(row=row_idx, column=col_idx, value=value)
 
-            # Clear fills and save
+            # Clear fills across the same row range and the header columns.
             empty_fill = PatternFill(fill_type=None)
-            for row in ws.iter_rows(
-                min_row=1, max_row=ws.max_row, max_col=ws.max_column
-            ):
+            last_col = max(header_to_col.values()) if header_to_col else 1
+            for row in ws.iter_rows(min_row=1, max_row=clear_max_row, max_col=last_col):
                 for cell in row:
                     cell.fill = empty_fill
             wb.save(temp_path)

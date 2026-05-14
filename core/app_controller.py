@@ -3,8 +3,6 @@
 Application controller that orchestrates processing using UI abstraction.
 """
 
-from typing import Optional
-
 from openpyxl import load_workbook
 
 from adapters.excel_repo import ExcelOpenpyxlRepo
@@ -14,7 +12,7 @@ from adapters.ui_tkinter import simplify_error
 from core.config import DEFAULT_REQUIRED_COLUMNS, DEFAULT_SHEET_NAME
 from core.interfaces import ExcelRepo, Logger, UIController
 from core.interfaces import PdfRepo as PdfRepoInterface
-from core.message_types import MSG_ERROR, MSG_INFO, MSG_SUCCESS
+from core.message_types import MSG_ERROR, MSG_SUCCESS
 from core.services.renumber import RenumberService
 
 
@@ -24,9 +22,9 @@ class AppController:
     def __init__(
         self,
         ui: UIController,
-        excel_repo: Optional[ExcelRepo] = None,
-        pdf_repo: Optional[PdfRepoInterface] = None,
-        logger: Optional[Logger] = None,
+        excel_repo: ExcelRepo | None = None,
+        pdf_repo: PdfRepoInterface | None = None,
+        logger: Logger | None = None,
     ) -> None:
         """Initialize with UI controller and optional dependencies."""
         self.ui = ui
@@ -39,19 +37,19 @@ class AppController:
     def process_files(self) -> None:
         """
         Main processing function with merge validation.
-        
+
         Validates that merge mode configuration is correct before processing:
         - If merge enabled, at least one file pair must be selected
         - Prevents single-file processing with merge mode active
         - Ensures backup protection is not inappropriately disabled
-        
+
         Raises:
             ValueError: If merge enabled but no pairs selected
         """
         try:
             # Mark start of new operation with visual separator
             self.ui.start_new_operation()
-            
+
             excel_file, pdf_file = self.ui.get_file_paths()
             if not excel_file or not pdf_file:
                 self.ui.show_error(
@@ -74,11 +72,13 @@ class AppController:
             # The adapter returns None for merge_pairs when merge is enabled but no pairs selected
             # We need to check if the GUI has merge enabled to distinguish from normal single-file mode
             gui_merge_enabled = (
-                hasattr(self.ui, 'gui') 
-                and hasattr(self.ui.gui, 'get_merge_enabled') 
+                hasattr(self.ui, "gui")
+                and hasattr(self.ui.gui, "get_merge_enabled")
                 and self.ui.gui.get_merge_enabled()
             )
-            if gui_merge_enabled and (options.merge_pairs is None or len(options.merge_pairs) == 0):
+            if gui_merge_enabled and (
+                options.merge_pairs is None or len(options.merge_pairs) == 0
+            ):
                 error_msg = (
                     "Merge mode is enabled but no file pairs were selected.\n\n"
                     "Please select at least one additional file pair using the 'Pairs...' button,\n"
@@ -137,7 +137,7 @@ class AppController:
             self.ui.log_status(f"Error: {user_friendly_msg}", MSG_ERROR)
             self.ui.show_error("Processing Error", user_friendly_msg)
 
-    def _resolve_processing_sheet_name(self, file_path: str) -> Optional[str]:
+    def _resolve_processing_sheet_name(self, file_path: str) -> str | None:
         """Resolve the processing sheet name, case-insensitively."""
         try:
             wb = load_workbook(file_path, read_only=True, data_only=True)
@@ -151,7 +151,7 @@ class AppController:
         except (OSError, ValueError, PermissionError):
             return None
 
-    def _prompt_user_select_sheet(self, file_path: str) -> Optional[str]:
+    def _prompt_user_select_sheet(self, file_path: str) -> str | None:
         """Prompt user to select a sheet from available options, or auto-select if only one sheet."""
         try:
             wb = load_workbook(file_path, read_only=True, data_only=True)
