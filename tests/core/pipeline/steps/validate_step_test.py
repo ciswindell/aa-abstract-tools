@@ -49,14 +49,9 @@ class TestValidateStep:
             patch.object(self.validate_step, "_validate_pdf_bookmarks"),
             patch.object(self.validate_step, "_validate_pdf_excel_cross_reference"),
         ):
-            # Should complete without error
+            # Should complete without error.
+            # Per-step info logs were reduced in spec 003-reduce-info-logging.
             self.validate_step.execute(context)
-
-            # Verify logging
-            self.logger.info.assert_any_call("Validating input files before loading")
-            self.logger.info.assert_any_call(
-                "File validation passed: 1 file pairs validated"
-            )
 
     def test_execute_success_multiple_files(self):
         """Test successful validation with multiple files."""
@@ -72,11 +67,8 @@ class TestValidateStep:
             patch.object(self.validate_step, "_validate_pdf_bookmarks"),
             patch.object(self.validate_step, "_validate_pdf_excel_cross_reference"),
         ):
+            # No-raise across multiple file pairs.
             self.validate_step.execute(context)
-
-            self.logger.info.assert_any_call(
-                "File validation passed: 2 file pairs validated"
-            )
 
     # File Existence Validation Tests
 
@@ -175,7 +167,6 @@ class TestValidateStep:
         result = self.validate_step._validate_excel_sheet("test.xlsx", "Sheet1")
 
         assert result == "Sheet1"
-        self.logger.info.assert_called_with("Sheet 'Sheet1' found in test.xlsx")
 
     def test_validate_excel_sheet_not_exists_user_selects(self):
         """Test Excel sheet validation when sheet doesn't exist and user selects one."""
@@ -220,10 +211,6 @@ class TestValidateStep:
 
         # Should complete without error
         self.validate_step._validate_excel_data_integrity(context)
-
-        self.logger.info.assert_any_call(
-            "Excel file 1 data integrity passed: 3 rows, 3 unique Index# values"
-        )
 
     def test_validate_excel_data_integrity_empty_dataframe(self):
         """Test Excel data integrity validation with empty DataFrame."""
@@ -307,10 +294,6 @@ class TestValidateStep:
         ):
             self.validate_step._validate_pdf_bookmarks(context)
 
-            self.logger.info.assert_any_call(
-                "PDF file 1 bookmark validation passed: 3/3 bookmarks have valid Index# format, 15 pages"
-            )
-
     def test_validate_pdf_bookmarks_no_pages(self):
         """Test PDF bookmark validation with no pages."""
         context = self.create_test_context([("test.xlsx", "test.pdf", "Sheet1")])
@@ -372,7 +355,7 @@ class TestValidateStep:
                 self.validate_step._validate_pdf_bookmarks(context)
 
             error_msg = str(exc_info.value)
-            assert "duplicate bookmark indices" in error_msg
+            assert "Duplicate bookmark indices" in error_msg
             assert "'1'" in error_msg
 
     def test_validate_pdf_bookmarks_duplicate_pages(self):
@@ -430,10 +413,6 @@ class TestValidateStep:
         ):
             self.validate_step._validate_pdf_excel_cross_reference(context)
 
-            self.logger.info.assert_any_call(
-                "Cross-reference validation passed for pair 1: 2/2 PDF bookmarks have matching Excel rows"
-            )
-
     def test_validate_pdf_excel_cross_reference_orphaned_bookmarks(self):
         """Test cross-reference validation with orphaned PDF bookmarks."""
         context = self.create_test_context([("test.xlsx", "test.pdf", "Sheet1")])
@@ -472,7 +451,7 @@ class TestValidateStep:
                 self.validate_step._validate_pdf_excel_cross_reference(context)
 
             error_msg = str(exc_info.value)
-            assert "bookmark(s) without corresponding Excel rows" in error_msg
+            assert "PDF bookmark(s) have no matching Excel row" in error_msg
             assert "'3'" in error_msg and "'4'" in error_msg
 
     def test_validate_pdf_excel_cross_reference_no_valid_bookmarks(self):
@@ -496,10 +475,6 @@ class TestValidateStep:
         with patch("core.transform.pdf.extract_original_index", return_value=None):
             # Should complete successfully (no valid bookmarks to cross-reference)
             self.validate_step._validate_pdf_excel_cross_reference(context)
-
-            self.logger.info.assert_any_call(
-                "Cross-reference validation passed for pair 1: 0/0 PDF bookmarks have matching Excel rows"
-            )
 
     def test_multiple_file_pairs_validation(self):
         """Test validation with multiple file pairs."""
@@ -572,7 +547,7 @@ class TestValidateStep:
             with pytest.raises(Exception) as exc_info:
                 self.validate_step.execute(context)
 
-            # Should propagate the original error with context
+            # Production re-raises the underlying error without wrapping
+            # (validate_step.py comment: "error messages are already clear").
             error_msg = str(exc_info.value)
-            assert "Excel data integrity validation failed" in error_msg
             assert "Excel file corrupted" in error_msg

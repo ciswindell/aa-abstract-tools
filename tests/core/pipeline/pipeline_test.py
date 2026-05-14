@@ -160,12 +160,7 @@ class TestPipeline:
         assert result.message == "OK"
         assert step1.execute_called is True
         assert step2.execute_called is True
-
-        # Verify logging
-        self.logger.info.assert_any_call("Starting pipeline with 2 steps")
-        self.logger.info.assert_any_call(
-            "Pipeline completed successfully (2 steps executed)"
-        )
+        # Pipeline-level info logs were removed in spec 003-reduce-info-logging.
 
     def test_execute_merge_workflow_with_pairs(self):
         """Test execution with merge pairs."""
@@ -226,11 +221,7 @@ class TestPipeline:
         assert step1.execute_called is True
         assert step2.execute_called is False  # Should be skipped
         assert step3.execute_called is True
-
-        # Verify logging for skipped step
-        self.logger.info.assert_any_call(
-            "Skipping step 2/3: MockStep (conditions not met)"
-        )
+        # "Skipping step" info log was removed in spec 003-reduce-info-logging.
 
     def test_execute_step_failure(self):
         """Test pipeline failure when step raises exception."""
