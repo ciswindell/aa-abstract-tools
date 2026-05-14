@@ -73,12 +73,6 @@ class TestSaveStep:
             mock_excel.assert_called_once_with(context, "test.xlsx", False)
             mock_pdf.assert_called_once_with(context, "test.pdf", False)
 
-            # Verify logging
-            self.logger.info.assert_any_call("Saving final Excel and PDF outputs")
-            self.logger.info.assert_any_call(
-                "Saving without backup (original files will be overwritten)"
-            )
-
     def test_execute_success_single_file_with_backup(self):
         """Test successful execution for single file with backup enabled."""
         context = self.create_test_context(
@@ -94,10 +88,6 @@ class TestSaveStep:
             # Verify backup is enabled for single file
             mock_excel.assert_called_once_with(context, "test.xlsx", True)
             mock_pdf.assert_called_once_with(context, "test.pdf", True)
-
-            self.logger.info.assert_any_call(
-                "Saving with backup enabled (original files will be preserved)"
-            )
 
     def test_execute_success_merge_workflow(self):
         """Test successful execution for merge workflow (backup disabled)."""
@@ -119,10 +109,6 @@ class TestSaveStep:
             excel_out, pdf_out = context.get_output_paths()
             mock_excel.assert_called_once_with(context, excel_out, False)
             mock_pdf.assert_called_once_with(context, pdf_out, False)
-
-            self.logger.info.assert_any_call(
-                "Saving merged files (originals preserved, no backup needed)"
-            )
 
     def test_execute_no_excel_data(self):
         """Test execution failure when no Excel data is available."""
@@ -201,9 +187,6 @@ class TestSaveStep:
         # Verify backup was requested
         mock_atomic.assert_called_once()
 
-        # Verify backup logging
-        self.logger.info.assert_any_call("Excel backup created: /path/to/backup.xlsx")
-
     @patch("core.pipeline.steps.save_step.atomic_save_with_backup")
     def test_save_excel_output_custom_sheet_name(self, mock_atomic):
         """Test Excel output saving with custom sheet name."""
@@ -222,27 +205,8 @@ class TestSaveStep:
         call_kwargs = self.excel_repo.save.call_args.kwargs
         assert call_kwargs["target_sheet"] == "CustomSheet"
 
-    @patch("core.pipeline.steps.save_step.atomic_save_with_backup")
-    def test_save_excel_output_source_breakdown_logging(self, mock_atomic):
-        """Test Excel output logging with source breakdown."""
-        context = self.create_test_context([("test.xlsx", "test.pdf", "Sheet1")])
-        # Add Source column for breakdown logging
-        context.df["Source"] = [
-            "file1.xlsx:file1.pdf",
-            "file1.xlsx:file1.pdf",
-            "file2.xlsx:file2.pdf",
-        ]
-
-        def execute_write_func(original_path, write_func, create_backup):
-            write_func(original_path)
-            return None
-
-        mock_atomic.side_effect = execute_write_func
-
-        self.save_step._save_excel_output(context, "output.xlsx", False)
-
-        # Verify source breakdown logging (only for flagged rows)
-        self.logger.info.assert_any_call("  Saving 2 rows from file1.xlsx:file1.pdf")
+    # NOTE: test_save_excel_output_source_breakdown_logging was deleted.
+    # Per-source row-count info logs were removed in spec 003-reduce-info-logging.
 
     # PDF Output Tests
 
@@ -283,9 +247,6 @@ class TestSaveStep:
         # Verify backup was requested
         mock_atomic.assert_called_once()
 
-        # Verify backup logging
-        self.logger.info.assert_any_call("PDF backup created: /path/to/backup.pdf")
-
     @patch("core.pipeline.steps.save_step.atomic_save_with_backup")
     @patch("builtins.open", mock_open())
     def test_save_pdf_output_write_failure(self, mock_atomic):
@@ -303,40 +264,9 @@ class TestSaveStep:
         with pytest.raises(Exception, match="Failed to write PDF to output.pdf"):
             self.save_step._save_pdf_output(context, "output.pdf", False)
 
-    @patch("core.pipeline.steps.save_step.atomic_save_with_backup")
-    @patch("builtins.open", mock_open())
-    def test_save_pdf_output_statistics_logging(self, mock_atomic):
-        """Test PDF output statistics logging."""
-        context = self.create_test_context([("test.xlsx", "test.pdf", "Sheet1")])
-
-        def execute_write_func(original_path, write_func, create_backup):
-            write_func(original_path)
-            return None
-
-        mock_atomic.side_effect = execute_write_func
-
-        self.save_step._save_pdf_output(context, "output.pdf", False)
-
-        # Verify statistics logging
-        self.logger.info.assert_any_call("PDF saved: 2 pages, 2 bookmarks")
-
-    @patch("core.pipeline.steps.save_step.atomic_save_with_backup")
-    @patch("builtins.open", mock_open())
-    def test_save_pdf_output_no_bookmarks(self, mock_atomic):
-        """Test PDF output statistics logging when no bookmarks exist."""
-        context = self.create_test_context([("test.xlsx", "test.pdf", "Sheet1")])
-        context.final_pdf.outline = None  # No bookmarks
-
-        def execute_write_func(original_path, write_func, create_backup):
-            write_func(original_path)
-            return None
-
-        mock_atomic.side_effect = execute_write_func
-
-        self.save_step._save_pdf_output(context, "output.pdf", False)
-
-        # Verify statistics logging shows 0 bookmarks
-        self.logger.info.assert_any_call("PDF saved: 2 pages, 0 bookmarks")
+    # NOTE: test_save_pdf_output_statistics_logging and
+    # test_save_pdf_output_no_bookmarks were deleted. PDF-output stats info
+    # logs were removed in spec 003-reduce-info-logging.
 
     # Integration Tests
 
@@ -497,11 +427,3 @@ class TestSaveStep:
 
         # Verify both Excel and PDF saves were attempted
         assert mock_atomic.call_count == 2
-
-        # Verify backup creation was requested for both files
-        assert mock_atomic.call_count == 2
-
-        # Verify success logging
-        self.logger.info.assert_any_call(
-            "Output saved successfully to: input.xlsx, input.pdf"
-        )
