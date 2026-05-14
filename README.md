@@ -162,69 +162,53 @@ Version numbers follow the **MAJOR.MINOR.PATCH** format (e.g., `1.0.0`):
   - `1.2.5` → `1.3.0` (added feature, reset PATCH)
   - `1.3.7` → `2.0.0` (breaking change, reset MINOR and PATCH)
 
-### Version Update Workflow
+### Release Workflow (Tag-Driven CI Build)
 
-To release a new version:
+Releases are produced by GitHub Actions when a `v*` tag is pushed. The Windows
+`.exe` is built on `windows-latest`, attached as a workflow artifact, and
+published as a GitHub Release. There is no need to build locally for delivery.
 
-1. **Update version** in `_version.py`:
+1. **Update CHANGELOG.md** with the new version's entry under a section
+   like `## [1.2.3] - YYYY-MM-DD`.
+
+2. **Commit the changelog**:
    ```bash
-   # Edit the file
-   vim _version.py
-   # Change: __version__ = "1.0.0" to "1.0.1" (or appropriate version)
+   git add CHANGELOG.md
+   git commit -m "chore: prep release 1.2.3"
    ```
 
-2. **Update CHANGELOG.md**:
+3. **Tag and push** — this is what triggers the build:
    ```bash
-   # Add new version section with changes
-   vim CHANGELOG.md
-   # Add: ## [1.0.1] - 2025-11-20
-   #      ### Fixed
-   #      - Description of changes
+   git tag -a v1.2.3 -m "Version 1.2.3"
+   git push origin main v1.2.3
    ```
 
-3. **Commit the changes**:
-   ```bash
-   git add _version.py CHANGELOG.md
-   git commit -m "chore: bump version to 1.0.1"
-   ```
+4. **Watch the build**: `gh run watch` or visit
+   `https://github.com/<owner>/<repo>/actions/workflows/build.yml`. The
+   workflow injects `1.2.3` into `_version.py` from the tag name before
+   running `python build/build.py`, so the executable is named
+   `AbstractRenumberTool-v1.2.3.exe`.
 
-4. **Create git tag**:
-   ```bash
-   git tag -a v1.0.1 -m "Version 1.0.1: Brief description of changes"
-   git push origin main v1.0.1
-   ```
+5. **Distribute**: the release is published at
+   `https://github.com/<owner>/<repo>/releases/tag/v1.2.3`. Send clients
+   the download URL.
 
-5. **Build the executable**:
-   ```bash
-   cd build
-   python3 build.py
-   ```
+`_version.py` in the repo is the *local development* version and does not
+need to be edited per release; the tag is the source of truth.
 
-6. **Verify the update**:
-   - Check executable name: `ls dist/AbstractRenumberTool-v1.0.1.exe`
-   - Launch the app and verify window title shows "v1.0.1"
-   - Check footer shows "Version 1.0.1"
-   - Verify git tag: `git tag -l`
+### Manual / Ad-Hoc Build
 
-### Version Increment Examples
+For a one-off Windows build without cutting a release, trigger the
+`Build Windows Executable` workflow via the Actions tab (`workflow_dispatch`)
+and supply a version string. The artifact will be uploaded but no GitHub
+Release will be created.
 
-**Bug Fix (PATCH)**: `1.0.0` → `1.0.1`
+To build locally (Linux/macOS/Windows) for development:
 ```bash
-# Example: Fixed Windows file locking warning
-echo '__version__ = "1.0.1"' > _version.py
+pip install pyinstaller
+python build/build.py
 ```
-
-**New Feature (MINOR)**: `1.0.1` → `1.1.0`
-```bash
-# Example: Added export to CSV button
-echo '__version__ = "1.1.0"' > _version.py
-```
-
-**Breaking Change (MAJOR)**: `1.1.0` → `2.0.0`
-```bash
-# Example: Redesigned GUI workflow
-echo '__version__ = "2.0.0"' > _version.py
-```
+The executable lands in `dist/`.
 
 ### Detailed Version Management Guide
 
