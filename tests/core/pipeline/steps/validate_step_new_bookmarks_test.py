@@ -106,3 +106,23 @@ def test_no_ui_raises_current_error():
         step = ValidateStep(ExcelOpenpyxlRepo(), PypdfPdfRepo(), _Logger(), None)
         with pytest.raises(ValueError, match="no matching Excel row"):
             step.execute(ctx)
+
+
+def test_merge_mode_does_not_prompt_and_raises():
+    with tempfile.TemporaryDirectory() as d1:
+        with tempfile.TemporaryDirectory() as d2:
+            xlsx1, pdf1 = _make_files(Path(d1))
+            xlsx2, pdf2 = _make_files(Path(d2))
+            ctx = PipelineContext(
+                file_pairs=[
+                    (xlsx1, pdf1, "Sheet"),
+                    (xlsx2, pdf2, "Sheet"),
+                ],
+                options={"sheet_name": "Sheet", "backup": False},
+            )
+            ui = _StubUI(answer=True)
+            step = ValidateStep(ExcelOpenpyxlRepo(), PypdfPdfRepo(), _Logger(), ui)
+            with pytest.raises(ValueError, match="no matching Excel row"):
+                step.execute(ctx)
+            assert ui.asked_with is None
+            assert ctx.new_bookmark_titles is None
