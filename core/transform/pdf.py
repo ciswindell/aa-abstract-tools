@@ -134,6 +134,6 @@ def add_rows_for_new_bookmarks(
     if not new_rows:
         return df, new_bookmarks
 
-    additions = pd.DataFrame(new_rows).reindex(columns=df.columns).astype(df.dtypes)
+    additions = pd.DataFrame(new_rows)
     new_df = pd.concat([df, additions], ignore_index=True)
     return new_df, new_bookmarks
