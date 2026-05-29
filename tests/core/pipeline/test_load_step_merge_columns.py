@@ -28,9 +28,7 @@ class TestMergeDataframesColumnAlignment:
         merged = _make_step()._merge_dataframes([a, b])
 
         source_cols = [c for c in merged.columns if str(c).strip().lower() == "source"]
-        assert len(source_cols) == 1, (
-            f"Expected one 'source' column, got {source_cols}"
-        )
+        assert len(source_cols) == 1, f"Expected one 'source' column, got {source_cols}"
         # No values dropped: all four rows have a Source value.
         col = source_cols[0]
         assert merged[col].tolist() == ["A1", "A2", "B1", "B2"]

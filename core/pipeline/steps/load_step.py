@@ -269,9 +269,7 @@ class LoadStep(BaseStep):
         """
         return " ".join(str(name).strip().lower().split())
 
-    def _canonicalize_columns(
-        self, df_parts: list[pd.DataFrame]
-    ) -> list[pd.DataFrame]:
+    def _canonicalize_columns(self, df_parts: list[pd.DataFrame]) -> list[pd.DataFrame]:
         """Align column names across parts that differ only by case/whitespace.
 
         Without this, headers like 'Source ' (trailing space) and 'Source' are
