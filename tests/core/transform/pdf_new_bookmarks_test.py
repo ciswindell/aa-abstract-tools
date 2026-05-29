@@ -70,3 +70,40 @@ def test_no_matching_titles_returns_equivalent_data():
     new_df, new_bm = add_rows_for_new_bookmarks(df, bookmarks, set())
     assert len(new_df) == 2
     assert [b["title"] for b in new_bm] == [b["title"] for b in bookmarks]
+
+
+def test_non_numeric_index_ignored_when_computing_next_index():
+    """Non-numeric Index# values are ignored; max is taken from numeric-only entries."""
+    df = pd.DataFrame(
+        {
+            "Index#": ["A5", "2"],
+            "Document Type": ["Deed", "Release"],
+            "Received Date": ["2020-01-01", "2020-02-02"],
+        }
+    )
+    bookmarks = [
+        {"title": "A5-Deed-1/1/2020", "level": 0, "page": 1},
+        {"title": "2-Release-2/2/2020", "level": 0, "page": 2},
+        {"title": "Merger 2014", "level": 0, "page": 3},
+    ]
+    new_df, new_bm = add_rows_for_new_bookmarks(df, bookmarks, {"Merger 2014"})
+
+    # Max numeric index is 2, so the orphan gets index 3.
+    assert new_df.iloc[-1]["Index#"] == "3"
+    assert new_bm[2]["title"] == "3-Merger 2014"
+
+
+def test_no_match_returned_bookmarks_are_independent_copies():
+    """On the no-match path, returned bookmark dicts are copies; mutating them
+    does not affect the original input bookmark dicts."""
+    df, bookmarks = _df(), _bookmarks()
+    _original_titles = [b["title"] for b in bookmarks]
+
+    _new_df, new_bm = add_rows_for_new_bookmarks(df, bookmarks, set())
+
+    # Mutate the returned copies.
+    for bm in new_bm:
+        bm["title"] = "MUTATED"
+
+    # Original input dicts are unchanged.
+    assert [b["title"] for b in bookmarks] == _original_titles
