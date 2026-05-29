@@ -400,3 +400,18 @@ class TkinterUIAdapter:
         dialog.wait_window(dialog)
 
         return chosen["pairs"]
+
+    def prompt_add_new_bookmarks(self, bookmark_titles: list[str]) -> bool:
+        """Ask whether to add new Excel rows for orphaned PDF bookmarks."""
+        preview = "\n".join(f"  • {t}" for t in bookmark_titles[:10])
+        if len(bookmark_titles) > 10:
+            preview += f"\n  (and {len(bookmark_titles) - 10} more)"
+        message = (
+            f"{len(bookmark_titles)} PDF bookmark(s) have no matching row in the "
+            f"Excel file:\n{preview}\n\n"
+            "Add them to the Excel file as new rows?\n\n"
+            "⚠️ Caution: adding rows can create duplicate entries if the "
+            "bookmarks were not properly labeled. Use with caution.\n\n"
+            "Choosing No will cancel processing."
+        )
+        return bool(messagebox.askyesno("Add new bookmarks?", message, icon="warning"))
