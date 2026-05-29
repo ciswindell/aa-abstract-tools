@@ -36,13 +36,19 @@ proceed. This feature lets the tool offer to add those rows automatically.
 ## User experience
 
 No new checkbox on the main GUI. The decision is made in the **existing error
-dialog**, converted to a Yes/No prompt:
+dialog**, converted to a Yes/No prompt that includes a caution:
 
 > *"These N PDF bookmark(s) have no matching row in the Excel file: … Add them
-> to the Excel file as new rows? Choosing No will cancel processing."*
+> to the Excel file as new rows?*
+> *⚠️ Caution: adding rows can create duplicate entries if the bookmarks were
+> not properly labeled. Use with caution.*
+> *Choosing No will cancel processing."*
 
 - **Yes** → add the rows and continue processing normally.
 - **No** → raise the current error and abort (unchanged behavior).
+
+The caution text is part of the prompt itself, so the user sees the warning
+before choosing Yes.
 
 When there is no interactive UI (headless runs, tests), the tool raises the
 current error — existing behavior and tests are unchanged.
