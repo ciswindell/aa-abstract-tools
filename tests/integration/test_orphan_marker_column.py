@@ -175,3 +175,74 @@ def test_existing_orphan_column_untouched_when_no_orphans():
         # The pre-existing Orphan values are round-tripped unchanged.
         assert by_dt["Deed"] == "Yes"
         assert by_dt["Release"] == "No"
+
+
+def test_existing_orphan_column_overwritten_in_place_no_duplicate():
+    excel_repo, pdf_repo, logger = ExcelOpenpyxlRepo(), PypdfPdfRepo(), _Logger()
+    with tempfile.TemporaryDirectory() as d:
+        dpath = Path(d)
+        xlsx = dpath / "in.xlsx"
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Sheet"
+        # Input already has an Orphan column from a prior run (Deed marked Yes).
+        ws.append(
+            [
+                "Index#",
+                "Document Type",
+                "Received Date",
+                "Legal Description",
+                "Grantee",
+                "Grantor",
+                "Document Date",
+                "Orphan",
+            ]
+        )
+        ws.append([1, "Deed", "2020-01-01", "L1", "A", "B", "2020-01-01", "Yes"])
+        ws.append([2, "Release", "2020-02-02", "L2", "C", "D", "2020-02-02", "No"])
+        wb.save(xlsx)
+
+        pdf = dpath / "in.pdf"
+        w = PdfWriter()
+        for _ in range(3):
+            w.add_blank_page(width=200, height=200)
+        w.add_outline_item("1-Deed-1/1/2020", 0)
+        w.add_outline_item("2-Release-2/2/2020", 1)
+        w.add_outline_item("Court Order", 2)  # NEW orphan this run
+        with open(pdf, "wb") as fh:
+            w.write(fh)
+
+        ctx = PipelineContext(
+            file_pairs=[(str(xlsx), str(pdf), "Sheet")],
+            options={"sheet_name": "Sheet", "backup": False},
+        )
+        ValidateStep(excel_repo, pdf_repo, logger, _YesUI()).execute(ctx)
+        assert ctx.new_bookmark_titles == {"Court Order"}
+        LoadStep(excel_repo, pdf_repo, logger, None).execute(ctx)
+
+        out_xlsx = dpath / "out.xlsx"
+        ctx.excel_out_path = str(out_xlsx)
+        ctx.pdf_out_path = str(dpath / "out.pdf")
+        ctx.final_pdf = PdfWriter()
+        SaveStep(excel_repo, pdf_repo, logger, None).execute(ctx)
+
+        wb2 = load_workbook(str(out_xlsx))
+        ws2 = wb2.active
+        headers = _headers(ws2)
+        orphan_i = _col_index(ws2, "Orphan")
+        dt_i = _col_index(ws2, "Document Type")
+        by_dt = {}
+        for r in range(2, ws2.max_row + 1):
+            dt = ws2.cell(row=r, column=dt_i).value
+            if dt in (None, ""):
+                continue
+            by_dt[dt] = ws2.cell(row=r, column=orphan_i).value
+        wb2.close()
+
+        # Exactly one Orphan column — no duplicate created on the second run.
+        assert headers.count("Orphan") == 1
+        # Overwrite reflects THIS run: prior "Yes" on Deed is reset to "No";
+        # only this run's new orphan is "Yes".
+        assert by_dt["Deed"] == "No"
+        assert by_dt["Release"] == "No"
+        assert by_dt["Court Order"] == "Yes"
