@@ -126,6 +126,7 @@ def add_rows_for_new_bookmarks(
                     index_col: str(next_idx),
                     "Document Type": title,
                     "Received Date": None,
+                    "Orphan": "Yes",
                 }
             )
             next_idx += 1
@@ -134,6 +135,8 @@ def add_rows_for_new_bookmarks(
     if not new_rows:
         return df, new_bookmarks
 
+    df = df.copy()
+    df["Orphan"] = "No"
     additions = pd.DataFrame(new_rows)
     new_df = pd.concat([df, additions], ignore_index=True)
     return new_df, new_bookmarks

@@ -47,6 +47,10 @@ def test_appends_row_and_relabels_bookmark():
     assert len(df) == 2
     assert bookmarks[2]["title"] == "Merger 2014"
 
+    # Orphan column: new row is "Yes", existing rows are "No".
+    assert "Orphan" in new_df.columns
+    assert list(new_df["Orphan"]) == ["No", "No", "Yes"]
+
 
 def test_multiple_orphans_get_sequential_indices():
     df = pd.DataFrame(
@@ -64,12 +68,20 @@ def test_multiple_orphans_get_sequential_indices():
     assert new_bm[1]["title"] == "6-Merger 2014"
     assert new_bm[2]["title"] == "7-Exhibit A"
 
+    # Orphan column: original row is "No", both added rows are "Yes".
+    assert "Orphan" in new_df.columns
+    assert new_df.iloc[0]["Orphan"] == "No"
+    assert new_df.iloc[1]["Orphan"] == "Yes"
+    assert new_df.iloc[2]["Orphan"] == "Yes"
+
 
 def test_no_matching_titles_returns_equivalent_data():
     df, bookmarks = _df(), _bookmarks()
     new_df, new_bm = add_rows_for_new_bookmarks(df, bookmarks, set())
     assert len(new_df) == 2
     assert [b["title"] for b in new_bm] == [b["title"] for b in bookmarks]
+    # No Orphan column when no rows are added.
+    assert "Orphan" not in new_df.columns
 
 
 def test_non_numeric_index_ignored_when_computing_next_index():
@@ -91,6 +103,8 @@ def test_non_numeric_index_ignored_when_computing_next_index():
     # Max numeric index is 2, so the orphan gets index 3.
     assert new_df.iloc[-1]["Index#"] == "3"
     assert new_bm[2]["title"] == "3-Merger 2014"
+    # The added row is marked as an orphan.
+    assert new_df.iloc[-1]["Orphan"] == "Yes"
 
 
 def test_no_match_returned_bookmarks_are_independent_copies():
