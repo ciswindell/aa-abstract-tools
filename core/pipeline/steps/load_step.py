@@ -260,6 +260,36 @@ class LoadStep(BaseStep):
                 Path(temp_path).unlink(missing_ok=True)
             raise
 
+    @staticmethod
+    def _normalize_column_name(name: object) -> str:
+        """Normalize a column name for case-insensitive, whitespace-tolerant matching.
+
+        Mirrors ExcelOpenpyxlRepo._normalize_column_name so that columns align
+        consistently between the merge concat and the template write-back.
+        """
+        return " ".join(str(name).strip().lower().split())
+
+    def _canonicalize_columns(self, df_parts: list[pd.DataFrame]) -> list[pd.DataFrame]:
+        """Align column names across parts that differ only by case/whitespace.
+
+        Without this, headers like 'Source ' (trailing space) and 'Source' are
+        treated by pandas.concat as two distinct columns, each populated for only
+        one file's rows. The first spelling seen wins as the canonical name so the
+        template's original header text (file 1) is preserved for write-back.
+        """
+        canonical: dict[str, str] = {}
+        aligned: list[pd.DataFrame] = []
+        for part in df_parts:
+            rename_map: dict[object, str] = {}
+            for col in part.columns:
+                key = self._normalize_column_name(col)
+                # First occurrence defines the canonical spelling for this key.
+                canonical_name = canonical.setdefault(key, col)
+                if col != canonical_name:
+                    rename_map[col] = canonical_name
+            aligned.append(part.rename(columns=rename_map) if rename_map else part)
+        return aligned
+
     def _merge_dataframes(self, df_parts: list[pd.DataFrame]) -> pd.DataFrame:
         """Merge all DataFrame parts into a single DataFrame."""
         if not df_parts:
@@ -268,9 +298,13 @@ class LoadStep(BaseStep):
         if len(df_parts) == 1:
             return df_parts[0]
 
+        # Align case/whitespace column variants so they don't split into separate
+        # columns during concat (which would drop one file's data per column).
+        aligned_parts = self._canonicalize_columns(df_parts)
+
         # Concatenate all DataFrames safely (each already has unique Document IDs)
         try:
-            merged_df = pd.concat(df_parts, ignore_index=True, sort=False)
+            merged_df = pd.concat(aligned_parts, ignore_index=True, sort=False)
         except Exception as e:
             raise ValueError(f"Failed to concatenate DataFrames: {e}") from e
 
