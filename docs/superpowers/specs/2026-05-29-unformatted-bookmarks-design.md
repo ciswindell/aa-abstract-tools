@@ -83,6 +83,32 @@ whatever the current sort produces (in practice, near the top because their
 sort-key columns are blank). No sort code is touched and no special-case
 ordering is added for these rows.
 
+### `Orphan` marker column
+
+So the user can review which rows the tool auto-created (the caution warns
+they may be duplicates), an `Orphan` column is written **only when orphans are
+added in this run**.
+
+- **Name:** `Orphan`. **Values:** `Yes` on each auto-added row, `No` on every
+  other row (matching the existing `Document_Found` Yes/No convention).
+- **Placement:** appended at the end of the sheet on the first run that adds
+  orphans (via the writer's add-missing-columns path). On later runs the
+  column already exists and is matched case/whitespace-tolerantly and
+  overwritten in place — no duplicate column is created.
+- **Overwrite reflects the current run:** every row is (re)written, so a row
+  that was auto-added in a previous run but is a normal matched row this run
+  shows `No`; only this run's additions show `Yes`. This overwrites any values
+  loaded from a prior run.
+- **No-orphan runs leave it untouched:** if this run adds no orphans, nothing
+  sets the column. A pre-existing `Orphan` column in the input is read by
+  `excel_repo.load` and round-tripped back to the output unchanged; if no such
+  column exists, none is created.
+
+Implementation: the row-injection helper sets `Orphan` (`No` for existing
+rows, `Yes` for added rows) only when it runs; `SaveStep` enables
+add-missing-columns when `context.new_bookmark_titles` is set so the new
+column is written in single-file mode.
+
 ## Architecture & data flow
 
 Single pass (no pipeline re-run), following the existing mid-pipeline UI
