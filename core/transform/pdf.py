@@ -85,3 +85,55 @@ def detect_page_ranges(
             end = start
         ranges[title] = {"start": start, "end": end}
     return ranges
+
+
+def add_rows_for_new_bookmarks(
+    df: pd.DataFrame,
+    bookmarks: list[Mapping[str, Any]],
+    new_bookmark_titles: set[str],
+    index_col: str = "Index#",
+) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
+    """Append a placeholder Excel row for each approved new (orphaned) bookmark.
+
+    For every bookmark whose title is in ``new_bookmark_titles``:
+      * append a row to ``df`` with a unique ``Index#`` (max existing numeric
+        index + 1, incrementing), ``Document Type`` set to the bookmark title,
+        and a blank ``Received Date``; all other columns left blank.
+      * rewrite the bookmark title to ``"<index>-<title>"`` so existing linking
+        (``extract_original_index`` -> ``Index#`` match) connects it to the row.
+
+    Returns a new (DataFrame, bookmarks) pair. Inputs are not mutated.
+    """
+
+    def _as_int(value: Any) -> int | None:
+        try:
+            return int(str(value).strip())
+        except (TypeError, ValueError):
+            return None
+
+    existing = [n for n in (_as_int(v) for v in df.get(index_col, [])) if n is not None]
+    next_idx = (max(existing) + 1) if existing else 1
+
+    new_rows: list[dict[str, Any]] = []
+    new_bookmarks: list[dict[str, Any]] = []
+    for bm in bookmarks:
+        bm_copy = dict(bm)
+        title = str(bm.get("title", ""))
+        if title in new_bookmark_titles:
+            bm_copy["title"] = f"{next_idx}-{title}"
+            new_rows.append(
+                {
+                    index_col: str(next_idx),
+                    "Document Type": title,
+                    "Received Date": None,
+                }
+            )
+            next_idx += 1
+        new_bookmarks.append(bm_copy)
+
+    if not new_rows:
+        return df, new_bookmarks
+
+    additions = pd.DataFrame(new_rows)
+    new_df = pd.concat([df, additions], ignore_index=True)
+    return new_df, new_bookmarks
