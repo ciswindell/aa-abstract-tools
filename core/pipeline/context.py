@@ -40,6 +40,10 @@ class PipelineContext:
     intermediate_pdf_path: str | None = None
     total_pages: int | None = None
 
+    # New (orphaned) bookmark titles the user approved adding as Excel rows
+    # (single-file mode only). None/empty means no new bookmarks to add.
+    new_bookmark_titles: set[str] | None = None
+
     # Final outputs (populated by RebuildPdfStep)
     final_pdf: PdfWriter | None = None
     processed_document_units: list[DocumentUnit] | None = None

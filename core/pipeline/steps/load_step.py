@@ -24,6 +24,7 @@ from core.pipeline.context import PipelineContext
 from core.pipeline.steps import BaseStep
 from core.transform.document_unit import link_bookmarks_to_excel_rows
 from core.transform.excel import add_document_ids
+from core.transform.pdf import add_rows_for_new_bookmarks
 
 
 class LoadStep(BaseStep):
@@ -75,6 +76,7 @@ class LoadStep(BaseStep):
                         sheet_name,
                         current_page_offset,
                         merged_writer,
+                        context.new_bookmark_titles,
                     )
 
                     # Validate results
@@ -144,6 +146,7 @@ class LoadStep(BaseStep):
         sheet_name: str,
         page_offset: int,
         merged_writer: PdfWriter,
+        new_bookmark_titles: set[str] | None = None,
     ) -> tuple[list[DocumentUnit], pd.DataFrame, int]:
         """Process a single Excel/PDF pair and return DocumentUnits, DataFrame, and pages added.
 
@@ -164,17 +167,12 @@ class LoadStep(BaseStep):
             raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
         try:
-            # Load Excel file and add Document IDs using this file's path
+            # Load Excel file (Index# already cleaned to string by ExcelRepo.load)
             pair_df = self.excel_repo.load(excel_path, sheet_name)
 
             if pair_df.empty:
                 self.logger.warning(f"Excel file is empty: {excel_path}")
                 # Continue processing even with empty DataFrame
-
-            # Index# column is already cleaned to string format by ExcelRepo.load()
-            # Generate Document IDs using the loaded DataFrame
-            pair_df_with_ids = add_document_ids(pair_df, excel_path)
-
         except Exception as e:
             raise Exception(f"Failed to load Excel file {excel_path}: {e}") from e
 
@@ -184,12 +182,24 @@ class LoadStep(BaseStep):
 
             if pair_total_pages <= 0:
                 raise ValueError(f"PDF has no pages: {pdf_path}")
-
         except Exception as e:
             raise Exception(f"Failed to load PDF file {pdf_path}: {e}") from e
 
+        # Inject placeholder rows for user-approved orphaned bookmarks, relabeling
+        # each bookmark to "<index>-<title>" so normal linking picks it up.
+        if new_bookmark_titles:
+            pair_df, pair_bookmarks = add_rows_for_new_bookmarks(
+                pair_df, pair_bookmarks, new_bookmark_titles
+            )
+
         try:
-            # Add all pages from this PDF to the merged writer (memory efficient - no list creation)
+            # Generate Document IDs from the (possibly augmented) DataFrame
+            pair_df_with_ids = add_document_ids(pair_df, excel_path)
+        except Exception as e:
+            raise Exception(f"Failed to load Excel file {excel_path}: {e}") from e
+
+        try:
+            # Add all pages from this PDF to the merged writer
             from pypdf import PdfReader
 
             reader = PdfReader(pdf_path)
@@ -202,7 +212,6 @@ class LoadStep(BaseStep):
                 self.logger.warning(
                     f"Page count mismatch in {pdf_path}: expected {pair_total_pages}, added {pages_added}"
                 )
-
         except Exception as e:
             raise Exception(
                 f"Failed to add pages from {pdf_path} to merged PDF: {e}"
@@ -260,6 +269,36 @@ class LoadStep(BaseStep):
                 Path(temp_path).unlink(missing_ok=True)
             raise
 
+    @staticmethod
+    def _normalize_column_name(name: object) -> str:
+        """Normalize a column name for case-insensitive, whitespace-tolerant matching.
+
+        Mirrors ExcelOpenpyxlRepo._normalize_column_name so that columns align
+        consistently between the merge concat and the template write-back.
+        """
+        return " ".join(str(name).strip().lower().split())
+
+    def _canonicalize_columns(self, df_parts: list[pd.DataFrame]) -> list[pd.DataFrame]:
+        """Align column names across parts that differ only by case/whitespace.
+
+        Without this, headers like 'Source ' (trailing space) and 'Source' are
+        treated by pandas.concat as two distinct columns, each populated for only
+        one file's rows. The first spelling seen wins as the canonical name so the
+        template's original header text (file 1) is preserved for write-back.
+        """
+        canonical: dict[str, str] = {}
+        aligned: list[pd.DataFrame] = []
+        for part in df_parts:
+            rename_map: dict[object, str] = {}
+            for col in part.columns:
+                key = self._normalize_column_name(col)
+                # First occurrence defines the canonical spelling for this key.
+                canonical_name = canonical.setdefault(key, col)
+                if col != canonical_name:
+                    rename_map[col] = canonical_name
+            aligned.append(part.rename(columns=rename_map) if rename_map else part)
+        return aligned
+
     def _merge_dataframes(self, df_parts: list[pd.DataFrame]) -> pd.DataFrame:
         """Merge all DataFrame parts into a single DataFrame."""
         if not df_parts:
@@ -268,9 +307,13 @@ class LoadStep(BaseStep):
         if len(df_parts) == 1:
             return df_parts[0]
 
+        # Align case/whitespace column variants so they don't split into separate
+        # columns during concat (which would drop one file's data per column).
+        aligned_parts = self._canonicalize_columns(df_parts)
+
         # Concatenate all DataFrames safely (each already has unique Document IDs)
         try:
-            merged_df = pd.concat(df_parts, ignore_index=True, sort=False)
+            merged_df = pd.concat(aligned_parts, ignore_index=True, sort=False)
         except Exception as e:
             raise ValueError(f"Failed to concatenate DataFrames: {e}") from e
 

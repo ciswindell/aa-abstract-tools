@@ -110,6 +110,7 @@ class SaveStep(BaseStep):
             add_missing_columns = (
                 context.options.get("check_document_images", False)
                 or context.is_merge_workflow()
+                or bool(context.new_bookmark_titles)
             )
 
             self.excel_repo.save(

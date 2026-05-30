@@ -11,6 +11,7 @@ import pandas as pd
 from fixtures.excel_fixtures import (
     create_excel_with_basic_columns,
     create_excel_with_extra_columns,
+    create_test_excel,
 )
 from openpyxl import load_workbook
 from pypdf import PdfWriter
@@ -19,6 +20,7 @@ from adapters.excel_repo import ExcelOpenpyxlRepo
 from adapters.logger_tk import TkLogger
 from adapters.pdf_repo import PdfRepo
 from core.pipeline.context import PipelineContext
+from core.pipeline.steps.load_step import LoadStep
 from core.pipeline.steps.save_step import SaveStep
 
 
@@ -105,6 +107,62 @@ class TestMergeColumnPreservation:
         assert "Name" in headers
         assert "Status" in headers, "Status column from file2 should be preserved"
         assert "Comments" in headers, "Comments column from file2 should be preserved"
+
+    def test_whitespace_variant_column_not_dropped_end_to_end(self):
+        """Concat + write must not drop data when a column name differs only by space.
+
+        Regression: file 1's "Source " (trailing space) and file 2's "Source"
+        used to concat into two separate columns; the write step then overwrote
+        file 1's values with file 2's blanks, dropping file 1's Source data.
+        """
+        # Two loaded-file DataFrames whose Source header differs only by a space.
+        df1 = pd.DataFrame({"Source ": ["FILE1-a", "FILE1-b"], "Index#": ["1", "2"]})
+        df2 = pd.DataFrame({"Source": ["FILE2-a", "FILE2-b"], "Index#": ["1", "2"]})
+
+        # Real merge concat (the code path where the bug lived).
+        merge_step = LoadStep(self.excel_repo, self.pdf_repo, self.logger, None)
+        merged_df = merge_step._merge_dataframes([df1, df2])
+
+        # Template is file 1 (matches the pipeline: template = first file).
+        template_path = create_test_excel(
+            columns=["Source ", "Index#"], sheet_name="Index"
+        )
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as output_file:
+            output_path = Path(output_file.name)
+
+        try:
+            self.excel_repo.save(
+                df=merged_df,
+                template_path=str(template_path),
+                target_sheet="Index",
+                out_path=str(output_path),
+                add_missing_columns=True,
+            )
+
+            wb = load_workbook(str(output_path))
+            ws = wb.active
+            headers = [c.value for c in ws[1] if c.value not in (None, "")]
+            source_idx = next(
+                i + 1
+                for i, h in enumerate(headers)
+                if str(h).strip().lower() == "source"
+            )
+            source_values = [
+                ws.cell(row=r, column=source_idx).value
+                for r in range(2, ws.max_row + 1)
+                if ws.cell(row=r, column=source_idx).value not in (None, "")
+            ]
+            wb.close()
+        finally:
+            template_path.unlink(missing_ok=True)
+            output_path.unlink(missing_ok=True)
+
+        # Exactly one Source column, and BOTH files' data survived.
+        source_headers = [h for h in headers if str(h).strip().lower() == "source"]
+        assert len(source_headers) == 1, f"Expected one Source column: {headers}"
+        assert source_values == ["FILE1-a", "FILE1-b", "FILE2-a", "FILE2-b"], (
+            f"File 1's Source data was dropped: {source_values}"
+        )
 
     def test_merge_workflow_detection(self):
         """Test that SaveStep correctly detects merge workflows."""
