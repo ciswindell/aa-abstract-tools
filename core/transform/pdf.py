@@ -136,7 +136,12 @@ def add_rows_for_new_bookmarks(
         return df, new_bookmarks
 
     df = df.copy()
-    df["Orphan"] = "No"
+    if "Orphan" in df.columns:
+        df["Orphan"] = df["Orphan"].apply(
+            lambda v: "Yes" if str(v).strip().lower() == "yes" else "No"
+        )
+    else:
+        df["Orphan"] = "No"
     additions = pd.DataFrame(new_rows)
     new_df = pd.concat([df, additions], ignore_index=True)
     return new_df, new_bookmarks

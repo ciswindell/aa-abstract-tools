@@ -121,3 +121,21 @@ def test_no_match_returned_bookmarks_are_independent_copies():
 
     # Original input dicts are unchanged.
     assert [b["title"] for b in bookmarks] == _original_titles
+
+
+def test_existing_orphan_yes_is_preserved_not_downgraded():
+    df = pd.DataFrame(
+        {
+            "Index#": ["1", "2"],
+            "Document Type": ["Deed", "Release"],
+            "Received Date": ["2020-01-01", "2020-02-02"],
+            "Orphan": ["Yes", "No"],  # row 1 was orphaned in a prior run
+        }
+    )
+    bookmarks = [
+        {"title": "1-Deed-1/1/2020", "level": 0, "page": 1},
+        {"title": "2-Release-2/2/2020", "level": 0, "page": 2},
+        {"title": "Court Order", "level": 0, "page": 3},  # new orphan
+    ]
+    new_df, _ = add_rows_for_new_bookmarks(df, bookmarks, {"Court Order"})
+    assert list(new_df["Orphan"]) == ["Yes", "No", "Yes"]

@@ -177,7 +177,7 @@ def test_existing_orphan_column_untouched_when_no_orphans():
         assert by_dt["Release"] == "No"
 
 
-def test_existing_orphan_column_overwritten_in_place_no_duplicate():
+def test_existing_orphan_column_is_sticky_no_duplicate():
     excel_repo, pdf_repo, logger = ExcelOpenpyxlRepo(), PypdfPdfRepo(), _Logger()
     with tempfile.TemporaryDirectory() as d:
         dpath = Path(d)
@@ -241,8 +241,8 @@ def test_existing_orphan_column_overwritten_in_place_no_duplicate():
 
         # Exactly one Orphan column — no duplicate created on the second run.
         assert headers.count("Orphan") == 1
-        # Overwrite reflects THIS run: prior "Yes" on Deed is reset to "No";
-        # only this run's new orphan is "Yes".
-        assert by_dt["Deed"] == "No"
+        # Sticky: prior "Yes" on Deed is preserved (not downgraded);
+        # only this run's new orphan is "Yes"; non-orphan Release stays "No".
+        assert by_dt["Deed"] == "Yes"
         assert by_dt["Release"] == "No"
         assert by_dt["Court Order"] == "Yes"
