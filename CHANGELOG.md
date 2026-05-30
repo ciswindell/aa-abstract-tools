@@ -5,7 +5,16 @@ All notable changes to Abstract Renumber Tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.0] - 2026-05-29
+
+### Added
+- **Unformatted bookmark handling** (#2): in single-file processing, PDF bookmarks with no matching Excel `Index#` row now trigger an opt-in Yes/No prompt (shown in place of the previous hard error, with a caution that adding rows can create duplicate entries). On Yes, a row is added per unmatched bookmark — `Document Type` set to the bookmark name, blank `Received Date` (so the bookmark is renamed `<index>-<name>-N/A`) — then linked, sorted, and renumbered through the normal flow. A sticky `Orphan` column (`Yes`/`No`) marks the auto-added rows for review and preserves the `Yes` history across runs (appended once, updated in place, never duplicated). Merge mode keeps the previous error (out of scope). See `docs/superpowers/specs/2026-05-29-unformatted-bookmarks-design.md`.
+
+### Fixed
+- **Source column data loss when merging files** (#8): merging two Excel/PDF pairs whose column headers differed only by case or surrounding whitespace (e.g. `'Source '` vs `'Source'`) caused `pandas.concat` to split them into two columns, and the write step then overwrote one file's values with the other's blanks — dropping that file's `Source` data. Case/whitespace-equivalent columns are now aligned to a single column before concatenation, preserving all rows.
+- **Nested PDF outline flattening** (#1): added regression coverage confirming bookmarks nested under parent/section entries are flattened into a single ordered list at read time. The behavior was already correct after the pypdf refactor; this locks it in against regressions.
+
+## [1.2.0] - 2026-05-14
 
 ### Added
 - **GitHub Actions CI/CD**: three workflows now run on push/PR and tag events. `lint.yml` and `ci.yml` run on every PR to `dev`/`main` (ruff check + format check, full pytest). `build.yml` triggers on `v*` tags (or manually via workflow_dispatch): it injects the version from the tag into `_version.py`, runs `python build/build.py`, uploads the executable as an artifact, and publishes a GitHub Release with auto-generated notes. Local builds remain available via `python build/build.py`. See `specs/010-github-actions/spec.md`.
