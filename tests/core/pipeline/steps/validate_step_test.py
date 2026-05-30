@@ -444,6 +444,9 @@ class TestValidateStep:
                 return "4"
             return None
 
+        # New-bookmark prompt declined -> original orphaned-bookmark error is raised
+        self.validate_step.ui.prompt_add_new_bookmarks.return_value = False
+
         with patch(
             "core.transform.pdf.extract_original_index", side_effect=mock_extract
         ):

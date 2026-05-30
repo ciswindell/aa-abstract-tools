@@ -331,6 +331,18 @@ class ValidateStep(BaseStep):
 
                 # Report orphaned bookmarks (PDF bookmarks without Excel rows)
                 if orphaned_bookmarks:
+                    titles = [title for _, title in orphaned_bookmarks]
+
+                    # Single-file mode with an interactive UI: offer to add rows.
+                    if (
+                        not context.is_merge_workflow()
+                        and hasattr(self.ui, "prompt_add_new_bookmarks")
+                        and self.ui.prompt_add_new_bookmarks(titles)
+                    ):
+                        existing = context.new_bookmark_titles or set()
+                        context.new_bookmark_titles = existing | set(titles)
+                        return
+
                     bullet_list = "\n".join(
                         f"  • '{idx}' — {title}"
                         for idx, title in orphaned_bookmarks[:10]

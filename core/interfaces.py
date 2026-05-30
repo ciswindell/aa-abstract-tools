@@ -102,3 +102,10 @@ class UIController(Protocol):
 
         Returns None if the user cancels.
         """
+
+    def prompt_add_new_bookmarks(self, bookmark_titles: list[str]) -> bool:
+        """Ask whether to add new Excel rows for orphaned PDF bookmarks.
+
+        Returns True if the user accepts (add the rows and continue), False to
+        cancel (caller raises the standard orphaned-bookmark error).
+        """

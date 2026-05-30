@@ -24,6 +24,7 @@ from core.pipeline.context import PipelineContext
 from core.pipeline.steps import BaseStep
 from core.transform.document_unit import link_bookmarks_to_excel_rows
 from core.transform.excel import add_document_ids
+from core.transform.pdf import add_rows_for_new_bookmarks
 
 
 class LoadStep(BaseStep):
@@ -75,6 +76,7 @@ class LoadStep(BaseStep):
                         sheet_name,
                         current_page_offset,
                         merged_writer,
+                        context.new_bookmark_titles,
                     )
 
                     # Validate results
@@ -144,6 +146,7 @@ class LoadStep(BaseStep):
         sheet_name: str,
         page_offset: int,
         merged_writer: PdfWriter,
+        new_bookmark_titles: set[str] | None = None,
     ) -> tuple[list[DocumentUnit], pd.DataFrame, int]:
         """Process a single Excel/PDF pair and return DocumentUnits, DataFrame, and pages added.
 
@@ -164,17 +167,12 @@ class LoadStep(BaseStep):
             raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
         try:
-            # Load Excel file and add Document IDs using this file's path
+            # Load Excel file (Index# already cleaned to string by ExcelRepo.load)
             pair_df = self.excel_repo.load(excel_path, sheet_name)
 
             if pair_df.empty:
                 self.logger.warning(f"Excel file is empty: {excel_path}")
                 # Continue processing even with empty DataFrame
-
-            # Index# column is already cleaned to string format by ExcelRepo.load()
-            # Generate Document IDs using the loaded DataFrame
-            pair_df_with_ids = add_document_ids(pair_df, excel_path)
-
         except Exception as e:
             raise Exception(f"Failed to load Excel file {excel_path}: {e}") from e
 
@@ -184,12 +182,24 @@ class LoadStep(BaseStep):
 
             if pair_total_pages <= 0:
                 raise ValueError(f"PDF has no pages: {pdf_path}")
-
         except Exception as e:
             raise Exception(f"Failed to load PDF file {pdf_path}: {e}") from e
 
+        # Inject placeholder rows for user-approved orphaned bookmarks, relabeling
+        # each bookmark to "<index>-<title>" so normal linking picks it up.
+        if new_bookmark_titles:
+            pair_df, pair_bookmarks = add_rows_for_new_bookmarks(
+                pair_df, pair_bookmarks, new_bookmark_titles
+            )
+
         try:
-            # Add all pages from this PDF to the merged writer (memory efficient - no list creation)
+            # Generate Document IDs from the (possibly augmented) DataFrame
+            pair_df_with_ids = add_document_ids(pair_df, excel_path)
+        except Exception as e:
+            raise Exception(f"Failed to load Excel file {excel_path}: {e}") from e
+
+        try:
+            # Add all pages from this PDF to the merged writer
             from pypdf import PdfReader
 
             reader = PdfReader(pdf_path)
@@ -202,7 +212,6 @@ class LoadStep(BaseStep):
                 self.logger.warning(
                     f"Page count mismatch in {pdf_path}: expected {pair_total_pages}, added {pages_added}"
                 )
-
         except Exception as e:
             raise Exception(
                 f"Failed to add pages from {pdf_path} to merged PDF: {e}"
