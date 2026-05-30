@@ -89,25 +89,31 @@ So the user can review which rows the tool auto-created (the caution warns
 they may be duplicates), an `Orphan` column is written **only when orphans are
 added in this run**.
 
-- **Name:** `Orphan`. **Values:** `Yes` on each auto-added row, `No` on every
-  other row (matching the existing `Document_Found` Yes/No convention).
+- **Name:** `Orphan`. **Values:** `Yes` / `No` per row (matching the existing
+  `Document_Found` Yes/No convention).
 - **Placement:** appended at the end of the sheet on the first run that adds
   orphans (via the writer's add-missing-columns path). On later runs the
-  column already exists and is matched case/whitespace-tolerantly and
-  overwritten in place — no duplicate column is created.
-- **Overwrite reflects the current run:** every row is (re)written, so a row
-  that was auto-added in a previous run but is a normal matched row this run
-  shows `No`; only this run's additions show `Yes`. This overwrites any values
-  loaded from a prior run.
+  column already exists and is matched case/whitespace-tolerantly and updated
+  in place — no duplicate column is created.
+- **Sticky / cumulative provenance:** the marker is never downgraded. When a
+  run adds orphans, each existing row keeps `Yes` if it was already `Yes`
+  (loaded from a prior run), otherwise it is set to `No`; this run's newly
+  added rows are set to `Yes`. So once a row is marked `Yes`, it stays `Yes`
+  across runs — the history that a document was once auto-added/orphaned is
+  preserved (including the auto-added rows themselves, which match on
+  subsequent runs but retain their `Yes`).
 - **No-orphan runs leave it untouched:** if this run adds no orphans, nothing
   sets the column. A pre-existing `Orphan` column in the input is read by
   `excel_repo.load` and round-tripped back to the output unchanged; if no such
   column exists, none is created.
 
-Implementation: the row-injection helper sets `Orphan` (`No` for existing
-rows, `Yes` for added rows) only when it runs; `SaveStep` enables
-add-missing-columns when `context.new_bookmark_titles` is set so the new
-column is written in single-file mode.
+The prior `Yes` value is read from a column named exactly `Orphan` (what the
+tool always writes); a manually re-cased/renamed column is an unhandled edge.
+
+Implementation: the row-injection helper sets `Orphan` (existing rows keep an
+existing `Yes`, else `No`; added rows `Yes`) only when it runs; `SaveStep`
+enables add-missing-columns when `context.new_bookmark_titles` is set so the
+new column is written in single-file mode.
 
 ## Architecture & data flow
 
